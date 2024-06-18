@@ -10,13 +10,11 @@ import java.time.LocalDate
 data class BudgetEntry(
     val id: Int = -1,
     val budgetId: Int = -1,
-    val amount: String = "",
+    val amount: Double = 0.0,
     val description: String = "",
     @EncodeDefault
     val type: Type = Type.OUTCOME,
-    val date: String = LocalDate.now().toString(),
-    val invoice: String? = null,
-    val isSelected: Boolean = false
+    val date: String = LocalDate.now().toString()
 ) {
     @Serializable
     enum class Type {
