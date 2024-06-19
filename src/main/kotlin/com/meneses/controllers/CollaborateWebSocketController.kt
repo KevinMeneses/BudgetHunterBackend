@@ -32,6 +32,8 @@ fun Routing.collaborationWebSocketController(collaborationManager: Collaboration
                     )
                 )
                 return@webSocket
+            } else {
+                send(Frame.Text("Connected"))
             }
 
             try {
