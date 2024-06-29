@@ -9,6 +9,8 @@ import io.ktor.websocket.*
 import kotlinx.coroutines.channels.consumeEach
 import kotlinx.serialization.json.Json
 
+private val json = Json { ignoreUnknownKeys = true }
+
 fun Routing.collaborationWebSocketController(collaborationManager: CollaborationManager) {
     route("/collaborate") {
         webSocket {
@@ -43,13 +45,13 @@ fun Routing.collaborationWebSocketController(collaborationManager: Collaboration
                         when {
                             message.contains("budget#") -> {
                                 val budgetString = message.split("#").last()
-                                val budget = Json.decodeFromString<Budget>(budgetString)
+                                val budget = json.decodeFromString<Budget>(budgetString)
                                 collaborationManager.updateBudget(budget)
                             }
 
                             message.contains("budget_entries#") -> {
                                 val entriesString = message.split("#").last()
-                                val budgetEntries = Json.decodeFromString<List<BudgetEntry>>(entriesString)
+                                val budgetEntries = json.decodeFromString<List<BudgetEntry>>(entriesString)
                                 collaborationManager.updateEntries(budgetEntries)
                             }
                         }
