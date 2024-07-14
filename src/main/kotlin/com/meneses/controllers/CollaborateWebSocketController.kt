@@ -1,8 +1,7 @@
 package com.meneses.controllers
 
 import com.meneses.application.CollaborationManager
-import com.meneses.domain.Budget
-import com.meneses.domain.BudgetEntry
+import com.meneses.domain.BudgetDetail
 import io.ktor.server.routing.*
 import io.ktor.server.websocket.*
 import io.ktor.websocket.*
@@ -34,27 +33,14 @@ fun Routing.collaborationWebSocketController(collaborationManager: Collaboration
                     )
                 )
                 return@webSocket
-            } else {
-                send(Frame.Text("Connected"))
             }
 
             try {
                 incoming.consumeEach { frame ->
                     if (frame is Frame.Text) {
                         val message = frame.readText()
-                        when {
-                            message.contains("budget#") -> {
-                                val budgetString = message.split("#").last()
-                                val budget = json.decodeFromString<Budget>(budgetString)
-                                collaborationManager.updateBudget(budget)
-                            }
-
-                            message.contains("budget_entries#") -> {
-                                val entriesString = message.split("#").last()
-                                val budgetEntries = json.decodeFromString<List<BudgetEntry>>(entriesString)
-                                collaborationManager.updateEntries(budgetEntries)
-                            }
-                        }
+                        val budgetDetail = json.decodeFromString<BudgetDetail>(message)
+                        collaborationManager.sendBudgetDetailUpdate(budgetDetail)
                     }
                 }
             } catch (e: Exception) {

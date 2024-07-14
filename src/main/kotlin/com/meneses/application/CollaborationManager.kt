@@ -1,7 +1,6 @@
 package com.meneses.application
 
-import com.meneses.domain.Budget
-import com.meneses.domain.BudgetEntry
+import com.meneses.domain.BudgetDetail
 import io.ktor.websocket.*
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
@@ -34,15 +33,9 @@ class CollaborationManager {
         return false
     }
 
-    suspend fun updateBudget(budget: Budget) {
+    suspend fun sendBudgetDetailUpdate(budgetDetail: BudgetDetail) {
         for (collaborator in collaborators.values) {
-            collaborator.send("budget#" + Json.encodeToString(budget))
-        }
-    }
-
-    suspend fun updateEntries(budgetEntries: List<BudgetEntry>) {
-        for (collaborator in collaborators.values) {
-            collaborator.send("budget_entries#" + Json.encodeToString(budgetEntries))
+            collaborator.send(Json.encodeToString(budgetDetail))
         }
     }
 
