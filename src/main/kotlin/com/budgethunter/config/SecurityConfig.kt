@@ -23,7 +23,7 @@ class SecurityConfig {
             .csrf { it.disable() }
             .authorizeHttpRequests { auth ->
                 auth
-                    .requestMatchers("/api/users/sign_up", "/h2-console/**").permitAll()
+                    .requestMatchers("/api/users/sign_up", "/api/users/sign_in", "/h2-console/**").permitAll()
                     .anyRequest().authenticated()
             }
             .headers { headers ->

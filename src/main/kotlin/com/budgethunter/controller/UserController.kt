@@ -1,5 +1,7 @@
 package com.budgethunter.controller
 
+import com.budgethunter.dto.SignInRequest
+import com.budgethunter.dto.SignInResponse
 import com.budgethunter.dto.SignUpRequest
 import com.budgethunter.dto.UserResponse
 import com.budgethunter.service.UserService
@@ -18,5 +20,11 @@ class UserController(
     fun signUp(@Valid @RequestBody request: SignUpRequest): ResponseEntity<UserResponse> {
         val response = userService.signUp(request)
         return ResponseEntity.status(HttpStatus.CREATED).body(response)
+    }
+
+    @PostMapping("/sign_in")
+    fun signIn(@Valid @RequestBody request: SignInRequest): ResponseEntity<SignInResponse> {
+        val response = userService.signIn(request)
+        return ResponseEntity.ok(response)
     }
 }
