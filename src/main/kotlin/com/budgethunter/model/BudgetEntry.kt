@@ -9,48 +9,48 @@ import java.time.LocalDateTime
 @Entity
 @Table(name = "budget_entries")
 data class BudgetEntry(
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @field:Id
+    @field:GeneratedValue(strategy = GenerationType.IDENTITY)
     val id: Long? = null,
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "budget_id", nullable = false)
-    @NotNull
+    @field:ManyToOne(fetch = FetchType.LAZY)
+    @field:JoinColumn(name = "budget_id", nullable = false)
+    @field:NotNull
     val budget: Budget,
 
-    @NotNull
-    @Column(nullable = false, precision = 19, scale = 2)
+    @field:NotNull
+    @field:Column(nullable = false, precision = 19, scale = 2)
     val amount: BigDecimal,
 
-    @NotBlank
-    @Column(nullable = false)
+    @field:NotBlank
+    @field:Column(nullable = false)
     val description: String,
 
-    @NotBlank
-    @Column(nullable = false)
+    @field:NotBlank
+    @field:Column(nullable = false)
     val category: String,
 
-    @NotBlank
-    @Column(nullable = false)
-    @Enumerated(EnumType.STRING)
+    @field:NotBlank
+    @field:Column(nullable = false)
+    @field:Enumerated(EnumType.STRING)
     val type: EntryType,
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "created_by")
+    @field:ManyToOne(fetch = FetchType.LAZY)
+    @field:JoinColumn(name = "created_by")
     val createdBy: User? = null,
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "updated_by")
+    @field:ManyToOne(fetch = FetchType.LAZY)
+    @field:JoinColumn(name = "updated_by")
     val updatedBy: User? = null,
 
-    @Column(nullable = false, updatable = false)
+    @field:Column(nullable = false, updatable = false)
     val creationDate: LocalDateTime = LocalDateTime.now(),
 
-    @Column(nullable = false)
+    @field:Column(nullable = false)
     val modificationDate: LocalDateTime = LocalDateTime.now()
 )
 
 enum class EntryType {
     INCOME,
-    EXPENSE
+    OUTCOME
 }

@@ -7,20 +7,20 @@ import jakarta.validation.constraints.NotBlank
 @Entity
 @Table(name = "users")
 data class User(
-    @Id
-    @Email
-    @NotBlank
-    @Column(nullable = false, unique = true)
+    @field:Id
+    @field:Email
+    @field:NotBlank
+    @field:Column(nullable = false, unique = true)
     val email: String,
 
-    @NotBlank
-    @Column(nullable = false)
+    @field:NotBlank
+    @field:Column(nullable = false)
     val name: String,
 
-    @NotBlank
-    @Column(nullable = false)
+    @field:NotBlank
+    @field:Column(nullable = false)
     val password: String,
 
-    @OneToMany(mappedBy = "user", cascade = [CascadeType.ALL], orphanRemoval = true)
+    @field:OneToMany(mappedBy = "user", cascade = [CascadeType.ALL], orphanRemoval = true)
     val userBudgets: MutableList<UserBudget> = mutableListOf()
 )
