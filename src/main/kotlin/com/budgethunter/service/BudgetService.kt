@@ -1,24 +1,30 @@
 package com.budgethunter.service
 
 import com.budgethunter.dto.AddCollaboratorRequest
+import com.budgethunter.dto.BudgetEntryResponse
 import com.budgethunter.dto.BudgetResponse
 import com.budgethunter.dto.CollaboratorResponse
 import com.budgethunter.dto.CreateBudgetRequest
+import com.budgethunter.dto.PutEntryRequest
 import com.budgethunter.dto.UserResponse
 import com.budgethunter.model.Budget
+import com.budgethunter.model.BudgetEntry
 import com.budgethunter.model.UserBudget
 import com.budgethunter.model.UserBudgetId
+import com.budgethunter.repository.BudgetEntryRepository
 import com.budgethunter.repository.BudgetRepository
 import com.budgethunter.repository.UserBudgetRepository
 import com.budgethunter.repository.UserRepository
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
+import java.time.LocalDateTime
 
 @Service
 class BudgetService(
     private val budgetRepository: BudgetRepository,
     private val userBudgetRepository: UserBudgetRepository,
-    private val userRepository: UserRepository
+    private val userRepository: UserRepository,
+    private val budgetEntryRepository: BudgetEntryRepository
 ) {
 
     @Transactional
@@ -114,6 +120,73 @@ class BudgetService(
             )
         }
     }
+
+    @Transactional
+    fun putEntry(request: PutEntryRequest, authenticatedUserEmail: String): BudgetEntryResponse {
+        verifyAuthenticatedUserHasAccessToBudget(request.budgetId, authenticatedUserEmail)
+
+        val budget = budgetRepository.findById(request.budgetId)
+            .orElseThrow { IllegalArgumentException("Budget not found with id: ${request.budgetId}") }
+
+        val user = userRepository.findById(authenticatedUserEmail)
+            .orElseThrow { IllegalArgumentException("User not found with email: $authenticatedUserEmail") }
+
+        val budgetEntry = if (request.id != null) {
+            updateExistingEntry(request, budget, user)
+        } else {
+            createNewEntry(request, budget, user)
+        }
+
+        return budgetEntry.toResponse()
+    }
+
+    private fun createNewEntry(request: PutEntryRequest, budget: Budget, user: com.budgethunter.model.User): BudgetEntry {
+        val newEntry = BudgetEntry(
+            budget = budget,
+            amount = request.amount,
+            description = request.description,
+            category = request.category,
+            type = request.type,
+            createdBy = user,
+            creationDate = LocalDateTime.now(),
+            modificationDate = LocalDateTime.now()
+        )
+
+        return budgetEntryRepository.save(newEntry)
+    }
+
+    private fun updateExistingEntry(request: PutEntryRequest, budget: Budget, user: com.budgethunter.model.User): BudgetEntry {
+        val existingEntry = budgetEntryRepository.findById(request.id!!)
+            .orElseThrow { IllegalArgumentException("Budget entry not found with id: ${request.id}") }
+
+        if (existingEntry.budget.id != budget.id) {
+            throw IllegalArgumentException("Budget entry ${request.id} does not belong to budget ${budget.id}")
+        }
+
+        val updatedEntry = existingEntry.copy(
+            amount = request.amount,
+            description = request.description,
+            category = request.category,
+            type = request.type,
+            updatedBy = user,
+            modificationDate = LocalDateTime.now()
+        )
+
+        return budgetEntryRepository.save(updatedEntry)
+    }
+
+    private fun BudgetEntry.toResponse() = BudgetEntryResponse(
+        id = this.id!!,
+        budgetId = this.budget.id!!,
+        amount = this.amount,
+        description = this.description,
+        category = this.category,
+        type = this.type,
+        createdByEmail = this.createdBy?.email,
+        updatedByEmail = this.updatedBy?.email,
+        creationDate = this.creationDate,
+        modificationDate = this.modificationDate
+    )
 
     private fun verifyAuthenticatedUserHasAccessToBudget(budgetId: Long, userEmail: String) {
         val userBudgetId = UserBudgetId(budgetId = budgetId, userEmail = userEmail)

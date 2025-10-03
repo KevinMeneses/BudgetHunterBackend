@@ -1,9 +1,11 @@
 package com.budgethunter.controller
 
 import com.budgethunter.dto.AddCollaboratorRequest
+import com.budgethunter.dto.BudgetEntryResponse
 import com.budgethunter.dto.BudgetResponse
 import com.budgethunter.dto.CollaboratorResponse
 import com.budgethunter.dto.CreateBudgetRequest
+import com.budgethunter.dto.PutEntryRequest
 import com.budgethunter.dto.UserResponse
 import com.budgethunter.service.BudgetService
 import jakarta.validation.Valid
@@ -53,5 +55,16 @@ class BudgetController(
         val userEmail = authentication.principal as String
         val collaborators = budgetService.getCollaboratorsByBudgetId(budgetId, userEmail)
         return ResponseEntity.ok(collaborators)
+    }
+
+    @PutMapping("/put_entry")
+    fun putEntry(
+        @Valid @RequestBody request: PutEntryRequest,
+        authentication: Authentication
+    ): ResponseEntity<BudgetEntryResponse> {
+        val userEmail = authentication.principal as String
+        val response = budgetService.putEntry(request, userEmail)
+        val httpStatus = if (request.id == null) HttpStatus.CREATED else HttpStatus.OK
+        return ResponseEntity.status(httpStatus).body(response)
     }
 }
