@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BudgetHunter SSE Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+        }
+        .config {
+            background-color: #f5f5f5;
+            padding: 20px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }
+        input {
+            width: 100%;
+            padding: 8px;
+            margin: 5px 0;
+            box-sizing: border-box;
+        }
+        button {
+            padding: 10px 20px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        button.disconnect {
+            background-color: #f44336;
+        }
+        button.disconnect:hover {
+            background-color: #da190b;
+        }
+        #status {
+            padding: 10px;
+            border-radius: 5px;
+            margin: 10px 0;
+        }
+        #status.connected {
+            background-color: #d4edda;
+            color: #155724;
+        }
+        #status.disconnected {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+        #events {
+            border: 1px solid #ddd;
+            padding: 10px;
+            min-height: 200px;
+            max-height: 400px;
+            overflow-y: auto;
+            background-color: #f9f9f9;
+        }
+        .event {
+            padding: 10px;
+            margin: 5px 0;
+            background-color: white;
+            border-left: 4px solid #4CAF50;
+            border-radius: 3px;
+        }
+        .event-time {
+            color: #666;
+            font-size: 0.9em;
+        }
+        pre {
+            background-color: #f5f5f5;
+            padding: 10px;
+            border-radius: 3px;
+            overflow-x: auto;
+        }
+    </style>
+</head>
+<body>
+    <h1>BudgetHunter SSE Test Client</h1>
+
+    <div class="config">
+        <h3>Configuration</h3>
+        <label>JWT Token:</label>
+        <input type="text" id="jwtToken" placeholder="Enter your JWT token">
+
+        <label>Budget ID:</label>
+        <input type="number" id="budgetId" placeholder="Enter budget ID" value="1">
+
+        <label>API Base URL:</label>
+        <input type="text" id="apiUrl" placeholder="http://localhost:8080" value="http://localhost:8080">
+    </div>
+
+    <div>
+        <button onclick="connect()">Connect to SSE</button>
+        <button class="disconnect" onclick="disconnect()">Disconnect</button>
+        <button onclick="clearEvents()">Clear Events</button>
+    </div>
+
+    <div id="status" class="disconnected">Status: Disconnected</div>
+
+    <h3>Events (Budget Entry Updates)</h3>
+    <div id="events">
+        <p>No events received yet. Connect to start listening for budget entry updates.</p>
+    </div>
+
+    <script>
+        let eventSource = null;
+        let eventCount = 0;
+
+        function updateStatus(message, isConnected) {
+            const statusDiv = document.getElementById('status');
+            statusDiv.textContent = 'Status: ' + message;
+            statusDiv.className = isConnected ? 'connected' : 'disconnected';
+        }
+
+        function addEvent(eventData) {
+            const eventsDiv = document.getElementById('events');
+
+            if (eventCount === 0) {
+                eventsDiv.innerHTML = '';
+            }
+
+            eventCount++;
+
+            const eventDiv = document.createElement('div');
+            eventDiv.className = 'event';
+
+            const time = new Date().toLocaleTimeString();
+            eventDiv.innerHTML = `
+                <div class="event-time">Event #${eventCount} - ${time}</div>
+                <strong>Budget Entry ${eventData.budgetEntry.id}</strong>
+                (${eventData.budgetEntry.type})
+                <br>
+                <strong>Amount:</strong> $${eventData.budgetEntry.amount}
+                <br>
+                <strong>Description:</strong> ${eventData.budgetEntry.description}
+                <br>
+                <strong>Category:</strong> ${eventData.budgetEntry.category}
+                <br>
+                <strong>Modified by:</strong> ${eventData.userInfo.name} (${eventData.userInfo.email})
+                <br>
+                <strong>Modified at:</strong> ${eventData.budgetEntry.modificationDate}
+                <br>
+                <details>
+                    <summary>Full Event Data</summary>
+                    <pre>${JSON.stringify(eventData, null, 2)}</pre>
+                </details>
+            `;
+
+            eventsDiv.insertBefore(eventDiv, eventsDiv.firstChild);
+        }
+
+        function connect() {
+            const jwtToken = document.getElementById('jwtToken').value.trim();
+            const budgetId = document.getElementById('budgetId').value.trim();
+            const apiUrl = document.getElementById('apiUrl').value.trim();
+
+            if (!jwtToken) {
+                alert('Please enter a JWT token');
+                return;
+            }
+
+            if (!budgetId) {
+                alert('Please enter a budget ID');
+                return;
+            }
+
+            if (eventSource) {
+                eventSource.close();
+            }
+
+            const url = `${apiUrl}/api/budgets/new_entry?budgetId=${budgetId}`;
+
+            updateStatus('Connecting...', false);
+
+            eventSource = new EventSource(url, {
+                headers: {
+                    'Authorization': `Bearer ${jwtToken}`
+                }
+            });
+
+            eventSource.addEventListener('budget-entry', function(event) {
+                console.log('Received budget-entry event:', event.data);
+                const eventData = JSON.parse(event.data);
+                addEvent(eventData);
+            });
+
+            eventSource.onopen = function() {
+                updateStatus('Connected - Listening for budget entry updates', true);
+                console.log('SSE connection opened');
+            };
+
+            eventSource.onerror = function(error) {
+                console.error('SSE error:', error);
+                updateStatus('Error - Connection failed. Check console for details.', false);
+                if (eventSource.readyState === EventSource.CLOSED) {
+                    updateStatus('Disconnected - Connection closed', false);
+                }
+            };
+        }
+
+        function disconnect() {
+            if (eventSource) {
+                eventSource.close();
+                eventSource = null;
+                updateStatus('Disconnected', false);
+                console.log('SSE connection closed');
+            }
+        }
+
+        function clearEvents() {
+            document.getElementById('events').innerHTML = '<p>No events received yet. Connect to start listening for budget entry updates.</p>';
+            eventCount = 0;
+        }
+
+        window.addEventListener('beforeunload', function() {
+            if (eventSource) {
+                eventSource.close();
+            }
+        });
+    </script>
+</body>
+</html>

@@ -8,16 +8,20 @@ import com.budgethunter.dto.CreateBudgetRequest
 import com.budgethunter.dto.PutEntryRequest
 import com.budgethunter.dto.UserResponse
 import com.budgethunter.service.BudgetService
+import com.budgethunter.service.SseService
 import jakarta.validation.Valid
 import org.springframework.http.HttpStatus
+import org.springframework.http.MediaType
 import org.springframework.http.ResponseEntity
 import org.springframework.security.core.Authentication
 import org.springframework.web.bind.annotation.*
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter
 
 @RestController
 @RequestMapping("/api/budgets")
 class BudgetController(
-    private val budgetService: BudgetService
+    private val budgetService: BudgetService,
+    private val sseService: SseService
 ) {
 
     @PostMapping("/create_budget")
@@ -66,5 +70,15 @@ class BudgetController(
         val response = budgetService.putEntry(request, userEmail)
         val httpStatus = if (request.id == null) HttpStatus.CREATED else HttpStatus.OK
         return ResponseEntity.status(httpStatus).body(response)
+    }
+
+    @GetMapping("/new_entry", produces = [MediaType.TEXT_EVENT_STREAM_VALUE])
+    fun newEntry(
+        @RequestParam budgetId: Long,
+        authentication: Authentication
+    ): SseEmitter {
+        val userEmail = authentication.principal as String
+        budgetService.verifyUserHasAccessToBudget(budgetId, userEmail)
+        return sseService.createEmitter(budgetId)
     }
 }

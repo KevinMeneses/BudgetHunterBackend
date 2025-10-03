@@ -1,12 +1,6 @@
 package com.budgethunter.service
 
-import com.budgethunter.dto.AddCollaboratorRequest
-import com.budgethunter.dto.BudgetEntryResponse
-import com.budgethunter.dto.BudgetResponse
-import com.budgethunter.dto.CollaboratorResponse
-import com.budgethunter.dto.CreateBudgetRequest
-import com.budgethunter.dto.PutEntryRequest
-import com.budgethunter.dto.UserResponse
+import com.budgethunter.dto.*
 import com.budgethunter.model.Budget
 import com.budgethunter.model.BudgetEntry
 import com.budgethunter.model.UserBudget
@@ -24,7 +18,8 @@ class BudgetService(
     private val budgetRepository: BudgetRepository,
     private val userBudgetRepository: UserBudgetRepository,
     private val userRepository: UserRepository,
-    private val budgetEntryRepository: BudgetEntryRepository
+    private val budgetEntryRepository: BudgetEntryRepository,
+    private val sseService: SseService
 ) {
 
     @Transactional
@@ -71,7 +66,7 @@ class BudgetService(
 
     @Transactional
     fun addCollaborator(request: AddCollaboratorRequest, authenticatedUserEmail: String): CollaboratorResponse {
-        verifyAuthenticatedUserHasAccessToBudget(request.budgetId, authenticatedUserEmail)
+        verifyUserHasAccessToBudget(request.budgetId, authenticatedUserEmail)
 
         val budget = budgetRepository.findById(request.budgetId)
             .orElseThrow { IllegalArgumentException("Budget not found with id: ${request.budgetId}") }
@@ -106,7 +101,7 @@ class BudgetService(
 
     @Transactional(readOnly = true)
     fun getCollaboratorsByBudgetId(budgetId: Long, authenticatedUserEmail: String): List<UserResponse> {
-        verifyAuthenticatedUserHasAccessToBudget(budgetId, authenticatedUserEmail)
+        verifyUserHasAccessToBudget(budgetId, authenticatedUserEmail)
 
         if (!budgetRepository.existsById(budgetId)) {
             throw IllegalArgumentException("Budget not found with id: $budgetId")
@@ -123,7 +118,7 @@ class BudgetService(
 
     @Transactional
     fun putEntry(request: PutEntryRequest, authenticatedUserEmail: String): BudgetEntryResponse {
-        verifyAuthenticatedUserHasAccessToBudget(request.budgetId, authenticatedUserEmail)
+        verifyUserHasAccessToBudget(request.budgetId, authenticatedUserEmail)
 
         val budget = budgetRepository.findById(request.budgetId)
             .orElseThrow { IllegalArgumentException("Budget not found with id: ${request.budgetId}") }
@@ -137,7 +132,11 @@ class BudgetService(
             createNewEntry(request, budget, user)
         }
 
-        return budgetEntry.toResponse()
+        val response = budgetEntry.toResponse()
+
+        broadcastBudgetEntryEvent(budgetEntry, user)
+
+        return response
     }
 
     private fun createNewEntry(request: PutEntryRequest, budget: Budget, user: com.budgethunter.model.User): BudgetEntry {
@@ -188,10 +187,31 @@ class BudgetService(
         modificationDate = this.modificationDate
     )
 
-    private fun verifyAuthenticatedUserHasAccessToBudget(budgetId: Long, userEmail: String) {
+    fun verifyUserHasAccessToBudget(budgetId: Long, userEmail: String) {
         val userBudgetId = UserBudgetId(budgetId = budgetId, userEmail = userEmail)
         if (!userBudgetRepository.existsById(userBudgetId)) {
             throw IllegalArgumentException("You don't have access to budget with id: $budgetId")
         }
+    }
+
+    private fun broadcastBudgetEntryEvent(budgetEntry: BudgetEntry, user: com.budgethunter.model.User) {
+        val event = BudgetEntryEvent(
+            budgetEntry = BudgetEntryEventData(
+                id = budgetEntry.id!!,
+                budgetId = budgetEntry.budget.id!!,
+                amount = budgetEntry.amount,
+                description = budgetEntry.description,
+                category = budgetEntry.category,
+                type = budgetEntry.type,
+                creationDate = budgetEntry.creationDate,
+                modificationDate = budgetEntry.modificationDate
+            ),
+            userInfo = UserEventInfo(
+                email = user.email,
+                name = user.name
+            )
+        )
+
+        sseService.broadcastBudgetEntryEvent(budgetEntry.budget.id!!, event)
     }
 }

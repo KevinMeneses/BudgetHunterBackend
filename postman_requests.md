@@ -228,6 +228,44 @@ Copy the `token` value for the next request.
 
 ---
 
+## 9. Subscribe to Budget Entry Events (SSE)
+
+**Method:** GET
+**URL:** `http://localhost:8080/api/budgets/new_entry?budgetId=1`
+**Headers:**
+- Authorization: Bearer YOUR_JWT_TOKEN_HERE
+
+**Body:** None
+
+**Response:**
+- Content-Type: text/event-stream
+- Streaming connection that sends events when budget entries are created/updated
+
+**Event Format:**
+```json
+event: budget-entry
+data: {
+  "budgetEntry": {
+    "id": 123,
+    "budgetId": 1,
+    "amount": 150.00,
+    "description": "Grocery shopping",
+    "category": "Food",
+    "type": "OUTCOME",
+    "creationDate": "2025-10-02T10:30:00",
+    "modificationDate": "2025-10-02T10:30:00"
+  },
+  "userInfo": {
+    "email": "user@example.com",
+    "name": "John Doe"
+  }
+}
+```
+
+**Note:** For testing in a browser, use the included `test-sse.html` file. Standard Postman doesn't support SSE well. The curl command will keep the connection open and display events as they arrive.
+
+---
+
 ## cURL Commands (Alternative)
 
 ### Sign Up
@@ -299,4 +337,10 @@ curl -X PUT http://localhost:8080/api/budgets/put_entry \
     "category": "Food",
     "type": "OUTCOME"
   }'
+```
+
+### Subscribe to Budget Entry Events (SSE)
+```bash
+curl -N -H "Authorization: Bearer YOUR_JWT_TOKEN" \
+  "http://localhost:8080/api/budgets/new_entry?budgetId=1"
 ```
