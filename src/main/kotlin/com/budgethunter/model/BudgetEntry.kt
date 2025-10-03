@@ -30,7 +30,7 @@ data class BudgetEntry(
     @field:Column(nullable = false)
     val category: String,
 
-    @field:NotBlank
+    @field:NotNull
     @field:Column(nullable = false)
     @field:Enumerated(EnumType.STRING)
     val type: EntryType,
