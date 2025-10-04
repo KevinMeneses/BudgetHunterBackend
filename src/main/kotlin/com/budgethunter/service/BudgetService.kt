@@ -116,6 +116,18 @@ class BudgetService(
         }
     }
 
+    @Transactional(readOnly = true)
+    fun getEntriesByBudgetId(budgetId: Long, authenticatedUserEmail: String): List<BudgetEntryResponse> {
+        verifyUserHasAccessToBudget(budgetId, authenticatedUserEmail)
+
+        if (!budgetRepository.existsById(budgetId)) {
+            throw IllegalArgumentException("Budget not found with id: $budgetId")
+        }
+
+        val entries = budgetEntryRepository.findByBudgetId(budgetId)
+        return entries.map { it.toResponse() }
+    }
+
     @Transactional
     fun putEntry(request: PutEntryRequest, authenticatedUserEmail: String): BudgetEntryResponse {
         verifyUserHasAccessToBudget(request.budgetId, authenticatedUserEmail)
@@ -212,6 +224,6 @@ class BudgetService(
             )
         )
 
-        sseService.broadcastBudgetEntryEvent(budgetEntry.budget.id!!, event)
+        sseService.broadcastBudgetEntryEvent(budgetEntry.budget.id, event)
     }
 }

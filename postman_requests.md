@@ -153,7 +153,48 @@ Copy the `token` value for the next request.
 
 ---
 
-## 7. Create Budget Entry
+## 7. Get Budget Entries
+
+**Method:** GET
+**URL:** `http://localhost:8080/api/budgets/get_entries?budgetId=1`
+**Headers:**
+- Authorization: Bearer YOUR_JWT_TOKEN_HERE
+
+**Body:** None
+
+**Expected Response (200 OK):**
+```json
+[
+  {
+    "id": 1,
+    "budgetId": 1,
+    "amount": 150.00,
+    "description": "Grocery shopping",
+    "category": "Food",
+    "type": "OUTCOME",
+    "createdByEmail": "test@example.com",
+    "updatedByEmail": "test@example.com",
+    "creationDate": "2025-10-02T23:45:00",
+    "modificationDate": "2025-10-02T23:50:00"
+  },
+  {
+    "id": 2,
+    "budgetId": 1,
+    "amount": 2500.00,
+    "description": "Monthly salary",
+    "category": "Income",
+    "type": "INCOME",
+    "createdByEmail": "test@example.com",
+    "updatedByEmail": null,
+    "creationDate": "2025-10-01T09:00:00",
+    "modificationDate": "2025-10-01T09:00:00"
+  }
+]
+```
+
+---
+
+## 8. Create Budget Entry
 
 **Method:** PUT
 **URL:** `http://localhost:8080/api/budgets/put_entry`
@@ -190,7 +231,7 @@ Copy the `token` value for the next request.
 
 ---
 
-## 8. Update Budget Entry
+## 9. Update Budget Entry
 
 **Method:** PUT
 **URL:** `http://localhost:8080/api/budgets/put_entry`
@@ -228,7 +269,7 @@ Copy the `token` value for the next request.
 
 ---
 
-## 9. Subscribe to Budget Entry Events (SSE)
+## 10. Subscribe to Budget Entry Events (SSE)
 
 **Method:** GET
 **URL:** `http://localhost:8080/api/budgets/new_entry?budgetId=1`
@@ -307,6 +348,12 @@ curl -X POST http://localhost:8080/api/budgets/add_collaborator \
 ### Get Collaborators
 ```bash
 curl -X GET "http://localhost:8080/api/budgets/get_collaborators?budgetId=1" \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN"
+```
+
+### Get Budget Entries
+```bash
+curl -X GET "http://localhost:8080/api/budgets/get_entries?budgetId=1" \
   -H "Authorization: Bearer YOUR_JWT_TOKEN"
 ```
 

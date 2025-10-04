@@ -72,6 +72,16 @@ class BudgetController(
         return ResponseEntity.status(httpStatus).body(response)
     }
 
+    @GetMapping("/get_entries")
+    fun getEntries(
+        @RequestParam budgetId: Long,
+        authentication: Authentication
+    ): ResponseEntity<List<BudgetEntryResponse>> {
+        val userEmail = authentication.principal as String
+        val entries = budgetService.getEntriesByBudgetId(budgetId, userEmail)
+        return ResponseEntity.ok(entries)
+    }
+
     @GetMapping("/new_entry", produces = [MediaType.TEXT_EVENT_STREAM_VALUE])
     fun newEntry(
         @RequestParam budgetId: Long,
