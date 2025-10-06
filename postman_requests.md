@@ -16,6 +16,16 @@
 }
 ```
 
+**Expected Response (201 Created):**
+```json
+{
+  "email": "test@example.com",
+  "name": "Test User"
+}
+```
+
+**Note:** After signing up, use the sign_in endpoint to get your auth and refresh tokens.
+
 ---
 
 ## 2. Sign In
