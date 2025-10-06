@@ -5,6 +5,7 @@ import io.jsonwebtoken.Jwts
 import io.jsonwebtoken.security.Keys
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.stereotype.Component
+import java.time.Instant
 import java.util.*
 import javax.crypto.SecretKey
 
@@ -16,6 +17,9 @@ class JwtUtil {
 
     @Value("\${jwt.expiration:86400000}") // 24 hours in milliseconds
     private var expiration: Long = 86400000
+
+    @Value("\${jwt.refresh.expiration:604800000}") // 7 days in milliseconds
+    private var refreshExpiration: Long = 604800000
 
     private fun getSigningKey(): SecretKey {
         return Keys.hmacShaKeyFor(secret.toByteArray())
@@ -31,6 +35,14 @@ class JwtUtil {
             .expiration(expiryDate)
             .signWith(getSigningKey())
             .compact()
+    }
+
+    fun generateRefreshToken(): String {
+        return UUID.randomUUID().toString()
+    }
+
+    fun getRefreshTokenExpiry(): Instant {
+        return Instant.now().plusMillis(refreshExpiration)
     }
 
     fun extractEmail(token: String): String {

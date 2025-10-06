@@ -1,5 +1,6 @@
 package com.budgethunter.service
 
+import com.budgethunter.dto.RefreshTokenRequest
 import com.budgethunter.dto.SignInRequest
 import com.budgethunter.dto.SignInResponse
 import com.budgethunter.dto.SignUpRequest
@@ -11,6 +12,7 @@ import org.springframework.security.authentication.BadCredentialsException
 import org.springframework.security.crypto.password.PasswordEncoder
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
+import java.time.Instant
 
 @Service
 class UserService(
@@ -39,7 +41,7 @@ class UserService(
         )
     }
 
-    @Transactional(readOnly = true)
+    @Transactional
     fun signIn(request: SignInRequest): SignInResponse {
         val user = userRepository.findById(request.email)
             .orElseThrow { BadCredentialsException("Invalid email or password") }
@@ -48,10 +50,46 @@ class UserService(
             throw BadCredentialsException("Invalid email or password")
         }
 
-        val token = jwtUtil.generateToken(user.email)
+        val authToken = jwtUtil.generateToken(user.email)
+        val refreshToken = jwtUtil.generateRefreshToken()
+        val refreshTokenExpiry = jwtUtil.getRefreshTokenExpiry()
+
+        // Store refresh token in database
+        user.refreshToken = refreshToken
+        user.refreshTokenExpiry = refreshTokenExpiry
+        userRepository.save(user)
 
         return SignInResponse(
-            authToken = token,
+            authToken = authToken,
+            refreshToken = refreshToken,
+            email = user.email,
+            name = user.name
+        )
+    }
+
+    @Transactional
+    fun refreshToken(request: RefreshTokenRequest): SignInResponse {
+        val user = userRepository.findByRefreshToken(request.refreshToken)
+            .orElseThrow { BadCredentialsException("Invalid refresh token") }
+
+        // Validate refresh token expiry
+        if (user.refreshTokenExpiry == null || user.refreshTokenExpiry!!.isBefore(Instant.now())) {
+            throw BadCredentialsException("Refresh token has expired")
+        }
+
+        val authToken = jwtUtil.generateToken(user.email)
+
+        // Optional: Rotate refresh token for enhanced security
+        val newRefreshToken = jwtUtil.generateRefreshToken()
+        val newRefreshTokenExpiry = jwtUtil.getRefreshTokenExpiry()
+
+        user.refreshToken = newRefreshToken
+        user.refreshTokenExpiry = newRefreshTokenExpiry
+        userRepository.save(user)
+
+        return SignInResponse(
+            authToken = authToken,
+            refreshToken = newRefreshToken,
             email = user.email,
             name = user.name
         )

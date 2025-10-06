@@ -1,5 +1,6 @@
 package com.budgethunter.controller
 
+import com.budgethunter.dto.RefreshTokenRequest
 import com.budgethunter.dto.SignInRequest
 import com.budgethunter.dto.SignInResponse
 import com.budgethunter.dto.SignUpRequest
@@ -25,6 +26,12 @@ class UserController(
     @PostMapping("/sign_in")
     fun signIn(@Valid @RequestBody request: SignInRequest): ResponseEntity<SignInResponse> {
         val response = userService.signIn(request)
+        return ResponseEntity.ok(response)
+    }
+
+    @PostMapping("/refresh_token")
+    fun refreshToken(@Valid @RequestBody request: RefreshTokenRequest): ResponseEntity<SignInResponse> {
+        val response = userService.refreshToken(request)
         return ResponseEntity.ok(response)
     }
 }

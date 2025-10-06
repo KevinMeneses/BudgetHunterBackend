@@ -36,17 +36,46 @@
 **Response:**
 ```json
 {
-  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "authToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "refreshToken": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
   "email": "test@example.com",
   "name": "Test User"
 }
 ```
 
-Copy the `token` value for the next request.
+Copy the `authToken` value for authenticated requests and save the `refreshToken` for token refresh.
 
 ---
 
-## 3. Create Budget
+## 3. Refresh Token
+
+**Method:** POST
+**URL:** `http://localhost:8080/api/users/refresh_token`
+**Headers:**
+- Content-Type: application/json
+
+**Body (raw JSON):**
+```json
+{
+  "refreshToken": "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+}
+```
+
+**Expected Response (200 OK):**
+```json
+{
+  "authToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "refreshToken": "new-uuid-generated-here",
+  "email": "test@example.com",
+  "name": "Test User"
+}
+```
+
+**Note:** This endpoint uses refresh token rotation for enhanced security. Each time you refresh, you receive a new refresh token and the old one is invalidated.
+
+---
+
+## 4. Create Budget
 
 **Method:** POST
 **URL:** `http://localhost:8080/api/budgets/create_budget`
@@ -73,7 +102,7 @@ Copy the `token` value for the next request.
 
 ---
 
-## 4. Get Budgets
+## 5. Get Budgets
 
 **Method:** GET
 **URL:** `http://localhost:8080/api/budgets/get_budgets`
@@ -100,7 +129,7 @@ Copy the `token` value for the next request.
 
 ---
 
-## 5. Add Collaborator
+## 6. Add Collaborator
 
 **Method:** POST
 **URL:** `http://localhost:8080/api/budgets/add_collaborator`
@@ -128,7 +157,7 @@ Copy the `token` value for the next request.
 
 ---
 
-## 6. Get Collaborators
+## 7. Get Collaborators
 
 **Method:** GET
 **URL:** `http://localhost:8080/api/budgets/get_collaborators?budgetId=1`
@@ -153,7 +182,7 @@ Copy the `token` value for the next request.
 
 ---
 
-## 7. Get Budget Entries
+## 8. Get Budget Entries
 
 **Method:** GET
 **URL:** `http://localhost:8080/api/budgets/get_entries?budgetId=1`
@@ -194,7 +223,7 @@ Copy the `token` value for the next request.
 
 ---
 
-## 8. Create Budget Entry
+## 9. Create Budget Entry
 
 **Method:** PUT
 **URL:** `http://localhost:8080/api/budgets/put_entry`
@@ -231,7 +260,7 @@ Copy the `token` value for the next request.
 
 ---
 
-## 9. Update Budget Entry
+## 10. Update Budget Entry
 
 **Method:** PUT
 **URL:** `http://localhost:8080/api/budgets/put_entry`
@@ -269,7 +298,7 @@ Copy the `token` value for the next request.
 
 ---
 
-## 10. Subscribe to Budget Entry Events (SSE)
+## 11. Subscribe to Budget Entry Events (SSE)
 
 **Method:** GET
 **URL:** `http://localhost:8080/api/budgets/new_entry?budgetId=1`
@@ -321,6 +350,13 @@ curl -X POST http://localhost:8080/api/users/sign_up \
 curl -X POST http://localhost:8080/api/users/sign_in \
   -H "Content-Type: application/json" \
   -d '{"email":"test@example.com","password":"password123"}'
+```
+
+### Refresh Token
+```bash
+curl -X POST http://localhost:8080/api/users/refresh_token \
+  -H "Content-Type: application/json" \
+  -d '{"refreshToken":"a1b2c3d4-e5f6-7890-abcd-ef1234567890"}'
 ```
 
 ### Create Budget
