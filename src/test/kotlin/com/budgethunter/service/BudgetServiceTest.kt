@@ -44,12 +44,14 @@ class BudgetServiceTest {
         userRepository = mockk()
         budgetEntryRepository = mockk()
         sseService = mockk(relaxed = true)
+        val reactiveSseService = mockk<ReactiveSseService>(relaxed = true)
         budgetService = BudgetService(
             budgetRepository,
             userBudgetRepository,
             userRepository,
             budgetEntryRepository,
-            sseService
+            sseService,
+            reactiveSseService
         )
     }
 

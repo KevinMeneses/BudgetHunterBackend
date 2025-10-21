@@ -19,7 +19,8 @@ class BudgetService(
     private val userBudgetRepository: UserBudgetRepository,
     private val userRepository: UserRepository,
     private val budgetEntryRepository: BudgetEntryRepository,
-    private val sseService: SseService
+    private val sseService: SseService,
+    private val reactiveSseService: ReactiveSseService
 ) {
 
     @Transactional
@@ -224,6 +225,8 @@ class BudgetService(
             )
         )
 
+        // Broadcast to both old and new SSE implementations
         sseService.broadcastBudgetEntryEvent(budgetEntry.budget.id, event)
+        reactiveSseService.broadcastEvent(budgetEntry.budget.id, event)
     }
 }

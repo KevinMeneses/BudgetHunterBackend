@@ -1,27 +1,25 @@
 package com.budgethunter.controller
 
-import com.budgethunter.dto.AddCollaboratorRequest
-import com.budgethunter.dto.BudgetEntryResponse
-import com.budgethunter.dto.BudgetResponse
-import com.budgethunter.dto.CollaboratorResponse
-import com.budgethunter.dto.CreateBudgetRequest
-import com.budgethunter.dto.PutEntryRequest
-import com.budgethunter.dto.UserResponse
+import com.budgethunter.dto.*
 import com.budgethunter.service.BudgetService
+import com.budgethunter.service.ReactiveSseService
 import com.budgethunter.service.SseService
 import jakarta.validation.Valid
 import org.springframework.http.HttpStatus
 import org.springframework.http.MediaType
 import org.springframework.http.ResponseEntity
+import org.springframework.http.codec.ServerSentEvent
 import org.springframework.security.core.Authentication
 import org.springframework.web.bind.annotation.*
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter
+import reactor.core.publisher.Flux
 
 @RestController
 @RequestMapping("/api/budgets")
 class BudgetController(
     private val budgetService: BudgetService,
-    private val sseService: SseService
+    private val sseService: SseService,
+    private val reactiveSseService: ReactiveSseService
 ) {
 
     @PostMapping("/create_budget")
@@ -82,13 +80,29 @@ class BudgetController(
         return ResponseEntity.ok(entries)
     }
 
-    @GetMapping("/new_entry", produces = [MediaType.TEXT_EVENT_STREAM_VALUE])
-    fun newEntry(
+    @GetMapping("/new_entry_legacy", produces = [MediaType.TEXT_EVENT_STREAM_VALUE])
+    fun newEntryLegacy(
         @RequestParam budgetId: Long,
         authentication: Authentication
     ): SseEmitter {
         val userEmail = authentication.principal as String
         budgetService.verifyUserHasAccessToBudget(budgetId, userEmail)
         return sseService.createEmitter(budgetId)
+    }
+
+    @GetMapping("/new_entry", produces = [MediaType.TEXT_EVENT_STREAM_VALUE])
+    fun newEntry(
+        @RequestParam budgetId: Long,
+        authentication: Authentication
+    ): Flux<ServerSentEvent<BudgetEntryEvent>> {
+        val userEmail = authentication.principal as String
+        budgetService.verifyUserHasAccessToBudget(budgetId, userEmail)
+
+        return reactiveSseService.subscribeToEvents(budgetId)
+            .map { event ->
+                ServerSentEvent.builder(event)
+                    .event("budget-entry")
+                    .build()
+            }
     }
 }

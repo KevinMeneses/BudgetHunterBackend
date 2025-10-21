@@ -22,6 +22,7 @@ repositories {
 dependencies {
     // Spring Boot Starters
     implementation("org.springframework.boot:spring-boot-starter-web")
+    implementation("org.springframework.boot:spring-boot-starter-webflux")  // For Flux SSE support
     implementation("org.springframework.boot:spring-boot-starter-data-jpa")
     implementation("org.springframework.boot:spring-boot-starter-validation")
     implementation("org.springframework.boot:spring-boot-starter-security")
@@ -30,6 +31,8 @@ dependencies {
     implementation("org.jetbrains.kotlin:kotlin-reflect")
     implementation("org.jetbrains.kotlin:kotlin-stdlib-jdk8")
     implementation("com.fasterxml.jackson.module:jackson-module-kotlin")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-reactor")  // Coroutines ↔ Reactor bridge
 
     // JWT
     implementation("io.jsonwebtoken:jjwt-api:0.12.6")
@@ -44,6 +47,9 @@ dependencies {
     testImplementation("org.springframework.boot:spring-boot-starter-test")
     testImplementation("org.springframework.security:spring-security-test")
     testImplementation("io.mockk:mockk:1.13.12")
+    testImplementation("org.springframework.boot:spring-boot-starter-webflux")  // For WebTestClient
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test")  // For runTest
+    testImplementation("io.projectreactor:reactor-test")  // For StepVerifier
 }
 
 tasks.withType<KotlinCompile> {

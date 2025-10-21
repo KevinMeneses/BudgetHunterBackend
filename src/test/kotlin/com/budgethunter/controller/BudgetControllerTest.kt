@@ -3,6 +3,7 @@ package com.budgethunter.controller
 import com.budgethunter.dto.*
 import com.budgethunter.model.EntryType
 import com.budgethunter.service.BudgetService
+import com.budgethunter.service.ReactiveSseService
 import com.budgethunter.service.SseService
 import io.mockk.*
 import org.junit.jupiter.api.AfterEach
@@ -19,6 +20,7 @@ class BudgetControllerTest {
 
     private lateinit var budgetService: BudgetService
     private lateinit var sseService: SseService
+    private lateinit var reactiveSseService: ReactiveSseService
     private lateinit var budgetController: BudgetController
     private lateinit var authentication: Authentication
 
@@ -28,7 +30,8 @@ class BudgetControllerTest {
     fun setup() {
         budgetService = mockk()
         sseService = mockk()
-        budgetController = BudgetController(budgetService, sseService)
+        reactiveSseService = mockk(relaxed = true)
+        budgetController = BudgetController(budgetService, sseService, reactiveSseService)
         authentication = mockk()
 
         // Mock authentication to return test user email
@@ -412,25 +415,21 @@ class BudgetControllerTest {
         verify(exactly = 1) { budgetService.getEntriesByBudgetId(budgetId, testUserEmail) }
     }
 
-    // NewEntry (SSE) Tests
+    // NewEntry (SSE) Tests - These now test the reactive Flow endpoint
 
     @Test
-    fun `newEntry should return SseEmitter when user has access`() {
+    fun `newEntry should verify access and return Flux when user has access`() {
         // Given
         val budgetId = 1L
-        val expectedEmitter = SseEmitter(1800000L)
 
         every { budgetService.verifyUserHasAccessToBudget(budgetId, testUserEmail) } just Runs
-        every { sseService.createEmitter(budgetId) } returns expectedEmitter
 
         // When
-        val emitter = budgetController.newEntry(budgetId, authentication)
+        val flux = budgetController.newEntry(budgetId, authentication)
 
         // Then
-        assertNotNull(emitter)
-        assertEquals(1800000L, emitter.timeout)
+        assertNotNull(flux)
         verify(exactly = 1) { budgetService.verifyUserHasAccessToBudget(budgetId, testUserEmail) }
-        verify(exactly = 1) { sseService.createEmitter(budgetId) }
     }
 
     @Test
@@ -448,7 +447,25 @@ class BudgetControllerTest {
 
         assertTrue(exception.message!!.contains("don't have access"))
         verify(exactly = 1) { budgetService.verifyUserHasAccessToBudget(budgetId, testUserEmail) }
-        verify(exactly = 0) { sseService.createEmitter(any()) }
+    }
+
+    // Legacy SSE endpoint test
+    @Test
+    fun `newEntryLegacy should return SseEmitter when user has access`() {
+        // Given
+        val budgetId = 1L
+        val expectedEmitter = SseEmitter(1800000L)
+
+        every { budgetService.verifyUserHasAccessToBudget(budgetId, testUserEmail) } just Runs
+        every { sseService.createEmitter(budgetId) } returns expectedEmitter
+
+        // When
+        val emitter = budgetController.newEntryLegacy(budgetId, authentication)
+
+        // Then
+        assertNotNull(emitter)
+        verify(exactly = 1) { budgetService.verifyUserHasAccessToBudget(budgetId, testUserEmail) }
+        verify(exactly = 1) { sseService.createEmitter(budgetId) }
     }
 
     // Integration-like Tests
