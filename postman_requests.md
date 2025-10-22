@@ -1,5 +1,7 @@
 # Postman Request Collection - BudgetHunter API
 
+**Note:** This API now follows RESTful conventions. Legacy endpoints (with verbs in URLs) are still available but deprecated. Use the new RESTful endpoints for all new integrations.
+
 ## 1. Sign Up
 
 **Method:** POST
@@ -88,7 +90,7 @@ Copy the `authToken` value for authenticated requests and save the `refreshToken
 ## 4. Create Budget
 
 **Method:** POST
-**URL:** `http://localhost:8080/api/budgets/create_budget`
+**URL:** `http://localhost:8080/api/budgets`
 **Headers:**
 - Content-Type: application/json
 - Authorization: Bearer YOUR_JWT_TOKEN_HERE
@@ -110,12 +112,14 @@ Copy the `authToken` value for authenticated requests and save the `refreshToken
 }
 ```
 
+**Legacy URL (Deprecated):** `POST /api/budgets/create_budget`
+
 ---
 
 ## 5. Get Budgets
 
 **Method:** GET
-**URL:** `http://localhost:8080/api/budgets/get_budgets`
+**URL:** `http://localhost:8080/api/budgets`
 **Headers:**
 - Authorization: Bearer YOUR_JWT_TOKEN_HERE
 
@@ -137,12 +141,14 @@ Copy the `authToken` value for authenticated requests and save the `refreshToken
 ]
 ```
 
+**Legacy URL (Deprecated):** `GET /api/budgets/get_budgets`
+
 ---
 
 ## 6. Add Collaborator
 
 **Method:** POST
-**URL:** `http://localhost:8080/api/budgets/add_collaborator`
+**URL:** `http://localhost:8080/api/budgets/1/collaborators`
 **Headers:**
 - Content-Type: application/json
 - Authorization: Bearer YOUR_JWT_TOKEN_HERE
@@ -165,12 +171,14 @@ Copy the `authToken` value for authenticated requests and save the `refreshToken
 }
 ```
 
+**Legacy URL (Deprecated):** `POST /api/budgets/add_collaborator`
+
 ---
 
 ## 7. Get Collaborators
 
 **Method:** GET
-**URL:** `http://localhost:8080/api/budgets/get_collaborators?budgetId=1`
+**URL:** `http://localhost:8080/api/budgets/1/collaborators`
 **Headers:**
 - Authorization: Bearer YOUR_JWT_TOKEN_HERE
 
@@ -190,12 +198,14 @@ Copy the `authToken` value for authenticated requests and save the `refreshToken
 ]
 ```
 
+**Legacy URL (Deprecated):** `GET /api/budgets/get_collaborators?budgetId=1`
+
 ---
 
 ## 8. Get Budget Entries
 
 **Method:** GET
-**URL:** `http://localhost:8080/api/budgets/get_entries?budgetId=1`
+**URL:** `http://localhost:8080/api/budgets/1/entries`
 **Headers:**
 - Authorization: Bearer YOUR_JWT_TOKEN_HERE
 
@@ -231,12 +241,14 @@ Copy the `authToken` value for authenticated requests and save the `refreshToken
 ]
 ```
 
+**Legacy URL (Deprecated):** `GET /api/budgets/get_entries?budgetId=1`
+
 ---
 
 ## 9. Create Budget Entry
 
-**Method:** PUT
-**URL:** `http://localhost:8080/api/budgets/put_entry`
+**Method:** POST
+**URL:** `http://localhost:8080/api/budgets/1/entries`
 **Headers:**
 - Content-Type: application/json
 - Authorization: Bearer YOUR_JWT_TOKEN_HERE
@@ -244,7 +256,6 @@ Copy the `authToken` value for authenticated requests and save the `refreshToken
 **Body (raw JSON):**
 ```json
 {
-  "budgetId": 1,
   "amount": 150.00,
   "description": "Grocery shopping",
   "category": "Food",
@@ -268,12 +279,14 @@ Copy the `authToken` value for authenticated requests and save the `refreshToken
 }
 ```
 
+**Legacy URL (Deprecated):** `PUT /api/budgets/put_entry` (with budgetId in body, no id field)
+
 ---
 
 ## 10. Update Budget Entry
 
 **Method:** PUT
-**URL:** `http://localhost:8080/api/budgets/put_entry`
+**URL:** `http://localhost:8080/api/budgets/1/entries/1`
 **Headers:**
 - Content-Type: application/json
 - Authorization: Bearer YOUR_JWT_TOKEN_HERE
@@ -281,8 +294,6 @@ Copy the `authToken` value for authenticated requests and save the `refreshToken
 **Body (raw JSON):**
 ```json
 {
-  "id": 1,
-  "budgetId": 1,
   "amount": 175.50,
   "description": "Grocery shopping - updated",
   "category": "Food",
@@ -306,12 +317,14 @@ Copy the `authToken` value for authenticated requests and save the `refreshToken
 }
 ```
 
+**Legacy URL (Deprecated):** `PUT /api/budgets/put_entry` (with both id and budgetId in body)
+
 ---
 
 ## 11. Subscribe to Budget Entry Events (SSE)
 
 **Method:** GET
-**URL:** `http://localhost:8080/api/budgets/new_entry?budgetId=1`
+**URL:** `http://localhost:8080/api/budgets/1/entries/stream`
 **Headers:**
 - Authorization: Bearer YOUR_JWT_TOKEN_HERE
 
@@ -342,6 +355,8 @@ data: {
 }
 ```
 
+**Legacy URL (Deprecated):** `GET /api/budgets/new_entry?budgetId=1`
+
 **Note:** For testing in a browser, use the included `test-sse.html` file. Standard Postman doesn't support SSE well. The curl command will keep the connection open and display events as they arrive.
 
 ---
@@ -371,7 +386,7 @@ curl -X POST http://localhost:8080/api/users/refresh_token \
 
 ### Create Budget
 ```bash
-curl -X POST http://localhost:8080/api/budgets/create_budget \
+curl -X POST http://localhost:8080/api/budgets \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer YOUR_JWT_TOKEN" \
   -d '{"name":"Monthly Budget","amount":5000.00}'
@@ -379,13 +394,13 @@ curl -X POST http://localhost:8080/api/budgets/create_budget \
 
 ### Get Budgets
 ```bash
-curl -X GET http://localhost:8080/api/budgets/get_budgets \
+curl -X GET http://localhost:8080/api/budgets \
   -H "Authorization: Bearer YOUR_JWT_TOKEN"
 ```
 
 ### Add Collaborator
 ```bash
-curl -X POST http://localhost:8080/api/budgets/add_collaborator \
+curl -X POST http://localhost:8080/api/budgets/1/collaborators \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer YOUR_JWT_TOKEN" \
   -d '{"budgetId":1,"email":"collaborator@example.com"}'
@@ -393,23 +408,22 @@ curl -X POST http://localhost:8080/api/budgets/add_collaborator \
 
 ### Get Collaborators
 ```bash
-curl -X GET "http://localhost:8080/api/budgets/get_collaborators?budgetId=1" \
+curl -X GET http://localhost:8080/api/budgets/1/collaborators \
   -H "Authorization: Bearer YOUR_JWT_TOKEN"
 ```
 
 ### Get Budget Entries
 ```bash
-curl -X GET "http://localhost:8080/api/budgets/get_entries?budgetId=1" \
+curl -X GET http://localhost:8080/api/budgets/1/entries \
   -H "Authorization: Bearer YOUR_JWT_TOKEN"
 ```
 
 ### Create Budget Entry
 ```bash
-curl -X PUT http://localhost:8080/api/budgets/put_entry \
+curl -X POST http://localhost:8080/api/budgets/1/entries \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer YOUR_JWT_TOKEN" \
   -d '{
-    "budgetId": 1,
     "amount": 150.00,
     "description": "Grocery shopping",
     "category": "Food",
@@ -419,12 +433,10 @@ curl -X PUT http://localhost:8080/api/budgets/put_entry \
 
 ### Update Budget Entry
 ```bash
-curl -X PUT http://localhost:8080/api/budgets/put_entry \
+curl -X PUT http://localhost:8080/api/budgets/1/entries/1 \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer YOUR_JWT_TOKEN" \
   -d '{
-    "id": 1,
-    "budgetId": 1,
     "amount": 175.50,
     "description": "Grocery shopping - updated",
     "category": "Food",
@@ -435,5 +447,5 @@ curl -X PUT http://localhost:8080/api/budgets/put_entry \
 ### Subscribe to Budget Entry Events (SSE)
 ```bash
 curl -N -H "Authorization: Bearer YOUR_JWT_TOKEN" \
-  "http://localhost:8080/api/budgets/new_entry?budgetId=1"
+  "http://localhost:8080/api/budgets/1/entries/stream"
 ```

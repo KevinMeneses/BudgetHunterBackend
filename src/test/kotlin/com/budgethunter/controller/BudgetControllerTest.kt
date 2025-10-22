@@ -4,7 +4,6 @@ import com.budgethunter.dto.*
 import com.budgethunter.model.EntryType
 import com.budgethunter.service.BudgetService
 import com.budgethunter.service.ReactiveSseService
-import com.budgethunter.service.SseService
 import io.mockk.*
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.*
@@ -12,14 +11,12 @@ import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.springframework.http.HttpStatus
 import org.springframework.security.core.Authentication
-import org.springframework.web.servlet.mvc.method.annotation.SseEmitter
 import java.math.BigDecimal
 import java.time.LocalDateTime
 
 class BudgetControllerTest {
 
     private lateinit var budgetService: BudgetService
-    private lateinit var sseService: SseService
     private lateinit var reactiveSseService: ReactiveSseService
     private lateinit var budgetController: BudgetController
     private lateinit var authentication: Authentication
@@ -29,9 +26,8 @@ class BudgetControllerTest {
     @BeforeEach
     fun setup() {
         budgetService = mockk()
-        sseService = mockk()
         reactiveSseService = mockk(relaxed = true)
-        budgetController = BudgetController(budgetService, sseService, reactiveSseService)
+        budgetController = BudgetController(budgetService, reactiveSseService)
         authentication = mockk()
 
         // Mock authentication to return test user email
@@ -132,27 +128,28 @@ class BudgetControllerTest {
     @Test
     fun `addCollaborator should return created status with collaborator response`() {
         // Given
+        val budgetId = 1L
         val request = AddCollaboratorRequest(
-            budgetId = 1L,
+            budgetId = budgetId,
             email = "collaborator@example.com"
         )
         val expectedResponse = CollaboratorResponse(
-            budgetId = 1L,
+            budgetId = budgetId,
             budgetName = "Test Budget",
             collaboratorEmail = request.email,
             collaboratorName = "Collaborator User"
         )
 
-        every { budgetService.addCollaborator(request, testUserEmail) } returns expectedResponse
+        every { budgetService.addCollaborator(budgetId, request, testUserEmail) } returns expectedResponse
 
         // When
-        val response = budgetController.addCollaborator(request, authentication)
+        val response = budgetController.addCollaborator(budgetId, request, authentication)
 
         // Then
         assertEquals(HttpStatus.CREATED, response.statusCode)
         assertEquals(expectedResponse, response.body)
         assertEquals(request.email, response.body?.collaboratorEmail)
-        verify(exactly = 1) { budgetService.addCollaborator(request, testUserEmail) }
+        verify(exactly = 1) { budgetService.addCollaborator(budgetId, request, testUserEmail) }
     }
 
     @Test
@@ -163,36 +160,37 @@ class BudgetControllerTest {
             email = "collaborator@example.com"
         )
 
-        every { budgetService.addCollaborator(request, testUserEmail) } throws
+        every { budgetService.addCollaborator(1L, request, testUserEmail) } throws
             IllegalArgumentException("You don't have access to budget with id: 1")
 
         // When & Then
         val exception = org.junit.jupiter.api.assertThrows<IllegalArgumentException> {
-            budgetController.addCollaborator(request, authentication)
+            budgetController.addCollaborator(1L, request, authentication)
         }
 
         assertTrue(exception.message!!.contains("don't have access"))
-        verify(exactly = 1) { budgetService.addCollaborator(request, testUserEmail) }
+        verify(exactly = 1) { budgetService.addCollaborator(1L, request, testUserEmail) }
     }
 
     @Test
     fun `addCollaborator should propagate exception when collaborator already exists`() {
         // Given
+        val budgetId = 1L
         val request = AddCollaboratorRequest(
-            budgetId = 1L,
+            budgetId = budgetId,
             email = "existing@example.com"
         )
 
-        every { budgetService.addCollaborator(request, testUserEmail) } throws
+        every { budgetService.addCollaborator(budgetId, request, testUserEmail) } throws
             IllegalStateException("User existing@example.com is already a collaborator on budget 1")
 
         // When & Then
         val exception = org.junit.jupiter.api.assertThrows<IllegalStateException> {
-            budgetController.addCollaborator(request, authentication)
+            budgetController.addCollaborator(budgetId, request, authentication)
         }
 
         assertTrue(exception.message!!.contains("already a collaborator"))
-        verify(exactly = 1) { budgetService.addCollaborator(request, testUserEmail) }
+        verify(exactly = 1) { budgetService.addCollaborator(budgetId, request, testUserEmail) }
     }
 
     // GetCollaborators Tests
@@ -235,10 +233,10 @@ class BudgetControllerTest {
         verify(exactly = 1) { budgetService.getCollaboratorsByBudgetId(budgetId, testUserEmail) }
     }
 
-    // PutEntry Tests - Create New Entry
+    // PutEntry Tests - Testing Legacy Endpoint
 
     @Test
-    fun `putEntry should return created status when creating new entry`() {
+    fun `putEntryLegacy should return created status when creating new entry`() {
         // Given
         val request = PutEntryRequest(
             id = null,
@@ -262,20 +260,26 @@ class BudgetControllerTest {
             modificationDate = now
         )
 
-        every { budgetService.putEntry(request, testUserEmail) } returns expectedResponse
+        every {
+            budgetService.createEntry(
+                request.budgetId,
+                match { it.amount == request.amount && it.description == request.description },
+                testUserEmail
+            )
+        } returns expectedResponse
 
         // When
-        val response = budgetController.putEntry(request, authentication)
+        val response = budgetController.putEntryLegacy(request, authentication)
 
         // Then
         assertEquals(HttpStatus.CREATED, response.statusCode)
         assertEquals(expectedResponse, response.body)
         assertEquals(1L, response.body?.id)
-        verify(exactly = 1) { budgetService.putEntry(request, testUserEmail) }
+        verify(exactly = 1) { budgetService.createEntry(request.budgetId, any(), testUserEmail) }
     }
 
     @Test
-    fun `putEntry should return ok status when updating existing entry`() {
+    fun `putEntryLegacy should return ok status when updating existing entry`() {
         // Given
         val request = PutEntryRequest(
             id = 1L,
@@ -299,20 +303,27 @@ class BudgetControllerTest {
             modificationDate = now
         )
 
-        every { budgetService.putEntry(request, testUserEmail) } returns expectedResponse
+        every {
+            budgetService.updateEntry(
+                request.budgetId,
+                request.id,
+                match { it.amount == request.amount && it.description == request.description },
+                testUserEmail
+            )
+        } returns expectedResponse
 
         // When
-        val response = budgetController.putEntry(request, authentication)
+        val response = budgetController.putEntryLegacy(request, authentication)
 
         // Then
         assertEquals(HttpStatus.OK, response.statusCode)
         assertEquals(expectedResponse, response.body)
         assertEquals(testUserEmail, response.body?.updatedByEmail)
-        verify(exactly = 1) { budgetService.putEntry(request, testUserEmail) }
+        verify(exactly = 1) { budgetService.updateEntry(request.budgetId, request.id, any(), testUserEmail) }
     }
 
     @Test
-    fun `putEntry should propagate exception when user has no access`() {
+    fun `putEntryLegacy should propagate exception when user has no access`() {
         // Given
         val request = PutEntryRequest(
             id = null,
@@ -323,16 +334,16 @@ class BudgetControllerTest {
             type = EntryType.OUTCOME
         )
 
-        every { budgetService.putEntry(request, testUserEmail) } throws
+        every { budgetService.createEntry(request.budgetId, any(), testUserEmail) } throws
             IllegalArgumentException("You don't have access to budget with id: 1")
 
         // When & Then
         val exception = org.junit.jupiter.api.assertThrows<IllegalArgumentException> {
-            budgetController.putEntry(request, authentication)
+            budgetController.putEntryLegacy(request, authentication)
         }
 
         assertTrue(exception.message!!.contains("don't have access"))
-        verify(exactly = 1) { budgetService.putEntry(request, testUserEmail) }
+        verify(exactly = 1) { budgetService.createEntry(request.budgetId, any(), testUserEmail) }
     }
 
     // GetEntries Tests
@@ -415,17 +426,191 @@ class BudgetControllerTest {
         verify(exactly = 1) { budgetService.getEntriesByBudgetId(budgetId, testUserEmail) }
     }
 
-    // NewEntry (SSE) Tests - These now test the reactive Flow endpoint
+    // CreateEntry Tests - Testing new RESTful endpoint
 
     @Test
-    fun `newEntry should verify access and return Flux when user has access`() {
+    fun `createEntry should return created status with entry response`() {
+        // Given
+        val budgetId = 1L
+        val request = CreateBudgetEntryRequest(
+            amount = BigDecimal("150.00"),
+            description = "Groceries",
+            category = "Food",
+            type = EntryType.OUTCOME
+        )
+        val now = LocalDateTime.now()
+        val expectedResponse = BudgetEntryResponse(
+            id = 1L,
+            budgetId = budgetId,
+            amount = request.amount,
+            description = request.description,
+            category = request.category,
+            type = request.type,
+            createdByEmail = testUserEmail,
+            updatedByEmail = null,
+            creationDate = now,
+            modificationDate = now
+        )
+
+        every { budgetService.createEntry(budgetId, request, testUserEmail) } returns expectedResponse
+
+        // When
+        val response = budgetController.createEntry(budgetId, request, authentication)
+
+        // Then
+        assertEquals(HttpStatus.CREATED, response.statusCode)
+        assertEquals(expectedResponse, response.body)
+        assertEquals(1L, response.body?.id)
+        assertEquals(budgetId, response.body?.budgetId)
+        verify(exactly = 1) { budgetService.createEntry(budgetId, request, testUserEmail) }
+    }
+
+    @Test
+    fun `createEntry should propagate exception when user has no access`() {
+        // Given
+        val budgetId = 999L
+        val request = CreateBudgetEntryRequest(
+            amount = BigDecimal("100.00"),
+            description = "Test",
+            category = "Test",
+            type = EntryType.OUTCOME
+        )
+
+        every { budgetService.createEntry(budgetId, request, testUserEmail) } throws
+            IllegalArgumentException("You don't have access to budget with id: $budgetId")
+
+        // When & Then
+        val exception = org.junit.jupiter.api.assertThrows<IllegalArgumentException> {
+            budgetController.createEntry(budgetId, request, authentication)
+        }
+
+        assertTrue(exception.message!!.contains("don't have access"))
+        verify(exactly = 1) { budgetService.createEntry(budgetId, request, testUserEmail) }
+    }
+
+    // UpdateEntry Tests - Testing new RESTful endpoint
+
+    @Test
+    fun `updateEntry should return ok status with updated entry response`() {
+        // Given
+        val budgetId = 1L
+        val entryId = 5L
+        val request = UpdateBudgetEntryRequest(
+            amount = BigDecimal("200.00"),
+            description = "Updated Groceries",
+            category = "Food",
+            type = EntryType.OUTCOME
+        )
+        val now = LocalDateTime.now()
+        val expectedResponse = BudgetEntryResponse(
+            id = entryId,
+            budgetId = budgetId,
+            amount = request.amount,
+            description = request.description,
+            category = request.category,
+            type = request.type,
+            createdByEmail = testUserEmail,
+            updatedByEmail = testUserEmail,
+            creationDate = now.minusDays(1),
+            modificationDate = now
+        )
+
+        every { budgetService.updateEntry(budgetId, entryId, request, testUserEmail) } returns expectedResponse
+
+        // When
+        val response = budgetController.updateEntry(budgetId, entryId, request, authentication)
+
+        // Then
+        assertEquals(HttpStatus.OK, response.statusCode)
+        assertEquals(expectedResponse, response.body)
+        assertEquals(entryId, response.body?.id)
+        assertEquals(testUserEmail, response.body?.updatedByEmail)
+        verify(exactly = 1) { budgetService.updateEntry(budgetId, entryId, request, testUserEmail) }
+    }
+
+    @Test
+    fun `updateEntry should propagate exception when user has no access`() {
+        // Given
+        val budgetId = 999L
+        val entryId = 5L
+        val request = UpdateBudgetEntryRequest(
+            amount = BigDecimal("100.00"),
+            description = "Test",
+            category = "Test",
+            type = EntryType.OUTCOME
+        )
+
+        every { budgetService.updateEntry(budgetId, entryId, request, testUserEmail) } throws
+            IllegalArgumentException("You don't have access to budget with id: $budgetId")
+
+        // When & Then
+        val exception = org.junit.jupiter.api.assertThrows<IllegalArgumentException> {
+            budgetController.updateEntry(budgetId, entryId, request, authentication)
+        }
+
+        assertTrue(exception.message!!.contains("don't have access"))
+        verify(exactly = 1) { budgetService.updateEntry(budgetId, entryId, request, testUserEmail) }
+    }
+
+    @Test
+    fun `updateEntry should propagate exception when entry not found`() {
+        // Given
+        val budgetId = 1L
+        val entryId = 999L
+        val request = UpdateBudgetEntryRequest(
+            amount = BigDecimal("100.00"),
+            description = "Test",
+            category = "Test",
+            type = EntryType.OUTCOME
+        )
+
+        every { budgetService.updateEntry(budgetId, entryId, request, testUserEmail) } throws
+            IllegalArgumentException("Budget entry not found with id: $entryId")
+
+        // When & Then
+        val exception = org.junit.jupiter.api.assertThrows<IllegalArgumentException> {
+            budgetController.updateEntry(budgetId, entryId, request, authentication)
+        }
+
+        assertTrue(exception.message!!.contains("Budget entry not found"))
+        verify(exactly = 1) { budgetService.updateEntry(budgetId, entryId, request, testUserEmail) }
+    }
+
+    @Test
+    fun `updateEntry should propagate exception when entry does not belong to budget`() {
+        // Given
+        val budgetId = 1L
+        val entryId = 5L
+        val request = UpdateBudgetEntryRequest(
+            amount = BigDecimal("100.00"),
+            description = "Test",
+            category = "Test",
+            type = EntryType.OUTCOME
+        )
+
+        every { budgetService.updateEntry(budgetId, entryId, request, testUserEmail) } throws
+            IllegalArgumentException("Budget entry $entryId does not belong to budget $budgetId")
+
+        // When & Then
+        val exception = org.junit.jupiter.api.assertThrows<IllegalArgumentException> {
+            budgetController.updateEntry(budgetId, entryId, request, authentication)
+        }
+
+        assertTrue(exception.message!!.contains("does not belong to budget"))
+        verify(exactly = 1) { budgetService.updateEntry(budgetId, entryId, request, testUserEmail) }
+    }
+
+    // StreamEntries (SSE) Tests - Testing new RESTful endpoint
+
+    @Test
+    fun `streamEntries should verify access and return Flux when user has access`() {
         // Given
         val budgetId = 1L
 
         every { budgetService.verifyUserHasAccessToBudget(budgetId, testUserEmail) } just Runs
 
         // When
-        val flux = budgetController.newEntry(budgetId, authentication)
+        val flux = budgetController.streamEntries(budgetId, authentication)
 
         // Then
         assertNotNull(flux)
@@ -433,7 +618,7 @@ class BudgetControllerTest {
     }
 
     @Test
-    fun `newEntry should propagate exception when user has no access`() {
+    fun `streamEntries should propagate exception when user has no access`() {
         // Given
         val budgetId = 999L
 
@@ -442,7 +627,7 @@ class BudgetControllerTest {
 
         // When & Then
         val exception = org.junit.jupiter.api.assertThrows<IllegalArgumentException> {
-            budgetController.newEntry(budgetId, authentication)
+            budgetController.streamEntries(budgetId, authentication)
         }
 
         assertTrue(exception.message!!.contains("don't have access"))
@@ -451,21 +636,18 @@ class BudgetControllerTest {
 
     // Legacy SSE endpoint test
     @Test
-    fun `newEntryLegacy should return SseEmitter when user has access`() {
+    fun `newEntryLegacy should return Flux when user has access`() {
         // Given
         val budgetId = 1L
-        val expectedEmitter = SseEmitter(1800000L)
 
         every { budgetService.verifyUserHasAccessToBudget(budgetId, testUserEmail) } just Runs
-        every { sseService.createEmitter(budgetId) } returns expectedEmitter
 
         // When
-        val emitter = budgetController.newEntryLegacy(budgetId, authentication)
+        val flux = budgetController.newEntryLegacy(budgetId, authentication)
 
         // Then
-        assertNotNull(emitter)
+        assertNotNull(flux)
         verify(exactly = 1) { budgetService.verifyUserHasAccessToBudget(budgetId, testUserEmail) }
-        verify(exactly = 1) { sseService.createEmitter(budgetId) }
     }
 
     // Integration-like Tests
@@ -514,16 +696,22 @@ class BudgetControllerTest {
             modificationDate = LocalDateTime.now()
         )
 
-        every { budgetService.putEntry(entryRequest, testUserEmail) } returns entryResponse
+        every {
+            budgetService.createEntry(
+                budgetId,
+                match { it.amount == entryRequest.amount && it.description == entryRequest.description },
+                testUserEmail
+            )
+        } returns entryResponse
 
         // When - Add entry
-        val entryResult = budgetController.putEntry(entryRequest, authentication)
+        val entryResult = budgetController.putEntryLegacy(entryRequest, authentication)
 
         // Then - Verify entry created
         assertEquals(HttpStatus.CREATED, entryResult.statusCode)
         assertEquals(entryRequest.amount, entryResult.body?.amount)
 
         verify(exactly = 1) { budgetService.createBudget(createRequest, testUserEmail) }
-        verify(exactly = 1) { budgetService.putEntry(entryRequest, testUserEmail) }
+        verify(exactly = 1) { budgetService.createEntry(budgetId, any(), testUserEmail) }
     }
 }

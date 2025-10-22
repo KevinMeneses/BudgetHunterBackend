@@ -66,22 +66,22 @@ class BudgetService(
     }
 
     @Transactional
-    fun addCollaborator(request: AddCollaboratorRequest, authenticatedUserEmail: String): CollaboratorResponse {
-        verifyUserHasAccessToBudget(request.budgetId, authenticatedUserEmail)
+    fun addCollaborator(budgetId: Long, request: AddCollaboratorRequest, authenticatedUserEmail: String): CollaboratorResponse {
+        verifyUserHasAccessToBudget(budgetId, authenticatedUserEmail)
 
-        val budget = budgetRepository.findById(request.budgetId)
-            .orElseThrow { IllegalArgumentException("Budget not found with id: ${request.budgetId}") }
+        val budget = budgetRepository.findById(budgetId)
+            .orElseThrow { IllegalArgumentException("Budget not found with id: $budgetId") }
 
         val collaborator = userRepository.findById(request.email)
             .orElseThrow { IllegalArgumentException("User not found with email: ${request.email}") }
 
         val userBudgetId = UserBudgetId(
-            budgetId = request.budgetId,
+            budgetId = budgetId,
             userEmail = request.email
         )
 
         if (userBudgetRepository.existsById(userBudgetId)) {
-            throw IllegalStateException("User ${request.email} is already a collaborator on budget ${request.budgetId}")
+            throw IllegalStateException("User ${request.email} is already a collaborator on budget $budgetId")
         }
 
         val userBudget = UserBudget(
@@ -127,6 +127,66 @@ class BudgetService(
 
         val entries = budgetEntryRepository.findByBudgetId(budgetId)
         return entries.map { it.toResponse() }
+    }
+
+    @Transactional
+    fun createEntry(budgetId: Long, request: CreateBudgetEntryRequest, authenticatedUserEmail: String): BudgetEntryResponse {
+        verifyUserHasAccessToBudget(budgetId, authenticatedUserEmail)
+
+        val budget = budgetRepository.findById(budgetId)
+            .orElseThrow { IllegalArgumentException("Budget not found with id: $budgetId") }
+
+        val user = userRepository.findById(authenticatedUserEmail)
+            .orElseThrow { IllegalArgumentException("User not found with email: $authenticatedUserEmail") }
+
+        val newEntry = BudgetEntry(
+            budget = budget,
+            amount = request.amount,
+            description = request.description,
+            category = request.category,
+            type = request.type,
+            createdBy = user,
+            creationDate = LocalDateTime.now(),
+            modificationDate = LocalDateTime.now()
+        )
+
+        val savedEntry = budgetEntryRepository.save(newEntry)
+        val response = savedEntry.toResponse()
+
+        broadcastBudgetEntryEvent(savedEntry, user)
+
+        return response
+    }
+
+    @Transactional
+    fun updateEntry(budgetId: Long, entryId: Long, request: UpdateBudgetEntryRequest, authenticatedUserEmail: String): BudgetEntryResponse {
+        verifyUserHasAccessToBudget(budgetId, authenticatedUserEmail)
+
+        val user = userRepository.findById(authenticatedUserEmail)
+            .orElseThrow { IllegalArgumentException("User not found with email: $authenticatedUserEmail") }
+
+        val existingEntry = budgetEntryRepository.findById(entryId)
+            .orElseThrow { IllegalArgumentException("Budget entry not found with id: $entryId") }
+
+        if (existingEntry.budget.id != budgetId) {
+            throw IllegalArgumentException("Budget entry $entryId does not belong to budget $budgetId")
+        }
+
+        val updatedEntry = existingEntry.copy(
+            amount = request.amount,
+            description = request.description,
+            category = request.category,
+            type = request.type,
+            updatedBy = user,
+            modificationDate = LocalDateTime.now()
+        )
+
+        val savedEntry = budgetEntryRepository.save(updatedEntry)
+        val response = savedEntry.toResponse()
+
+        broadcastBudgetEntryEvent(savedEntry, user)
+
+        return response
     }
 
     @Transactional

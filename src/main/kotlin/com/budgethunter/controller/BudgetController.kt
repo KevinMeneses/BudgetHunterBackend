@@ -3,7 +3,6 @@ package com.budgethunter.controller
 import com.budgethunter.dto.*
 import com.budgethunter.service.BudgetService
 import com.budgethunter.service.ReactiveSseService
-import com.budgethunter.service.SseService
 import jakarta.validation.Valid
 import org.springframework.http.HttpStatus
 import org.springframework.http.MediaType
@@ -11,18 +10,16 @@ import org.springframework.http.ResponseEntity
 import org.springframework.http.codec.ServerSentEvent
 import org.springframework.security.core.Authentication
 import org.springframework.web.bind.annotation.*
-import org.springframework.web.servlet.mvc.method.annotation.SseEmitter
 import reactor.core.publisher.Flux
 
 @RestController
 @RequestMapping("/api/budgets")
 class BudgetController(
     private val budgetService: BudgetService,
-    private val sseService: SseService,
     private val reactiveSseService: ReactiveSseService
 ) {
 
-    @PostMapping("/create_budget")
+    @PostMapping
     fun createBudget(
         @Valid @RequestBody request: CreateBudgetRequest,
         authentication: Authentication
@@ -32,25 +29,98 @@ class BudgetController(
         return ResponseEntity.status(HttpStatus.CREATED).body(response)
     }
 
-    @GetMapping("/get_budgets")
+    @GetMapping
     fun getBudgets(authentication: Authentication): ResponseEntity<List<BudgetResponse>> {
         val userEmail = authentication.principal as String
         val budgets = budgetService.getBudgetsByUserEmail(userEmail)
         return ResponseEntity.ok(budgets)
     }
 
-    @PostMapping("/add_collaborator")
+    @PostMapping("/{budgetId}/collaborators")
     fun addCollaborator(
+        @PathVariable budgetId: Long,
         @Valid @RequestBody request: AddCollaboratorRequest,
         authentication: Authentication
     ): ResponseEntity<CollaboratorResponse> {
         val userEmail = authentication.principal as String
-        val response = budgetService.addCollaborator(request, userEmail)
+        val response = budgetService.addCollaborator(budgetId, request, userEmail)
         return ResponseEntity.status(HttpStatus.CREATED).body(response)
     }
 
-    @GetMapping("/get_collaborators")
+    @GetMapping("/{budgetId}/collaborators")
     fun getCollaborators(
+        @PathVariable budgetId: Long,
+        authentication: Authentication
+    ): ResponseEntity<List<UserResponse>> {
+        val userEmail = authentication.principal as String
+        val collaborators = budgetService.getCollaboratorsByBudgetId(budgetId, userEmail)
+        return ResponseEntity.ok(collaborators)
+    }
+
+    @PostMapping("/{budgetId}/entries")
+    fun createEntry(
+        @PathVariable budgetId: Long,
+        @Valid @RequestBody request: CreateBudgetEntryRequest,
+        authentication: Authentication
+    ): ResponseEntity<BudgetEntryResponse> {
+        val userEmail = authentication.principal as String
+        val response = budgetService.createEntry(budgetId, request, userEmail)
+        return ResponseEntity.status(HttpStatus.CREATED).body(response)
+    }
+
+    @PutMapping("/{budgetId}/entries/{entryId}")
+    fun updateEntry(
+        @PathVariable budgetId: Long,
+        @PathVariable entryId: Long,
+        @Valid @RequestBody request: UpdateBudgetEntryRequest,
+        authentication: Authentication
+    ): ResponseEntity<BudgetEntryResponse> {
+        val userEmail = authentication.principal as String
+        val response = budgetService.updateEntry(budgetId, entryId, request, userEmail)
+        return ResponseEntity.ok(response)
+    }
+
+    @GetMapping("/{budgetId}/entries")
+    fun getEntries(
+        @PathVariable budgetId: Long,
+        authentication: Authentication
+    ): ResponseEntity<List<BudgetEntryResponse>> {
+        val userEmail = authentication.principal as String
+        val entries = budgetService.getEntriesByBudgetId(budgetId, userEmail)
+        return ResponseEntity.ok(entries)
+    }
+
+    @GetMapping("/{budgetId}/entries/stream", produces = [MediaType.TEXT_EVENT_STREAM_VALUE])
+    fun streamEntries(
+        @PathVariable budgetId: Long,
+        authentication: Authentication
+    ): Flux<ServerSentEvent<BudgetEntryEvent>> {
+        val userEmail = authentication.principal as String
+        budgetService.verifyUserHasAccessToBudget(budgetId, userEmail)
+
+        return reactiveSseService.subscribeToEvents(budgetId)
+            .map { event ->
+                ServerSentEvent.builder(event)
+                    .event("budget-entry")
+                    .build()
+            }
+    }
+
+    // Legacy endpoints for backward compatibility
+    @Deprecated("Use POST /{budgetId}/collaborators instead")
+    @PostMapping("/add_collaborator")
+    fun addCollaboratorLegacy(
+        @Valid @RequestBody request: AddCollaboratorRequest,
+        authentication: Authentication
+    ): ResponseEntity<CollaboratorResponse> {
+        val userEmail = authentication.principal as String
+        val response = budgetService.addCollaborator(request.budgetId, request, userEmail)
+        return ResponseEntity.status(HttpStatus.CREATED).body(response)
+    }
+
+    @Deprecated("Use GET /{budgetId}/collaborators instead")
+    @GetMapping("/get_collaborators")
+    fun getCollaboratorsLegacy(
         @RequestParam budgetId: Long,
         authentication: Authentication
     ): ResponseEntity<List<UserResponse>> {
@@ -59,19 +129,9 @@ class BudgetController(
         return ResponseEntity.ok(collaborators)
     }
 
-    @PutMapping("/put_entry")
-    fun putEntry(
-        @Valid @RequestBody request: PutEntryRequest,
-        authentication: Authentication
-    ): ResponseEntity<BudgetEntryResponse> {
-        val userEmail = authentication.principal as String
-        val response = budgetService.putEntry(request, userEmail)
-        val httpStatus = if (request.id == null) HttpStatus.CREATED else HttpStatus.OK
-        return ResponseEntity.status(httpStatus).body(response)
-    }
-
+    @Deprecated("Use GET /{budgetId}/entries instead")
     @GetMapping("/get_entries")
-    fun getEntries(
+    fun getEntriesLegacy(
         @RequestParam budgetId: Long,
         authentication: Authentication
     ): ResponseEntity<List<BudgetEntryResponse>> {
@@ -80,18 +140,56 @@ class BudgetController(
         return ResponseEntity.ok(entries)
     }
 
-    @GetMapping("/new_entry_legacy", produces = [MediaType.TEXT_EVENT_STREAM_VALUE])
-    fun newEntryLegacy(
-        @RequestParam budgetId: Long,
+    @Deprecated("Use POST /api/budgets instead")
+    @PostMapping("/create_budget")
+    fun createBudgetLegacy(
+        @Valid @RequestBody request: CreateBudgetRequest,
         authentication: Authentication
-    ): SseEmitter {
+    ): ResponseEntity<BudgetResponse> {
         val userEmail = authentication.principal as String
-        budgetService.verifyUserHasAccessToBudget(budgetId, userEmail)
-        return sseService.createEmitter(budgetId)
+        val response = budgetService.createBudget(request, userEmail)
+        return ResponseEntity.status(HttpStatus.CREATED).body(response)
     }
 
-    @GetMapping("/new_entry", produces = [MediaType.TEXT_EVENT_STREAM_VALUE])
-    fun newEntry(
+    @Deprecated("Use GET /api/budgets instead")
+    @GetMapping("/get_budgets")
+    fun getBudgetsLegacy(authentication: Authentication): ResponseEntity<List<BudgetResponse>> {
+        val userEmail = authentication.principal as String
+        val budgets = budgetService.getBudgetsByUserEmail(userEmail)
+        return ResponseEntity.ok(budgets)
+    }
+
+    @Deprecated("Use PUT /{budgetId}/entries/{entryId} or POST /{budgetId}/entries")
+    @PutMapping("/put_entry")
+    fun putEntryLegacy(
+        @Valid @RequestBody request: PutEntryRequest,
+        authentication: Authentication
+    ): ResponseEntity<BudgetEntryResponse> {
+        val userEmail = authentication.principal as String
+        if (request.id == null) {
+            val createRequest = CreateBudgetEntryRequest(
+                amount = request.amount,
+                description = request.description,
+                category = request.category,
+                type = request.type
+            )
+            val response = budgetService.createEntry(request.budgetId, createRequest, userEmail)
+            return ResponseEntity.status(HttpStatus.CREATED).body(response)
+        } else {
+            val updateRequest = UpdateBudgetEntryRequest(
+                amount = request.amount,
+                description = request.description,
+                category = request.category,
+                type = request.type
+            )
+            val response = budgetService.updateEntry(request.budgetId, request.id, updateRequest, userEmail)
+            return ResponseEntity.ok(response)
+        }
+    }
+
+    @Deprecated("Use GET /{budgetId}/entries/stream instead")
+    @GetMapping("/new_entry")
+    fun newEntryLegacy(
         @RequestParam budgetId: Long,
         authentication: Authentication
     ): Flux<ServerSentEvent<BudgetEntryEvent>> {

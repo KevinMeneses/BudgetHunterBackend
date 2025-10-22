@@ -174,7 +174,7 @@ class BudgetServiceTest {
         every { userBudgetRepository.save(any()) } returns mockk()
 
         // When
-        val result = budgetService.addCollaborator(request, testUserEmail)
+        val result = budgetService.addCollaborator(1L, request, testUserEmail)
 
         // Then
         assertEquals(1L, result.budgetId)
@@ -201,7 +201,7 @@ class BudgetServiceTest {
 
         // When & Then
         val exception = assertThrows<IllegalArgumentException> {
-            budgetService.addCollaborator(request, testUserEmail)
+            budgetService.addCollaborator(request.budgetId, request, testUserEmail)
         }
 
         assertEquals("You don't have access to budget with id: 1", exception.message)
@@ -223,7 +223,7 @@ class BudgetServiceTest {
 
         // When & Then
         val exception = assertThrows<IllegalArgumentException> {
-            budgetService.addCollaborator(request, testUserEmail)
+            budgetService.addCollaborator(request.budgetId, request, testUserEmail)
         }
 
         assertEquals("Budget not found with id: 999", exception.message)
@@ -246,7 +246,7 @@ class BudgetServiceTest {
 
         // When & Then
         val exception = assertThrows<IllegalArgumentException> {
-            budgetService.addCollaborator(request, testUserEmail)
+            budgetService.addCollaborator(request.budgetId, request, testUserEmail)
         }
 
         assertEquals("User not found with email: $nonExistentEmail", exception.message)
@@ -276,7 +276,7 @@ class BudgetServiceTest {
 
         // When & Then
         val exception = assertThrows<IllegalStateException> {
-            budgetService.addCollaborator(request, testUserEmail)
+            budgetService.addCollaborator(request.budgetId, request, testUserEmail)
         }
 
         assertTrue(exception.message!!.contains("is already a collaborator"))
