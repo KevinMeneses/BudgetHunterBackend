@@ -20,6 +20,9 @@ repositories {
 }
 
 dependencies {
+    // Security: Force commons-lang3 to secure version (fixes CVE - Uncontrolled Recursion vulnerability)
+    implementation("org.apache.commons:commons-lang3:3.18.0")
+
     // Spring Boot Starters
     implementation("org.springframework.boot:spring-boot-starter-web")
     implementation("org.springframework.boot:spring-boot-starter-webflux")  // For Flux SSE support
@@ -33,6 +36,9 @@ dependencies {
     implementation("com.fasterxml.jackson.module:jackson-module-kotlin")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-reactor")  // Coroutines ↔ Reactor bridge
+
+    // OpenAPI/Swagger Documentation
+    implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:2.6.0")
 
     // JWT
     implementation("io.jsonwebtoken:jjwt-api:0.12.6")

@@ -243,6 +243,9 @@ All endpoints from the system architecture diagram have been successfully implem
 - [x] Implement JWT authentication ✅
 - [x] Implement authorization (users can only access their budgets) ✅
 - [x] Add request validation for all endpoints ✅
+- [x] ✅ **Security dependency updates** (completed 2025-10-25)
+  - Apache Commons Lang upgraded to 3.18.0 (fixes CVE - Uncontrolled Recursion vulnerability)
+  - SpringDoc OpenAPI upgraded to 2.6.0 (secure, latest stable version)
 - [ ] Add rate limiting
 - [ ] Implement CORS configuration for production
 - [ ] Add request/response logging
@@ -258,10 +261,16 @@ All endpoints from the system architecture diagram have been successfully implem
   - Codebase fully migrated to RESTful API design
 - [x] ✅ Add GET /api/budgets/{budgetId}/entries endpoint (list all entries)
 - [x] ✅ Add DELETE endpoints (budget, entry, collaborator) (completed 2025-10-25)
+- [x] ✅ **Add API documentation (Swagger/OpenAPI)** (completed 2025-10-25)
+  - SpringDoc OpenAPI 2.6.0 integrated (secure, latest stable version)
+  - Comprehensive annotations on all controller endpoints
+  - Interactive Swagger UI available at `/swagger-ui/index.html`
+  - OpenAPI JSON spec available at `/v3/api-docs`
+  - Security scheme configured for JWT Bearer authentication
+  - Detailed endpoint descriptions with request/response examples
 - [ ] Add pagination for GET endpoints
 - [ ] Add filtering/sorting for budget entries
 - [ ] Add GET /api/budgets/{id} endpoint (get single budget)
-- [ ] Add API documentation (Swagger/OpenAPI)
 
 ### Data & Database
 - [ ] Migrate from H2 to PostgreSQL for production
@@ -317,4 +326,4 @@ All endpoints from the system architecture diagram have been successfully implem
 
 ---
 
-**Last Updated:** 2025-10-25 (Legacy Deprecated Endpoints Removed - Full RESTful Migration Complete)
+**Last Updated:** 2025-10-25 (API Documentation Added - Swagger/OpenAPI Integration Complete)

@@ -2,6 +2,18 @@
 
 **Note:** This API follows RESTful conventions with resource-based URLs and proper HTTP methods (GET, POST, PUT, DELETE).
 
+## 📚 Interactive API Documentation
+
+For interactive API documentation with the ability to test endpoints directly in your browser:
+- **Swagger UI:** http://localhost:8080/swagger-ui/index.html
+- **OpenAPI JSON:** http://localhost:8080/v3/api-docs
+
+The Swagger UI provides:
+- Complete API reference with request/response schemas
+- Interactive "Try it out" functionality for all endpoints
+- JWT authentication support (click "Authorize" button to add your token)
+- Detailed descriptions and examples for each endpoint
+
 ## 1. Sign Up
 
 **Method:** POST

@@ -29,7 +29,15 @@ class SecurityConfig(
             .sessionManagement { it.sessionCreationPolicy(SessionCreationPolicy.STATELESS) }
             .authorizeHttpRequests { auth ->
                 auth
-                    .requestMatchers("/api/users/sign_up", "/api/users/sign_in", "/api/users/refresh_token", "/h2-console/**").permitAll()
+                    .requestMatchers(
+                        "/api/users/sign_up",
+                        "/api/users/sign_in",
+                        "/api/users/refresh_token",
+                        "/h2-console/**",
+                        "/swagger-ui/**",
+                        "/v3/api-docs/**",
+                        "/swagger-ui.html"
+                    ).permitAll()
                     .anyRequest().authenticated()
             }
             .headers { headers ->
