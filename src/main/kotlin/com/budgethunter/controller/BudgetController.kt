@@ -106,6 +106,38 @@ class BudgetController(
             }
     }
 
+    @DeleteMapping("/{budgetId}")
+    fun deleteBudget(
+        @PathVariable budgetId: Long,
+        authentication: Authentication
+    ): ResponseEntity<Void> {
+        val userEmail = authentication.principal as String
+        budgetService.deleteBudget(budgetId, userEmail)
+        return ResponseEntity.noContent().build()
+    }
+
+    @DeleteMapping("/{budgetId}/entries/{entryId}")
+    fun deleteEntry(
+        @PathVariable budgetId: Long,
+        @PathVariable entryId: Long,
+        authentication: Authentication
+    ): ResponseEntity<Void> {
+        val userEmail = authentication.principal as String
+        budgetService.deleteEntry(budgetId, entryId, userEmail)
+        return ResponseEntity.noContent().build()
+    }
+
+    @DeleteMapping("/{budgetId}/collaborators/{collaboratorEmail}")
+    fun removeCollaborator(
+        @PathVariable budgetId: Long,
+        @PathVariable collaboratorEmail: String,
+        authentication: Authentication
+    ): ResponseEntity<Void> {
+        val userEmail = authentication.principal as String
+        budgetService.removeCollaborator(budgetId, collaboratorEmail, userEmail)
+        return ResponseEntity.noContent().build()
+    }
+
     // Legacy endpoints for backward compatibility
     @Deprecated("Use POST /{budgetId}/collaborators instead")
     @PostMapping("/add_collaborator")

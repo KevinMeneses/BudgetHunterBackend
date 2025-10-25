@@ -634,6 +634,204 @@ class BudgetControllerTest {
         verify(exactly = 1) { budgetService.verifyUserHasAccessToBudget(budgetId, testUserEmail) }
     }
 
+    // DeleteBudget Tests
+
+    @Test
+    fun `deleteBudget should return no content status when budget deleted successfully`() {
+        // Given
+        val budgetId = 1L
+
+        every { budgetService.deleteBudget(budgetId, testUserEmail) } just Runs
+
+        // When
+        val response = budgetController.deleteBudget(budgetId, authentication)
+
+        // Then
+        assertEquals(HttpStatus.NO_CONTENT, response.statusCode)
+        assertNull(response.body)
+        verify(exactly = 1) { budgetService.deleteBudget(budgetId, testUserEmail) }
+    }
+
+    @Test
+    fun `deleteBudget should propagate exception when user has no access`() {
+        // Given
+        val budgetId = 999L
+
+        every { budgetService.deleteBudget(budgetId, testUserEmail) } throws
+            IllegalArgumentException("You don't have access to budget with id: $budgetId")
+
+        // When & Then
+        val exception = org.junit.jupiter.api.assertThrows<IllegalArgumentException> {
+            budgetController.deleteBudget(budgetId, authentication)
+        }
+
+        assertTrue(exception.message!!.contains("don't have access"))
+        verify(exactly = 1) { budgetService.deleteBudget(budgetId, testUserEmail) }
+    }
+
+    @Test
+    fun `deleteBudget should propagate exception when budget not found`() {
+        // Given
+        val budgetId = 999L
+
+        every { budgetService.deleteBudget(budgetId, testUserEmail) } throws
+            IllegalArgumentException("Budget not found with id: $budgetId")
+
+        // When & Then
+        val exception = org.junit.jupiter.api.assertThrows<IllegalArgumentException> {
+            budgetController.deleteBudget(budgetId, authentication)
+        }
+
+        assertTrue(exception.message!!.contains("Budget not found"))
+        verify(exactly = 1) { budgetService.deleteBudget(budgetId, testUserEmail) }
+    }
+
+    // DeleteEntry Tests
+
+    @Test
+    fun `deleteEntry should return no content status when entry deleted successfully`() {
+        // Given
+        val budgetId = 1L
+        val entryId = 5L
+
+        every { budgetService.deleteEntry(budgetId, entryId, testUserEmail) } just Runs
+
+        // When
+        val response = budgetController.deleteEntry(budgetId, entryId, authentication)
+
+        // Then
+        assertEquals(HttpStatus.NO_CONTENT, response.statusCode)
+        assertNull(response.body)
+        verify(exactly = 1) { budgetService.deleteEntry(budgetId, entryId, testUserEmail) }
+    }
+
+    @Test
+    fun `deleteEntry should propagate exception when user has no access`() {
+        // Given
+        val budgetId = 999L
+        val entryId = 5L
+
+        every { budgetService.deleteEntry(budgetId, entryId, testUserEmail) } throws
+            IllegalArgumentException("You don't have access to budget with id: $budgetId")
+
+        // When & Then
+        val exception = org.junit.jupiter.api.assertThrows<IllegalArgumentException> {
+            budgetController.deleteEntry(budgetId, entryId, authentication)
+        }
+
+        assertTrue(exception.message!!.contains("don't have access"))
+        verify(exactly = 1) { budgetService.deleteEntry(budgetId, entryId, testUserEmail) }
+    }
+
+    @Test
+    fun `deleteEntry should propagate exception when entry not found`() {
+        // Given
+        val budgetId = 1L
+        val entryId = 999L
+
+        every { budgetService.deleteEntry(budgetId, entryId, testUserEmail) } throws
+            IllegalArgumentException("Budget entry not found with id: $entryId")
+
+        // When & Then
+        val exception = org.junit.jupiter.api.assertThrows<IllegalArgumentException> {
+            budgetController.deleteEntry(budgetId, entryId, authentication)
+        }
+
+        assertTrue(exception.message!!.contains("Budget entry not found"))
+        verify(exactly = 1) { budgetService.deleteEntry(budgetId, entryId, testUserEmail) }
+    }
+
+    @Test
+    fun `deleteEntry should propagate exception when entry does not belong to budget`() {
+        // Given
+        val budgetId = 1L
+        val entryId = 5L
+
+        every { budgetService.deleteEntry(budgetId, entryId, testUserEmail) } throws
+            IllegalArgumentException("Budget entry $entryId does not belong to budget $budgetId")
+
+        // When & Then
+        val exception = org.junit.jupiter.api.assertThrows<IllegalArgumentException> {
+            budgetController.deleteEntry(budgetId, entryId, authentication)
+        }
+
+        assertTrue(exception.message!!.contains("does not belong to budget"))
+        verify(exactly = 1) { budgetService.deleteEntry(budgetId, entryId, testUserEmail) }
+    }
+
+    // RemoveCollaborator Tests
+
+    @Test
+    fun `removeCollaborator should return no content status when collaborator removed successfully`() {
+        // Given
+        val budgetId = 1L
+        val collaboratorEmail = "collaborator@example.com"
+
+        every { budgetService.removeCollaborator(budgetId, collaboratorEmail, testUserEmail) } just Runs
+
+        // When
+        val response = budgetController.removeCollaborator(budgetId, collaboratorEmail, authentication)
+
+        // Then
+        assertEquals(HttpStatus.NO_CONTENT, response.statusCode)
+        assertNull(response.body)
+        verify(exactly = 1) { budgetService.removeCollaborator(budgetId, collaboratorEmail, testUserEmail) }
+    }
+
+    @Test
+    fun `removeCollaborator should propagate exception when user has no access`() {
+        // Given
+        val budgetId = 999L
+        val collaboratorEmail = "collaborator@example.com"
+
+        every { budgetService.removeCollaborator(budgetId, collaboratorEmail, testUserEmail) } throws
+            IllegalArgumentException("You don't have access to budget with id: $budgetId")
+
+        // When & Then
+        val exception = org.junit.jupiter.api.assertThrows<IllegalArgumentException> {
+            budgetController.removeCollaborator(budgetId, collaboratorEmail, authentication)
+        }
+
+        assertTrue(exception.message!!.contains("don't have access"))
+        verify(exactly = 1) { budgetService.removeCollaborator(budgetId, collaboratorEmail, testUserEmail) }
+    }
+
+    @Test
+    fun `removeCollaborator should propagate exception when collaborator not found`() {
+        // Given
+        val budgetId = 1L
+        val collaboratorEmail = "nonexistent@example.com"
+
+        every { budgetService.removeCollaborator(budgetId, collaboratorEmail, testUserEmail) } throws
+            IllegalArgumentException("User $collaboratorEmail is not a collaborator on budget $budgetId")
+
+        // When & Then
+        val exception = org.junit.jupiter.api.assertThrows<IllegalArgumentException> {
+            budgetController.removeCollaborator(budgetId, collaboratorEmail, authentication)
+        }
+
+        assertTrue(exception.message!!.contains("is not a collaborator"))
+        verify(exactly = 1) { budgetService.removeCollaborator(budgetId, collaboratorEmail, testUserEmail) }
+    }
+
+    @Test
+    fun `removeCollaborator should propagate exception when trying to remove last collaborator`() {
+        // Given
+        val budgetId = 1L
+        val collaboratorEmail = "last@example.com"
+
+        every { budgetService.removeCollaborator(budgetId, collaboratorEmail, testUserEmail) } throws
+            IllegalStateException("Cannot remove the last collaborator from budget $budgetId")
+
+        // When & Then
+        val exception = org.junit.jupiter.api.assertThrows<IllegalStateException> {
+            budgetController.removeCollaborator(budgetId, collaboratorEmail, authentication)
+        }
+
+        assertTrue(exception.message!!.contains("Cannot remove the last collaborator"))
+        verify(exactly = 1) { budgetService.removeCollaborator(budgetId, collaboratorEmail, testUserEmail) }
+    }
+
     // Legacy SSE endpoint test
     @Test
     fun `newEntryLegacy should return Flux when user has access`() {

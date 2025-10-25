@@ -11,4 +11,6 @@ interface BudgetEntryRepository : JpaRepository<BudgetEntry, Long> {
 
     @Query("SELECT be FROM BudgetEntry be WHERE be.budget.id = :budgetId ORDER BY be.modificationDate DESC")
     fun findByBudgetId(@Param("budgetId") budgetId: Long): List<BudgetEntry>
+
+    fun deleteByBudgetId(budgetId: Long)
 }

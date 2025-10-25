@@ -260,6 +260,61 @@ class BudgetService(
         modificationDate = this.modificationDate
     )
 
+    @Transactional
+    fun deleteBudget(budgetId: Long, authenticatedUserEmail: String) {
+        verifyUserHasAccessToBudget(budgetId, authenticatedUserEmail)
+
+        if (!budgetRepository.existsById(budgetId)) {
+            throw IllegalArgumentException("Budget not found with id: $budgetId")
+        }
+
+        // Delete all budget entries first (due to foreign key constraints)
+        budgetEntryRepository.deleteByBudgetId(budgetId)
+
+        // Delete all user-budget associations
+        userBudgetRepository.deleteByBudgetId(budgetId)
+
+        // Finally delete the budget itself
+        budgetRepository.deleteById(budgetId)
+    }
+
+    @Transactional
+    fun deleteEntry(budgetId: Long, entryId: Long, authenticatedUserEmail: String) {
+        verifyUserHasAccessToBudget(budgetId, authenticatedUserEmail)
+
+        val entry = budgetEntryRepository.findById(entryId)
+            .orElseThrow { IllegalArgumentException("Budget entry not found with id: $entryId") }
+
+        if (entry.budget.id != budgetId) {
+            throw IllegalArgumentException("Budget entry $entryId does not belong to budget $budgetId")
+        }
+
+        budgetEntryRepository.deleteById(entryId)
+    }
+
+    @Transactional
+    fun removeCollaborator(budgetId: Long, collaboratorEmail: String, authenticatedUserEmail: String) {
+        verifyUserHasAccessToBudget(budgetId, authenticatedUserEmail)
+
+        if (!budgetRepository.existsById(budgetId)) {
+            throw IllegalArgumentException("Budget not found with id: $budgetId")
+        }
+
+        val userBudgetId = UserBudgetId(budgetId = budgetId, userEmail = collaboratorEmail)
+
+        if (!userBudgetRepository.existsById(userBudgetId)) {
+            throw IllegalArgumentException("User $collaboratorEmail is not a collaborator on budget $budgetId")
+        }
+
+        // Check if this is the last collaborator
+        val collaboratorsCount = userBudgetRepository.countByBudgetId(budgetId)
+        if (collaboratorsCount <= 1) {
+            throw IllegalStateException("Cannot remove the last collaborator from budget $budgetId")
+        }
+
+        userBudgetRepository.deleteById(userBudgetId)
+    }
+
     fun verifyUserHasAccessToBudget(budgetId: Long, userEmail: String) {
         val userBudgetId = UserBudgetId(budgetId = budgetId, userEmail = userEmail)
         if (!userBudgetRepository.existsById(userBudgetId)) {

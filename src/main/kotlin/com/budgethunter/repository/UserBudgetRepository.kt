@@ -17,4 +17,9 @@ interface UserBudgetRepository : JpaRepository<UserBudget, UserBudgetId> {
 
     @Query("SELECT ub.user FROM UserBudget ub WHERE ub.id.budgetId = :budgetId")
     fun findUsersByBudgetId(@Param("budgetId") budgetId: Long): List<User>
+
+    @Query("SELECT COUNT(ub) FROM UserBudget ub WHERE ub.id.budgetId = :budgetId")
+    fun countByBudgetId(@Param("budgetId") budgetId: Long): Long
+
+    fun deleteByBudgetId(budgetId: Long)
 }

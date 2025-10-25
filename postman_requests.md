@@ -361,6 +361,51 @@ data: {
 
 ---
 
+## 12. Delete Budget Entry
+
+**Method:** DELETE
+**URL:** `http://localhost:8080/api/budgets/1/entries/1`
+**Headers:**
+- Authorization: Bearer YOUR_JWT_TOKEN_HERE
+
+**Body:** None
+
+**Expected Response (204 No Content):** Empty response with 204 status code
+
+**Note:** Deletes a specific budget entry. The entry must belong to the specified budget, and the authenticated user must have access to the budget.
+
+---
+
+## 13. Remove Collaborator
+
+**Method:** DELETE
+**URL:** `http://localhost:8080/api/budgets/1/collaborators/collaborator@example.com`
+**Headers:**
+- Authorization: Bearer YOUR_JWT_TOKEN_HERE
+
+**Body:** None
+
+**Expected Response (204 No Content):** Empty response with 204 status code
+
+**Note:** Removes a collaborator from a budget. The authenticated user must have access to the budget. Cannot remove the last collaborator from a budget.
+
+---
+
+## 14. Delete Budget
+
+**Method:** DELETE
+**URL:** `http://localhost:8080/api/budgets/1`
+**Headers:**
+- Authorization: Bearer YOUR_JWT_TOKEN_HERE
+
+**Body:** None
+
+**Expected Response (204 No Content):** Empty response with 204 status code
+
+**Note:** Deletes a budget and all associated entries and collaborator relationships. The authenticated user must have access to the budget. This operation cannot be undone.
+
+---
+
 ## cURL Commands (Alternative)
 
 ### Sign Up
@@ -448,4 +493,22 @@ curl -X PUT http://localhost:8080/api/budgets/1/entries/1 \
 ```bash
 curl -N -H "Authorization: Bearer YOUR_JWT_TOKEN" \
   "http://localhost:8080/api/budgets/1/entries/stream"
+```
+
+### Delete Budget Entry
+```bash
+curl -X DELETE http://localhost:8080/api/budgets/1/entries/1 \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN"
+```
+
+### Delete Collaborator
+```bash
+curl -X DELETE http://localhost:8080/api/budgets/1/collaborators/collaborator@example.com \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN"
+```
+
+### Delete Budget
+```bash
+curl -X DELETE http://localhost:8080/api/budgets/1 \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN"
 ```
