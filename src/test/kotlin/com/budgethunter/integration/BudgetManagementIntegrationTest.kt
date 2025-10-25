@@ -80,7 +80,7 @@ class BudgetManagementIntegrationTest {
 
         // When & Then
         val result = mockMvc.perform(
-            post("/api/budgets/create_budget")
+            post("/api/budgets")
                 .header("Authorization", "Bearer $user1AuthToken")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request))
@@ -106,7 +106,7 @@ class BudgetManagementIntegrationTest {
 
         // When & Then
         mockMvc.perform(
-            post("/api/budgets/create_budget")
+            post("/api/budgets")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request))
         )
@@ -122,14 +122,14 @@ class BudgetManagementIntegrationTest {
         val budget2 = CreateBudgetRequest(name = "Budget 2", amount = BigDecimal("2000.00"))
 
         mockMvc.perform(
-            post("/api/budgets/create_budget")
+            post("/api/budgets")
                 .header("Authorization", "Bearer $user1AuthToken")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(budget1))
         )
 
         mockMvc.perform(
-            post("/api/budgets/create_budget")
+            post("/api/budgets")
                 .header("Authorization", "Bearer $user1AuthToken")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(budget2))
@@ -137,7 +137,7 @@ class BudgetManagementIntegrationTest {
 
         // When & Then
         val result = mockMvc.perform(
-            get("/api/budgets/get_budgets")
+            get("/api/budgets")
                 .header("Authorization", "Bearer $user1AuthToken")
         )
             .andExpect(status().isOk)
@@ -153,7 +153,7 @@ class BudgetManagementIntegrationTest {
     fun `should return empty list when user has no budgets`() {
         // When & Then
         mockMvc.perform(
-            get("/api/budgets/get_budgets")
+            get("/api/budgets")
                 .header("Authorization", "Bearer $user1AuthToken")
         )
             .andExpect(status().isOk)
@@ -169,7 +169,7 @@ class BudgetManagementIntegrationTest {
         val createRequest = CreateBudgetRequest(name = "Shared Budget", amount = BigDecimal("3000.00"))
 
         val createResult = mockMvc.perform(
-            post("/api/budgets/create_budget")
+            post("/api/budgets")
                 .header("Authorization", "Bearer $user1AuthToken")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(createRequest))
@@ -184,7 +184,7 @@ class BudgetManagementIntegrationTest {
         )
 
         mockMvc.perform(
-            post("/api/budgets/add_collaborator")
+            post("/api/budgets/${budget.id}/collaborators")
                 .header("Authorization", "Bearer $user1AuthToken")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(addCollaboratorRequest))
@@ -196,7 +196,7 @@ class BudgetManagementIntegrationTest {
 
         // Then - User 2 should see the budget
         mockMvc.perform(
-            get("/api/budgets/get_budgets")
+            get("/api/budgets")
                 .header("Authorization", "Bearer $user2AuthToken")
         )
             .andExpect(status().isOk)
@@ -210,7 +210,7 @@ class BudgetManagementIntegrationTest {
         val createRequest = CreateBudgetRequest(name = "Private Budget", amount = BigDecimal("1000.00"))
 
         val createResult = mockMvc.perform(
-            post("/api/budgets/create_budget")
+            post("/api/budgets")
                 .header("Authorization", "Bearer $user1AuthToken")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(createRequest))
@@ -225,7 +225,7 @@ class BudgetManagementIntegrationTest {
         )
 
         mockMvc.perform(
-            post("/api/budgets/add_collaborator")
+            post("/api/budgets/${budget.id}/collaborators")
                 .header("Authorization", "Bearer $user2AuthToken")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(addCollaboratorRequest))
@@ -239,7 +239,7 @@ class BudgetManagementIntegrationTest {
         val createRequest = CreateBudgetRequest(name = "Team Budget", amount = BigDecimal("5000.00"))
 
         val createResult = mockMvc.perform(
-            post("/api/budgets/create_budget")
+            post("/api/budgets")
                 .header("Authorization", "Bearer $user1AuthToken")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(createRequest))
@@ -250,7 +250,7 @@ class BudgetManagementIntegrationTest {
         val addCollaboratorRequest = AddCollaboratorRequest(budgetId = budget.id, email = user2Email)
 
         mockMvc.perform(
-            post("/api/budgets/add_collaborator")
+            post("/api/budgets/${budget.id}/collaborators")
                 .header("Authorization", "Bearer $user1AuthToken")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(addCollaboratorRequest))
@@ -258,9 +258,8 @@ class BudgetManagementIntegrationTest {
 
         // When & Then
         val result = mockMvc.perform(
-            get("/api/budgets/get_collaborators")
+            get("/api/budgets/${budget.id}/collaborators")
                 .header("Authorization", "Bearer $user1AuthToken")
-                .param("budgetId", budget.id.toString())
         )
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.length()").value(2)) // User 1 and User 2
@@ -280,7 +279,7 @@ class BudgetManagementIntegrationTest {
         val createBudgetRequest = CreateBudgetRequest(name = "Expense Budget", amount = BigDecimal("1000.00"))
 
         val budgetResult = mockMvc.perform(
-            post("/api/budgets/create_budget")
+            post("/api/budgets")
                 .header("Authorization", "Bearer $user1AuthToken")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(createBudgetRequest))
@@ -289,9 +288,7 @@ class BudgetManagementIntegrationTest {
         val budget = objectMapper.readValue(budgetResult.response.contentAsString, BudgetResponse::class.java)
 
         // When - Create entry
-        val entryRequest = PutEntryRequest(
-            id = null,
-            budgetId = budget.id,
+        val entryRequest = CreateBudgetEntryRequest(
             amount = BigDecimal("150.00"),
             description = "Groceries",
             category = "Food",
@@ -299,7 +296,7 @@ class BudgetManagementIntegrationTest {
         )
 
         mockMvc.perform(
-            put("/api/budgets/put_entry")
+            post("/api/budgets/${budget.id}/entries")
                 .header("Authorization", "Bearer $user1AuthToken")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(entryRequest))
@@ -318,7 +315,7 @@ class BudgetManagementIntegrationTest {
         val createBudgetRequest = CreateBudgetRequest(name = "Test Budget", amount = BigDecimal("1000.00"))
 
         val budgetResult = mockMvc.perform(
-            post("/api/budgets/create_budget")
+            post("/api/budgets")
                 .header("Authorization", "Bearer $user1AuthToken")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(createBudgetRequest))
@@ -326,9 +323,7 @@ class BudgetManagementIntegrationTest {
 
         val budget = objectMapper.readValue(budgetResult.response.contentAsString, BudgetResponse::class.java)
 
-        val createEntryRequest = PutEntryRequest(
-            id = null,
-            budgetId = budget.id,
+        val createEntryRequest = CreateBudgetEntryRequest(
             amount = BigDecimal("100.00"),
             description = "Original",
             category = "Test",
@@ -336,7 +331,7 @@ class BudgetManagementIntegrationTest {
         )
 
         val entryResult = mockMvc.perform(
-            put("/api/budgets/put_entry")
+            post("/api/budgets/${budget.id}/entries")
                 .header("Authorization", "Bearer $user1AuthToken")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(createEntryRequest))
@@ -345,9 +340,7 @@ class BudgetManagementIntegrationTest {
         val entry = objectMapper.readValue(entryResult.response.contentAsString, BudgetEntryResponse::class.java)
 
         // When - Update entry
-        val updateEntryRequest = PutEntryRequest(
-            id = entry.id,
-            budgetId = budget.id,
+        val updateEntryRequest = UpdateBudgetEntryRequest(
             amount = BigDecimal("200.00"),
             description = "Updated",
             category = "Updated Category",
@@ -355,7 +348,7 @@ class BudgetManagementIntegrationTest {
         )
 
         mockMvc.perform(
-            put("/api/budgets/put_entry")
+            put("/api/budgets/${budget.id}/entries/${entry.id}")
                 .header("Authorization", "Bearer $user1AuthToken")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(updateEntryRequest))
@@ -373,7 +366,7 @@ class BudgetManagementIntegrationTest {
         val createBudgetRequest = CreateBudgetRequest(name = "Entry Budget", amount = BigDecimal("1000.00"))
 
         val budgetResult = mockMvc.perform(
-            post("/api/budgets/create_budget")
+            post("/api/budgets")
                 .header("Authorization", "Bearer $user1AuthToken")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(createBudgetRequest))
@@ -382,18 +375,18 @@ class BudgetManagementIntegrationTest {
         val budget = objectMapper.readValue(budgetResult.response.contentAsString, BudgetResponse::class.java)
 
         // Create two entries
-        val entry1 = PutEntryRequest(null, budget.id, BigDecimal("100.00"), "Entry 1", "Cat1", EntryType.OUTCOME)
-        val entry2 = PutEntryRequest(null, budget.id, BigDecimal("200.00"), "Entry 2", "Cat2", EntryType.INCOME)
+        val entry1 = CreateBudgetEntryRequest(BigDecimal("100.00"), "Entry 1", "Cat1", EntryType.OUTCOME)
+        val entry2 = CreateBudgetEntryRequest(BigDecimal("200.00"), "Entry 2", "Cat2", EntryType.INCOME)
 
         mockMvc.perform(
-            put("/api/budgets/put_entry")
+            post("/api/budgets/${budget.id}/entries")
                 .header("Authorization", "Bearer $user1AuthToken")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(entry1))
         )
 
         mockMvc.perform(
-            put("/api/budgets/put_entry")
+            post("/api/budgets/${budget.id}/entries")
                 .header("Authorization", "Bearer $user1AuthToken")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(entry2))
@@ -401,12 +394,428 @@ class BudgetManagementIntegrationTest {
 
         // When & Then
         mockMvc.perform(
-            get("/api/budgets/get_entries")
+            get("/api/budgets/${budget.id}/entries")
                 .header("Authorization", "Bearer $user1AuthToken")
-                .param("budgetId", budget.id.toString())
         )
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.length()").value(2))
+    }
+
+    // Delete Budget Entry Tests
+
+    @Test
+    fun `should delete budget entry successfully`() {
+        // Given - Create budget and entry
+        val createBudgetRequest = CreateBudgetRequest(name = "Test Budget", amount = BigDecimal("1000.00"))
+
+        val budgetResult = mockMvc.perform(
+            post("/api/budgets")
+                .header("Authorization", "Bearer $user1AuthToken")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(createBudgetRequest))
+        ).andReturn()
+
+        val budget = objectMapper.readValue(budgetResult.response.contentAsString, BudgetResponse::class.java)
+
+        val entryRequest = CreateBudgetEntryRequest(
+            amount = BigDecimal("100.00"),
+            description = "Test Entry",
+            category = "Test",
+            type = EntryType.OUTCOME
+        )
+
+        val entryResult = mockMvc.perform(
+            post("/api/budgets/${budget.id}/entries")
+                .header("Authorization", "Bearer $user1AuthToken")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(entryRequest))
+        ).andReturn()
+
+        val entry = objectMapper.readValue(entryResult.response.contentAsString, BudgetEntryResponse::class.java)
+
+        // When - Delete the entry
+        mockMvc.perform(
+            delete("/api/budgets/${budget.id}/entries/${entry.id}")
+                .header("Authorization", "Bearer $user1AuthToken")
+        )
+            .andExpect(status().isNoContent)
+
+        // Then - Entry should not be found
+        mockMvc.perform(
+            get("/api/budgets/${budget.id}/entries")
+                .header("Authorization", "Bearer $user1AuthToken")
+        )
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.length()").value(0))
+    }
+
+    @Test
+    fun `should not allow deleting entry without budget access`() {
+        // Given - User 1 creates budget and entry
+        val createBudgetRequest = CreateBudgetRequest(name = "Private Budget", amount = BigDecimal("1000.00"))
+
+        val budgetResult = mockMvc.perform(
+            post("/api/budgets")
+                .header("Authorization", "Bearer $user1AuthToken")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(createBudgetRequest))
+        ).andReturn()
+
+        val budget = objectMapper.readValue(budgetResult.response.contentAsString, BudgetResponse::class.java)
+
+        val entryRequest = CreateBudgetEntryRequest(
+            amount = BigDecimal("100.00"),
+            description = "Test Entry",
+            category = "Test",
+            type = EntryType.OUTCOME
+        )
+
+        val entryResult = mockMvc.perform(
+            post("/api/budgets/${budget.id}/entries")
+                .header("Authorization", "Bearer $user1AuthToken")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(entryRequest))
+        ).andReturn()
+
+        val entry = objectMapper.readValue(entryResult.response.contentAsString, BudgetEntryResponse::class.java)
+
+        // When - User 2 tries to delete User 1's entry
+        mockMvc.perform(
+            delete("/api/budgets/${budget.id}/entries/${entry.id}")
+                .header("Authorization", "Bearer $user2AuthToken")
+        )
+            .andExpect(status().isBadRequest)
+    }
+
+    @Test
+    fun `should delete entry from shared budget when collaborator deletes it`() {
+        // Given - User 1 creates budget, adds User 2 as collaborator, User 2 creates entry
+        val createBudgetRequest = CreateBudgetRequest(name = "Shared Budget", amount = BigDecimal("2000.00"))
+
+        val budgetResult = mockMvc.perform(
+            post("/api/budgets")
+                .header("Authorization", "Bearer $user1AuthToken")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(createBudgetRequest))
+        ).andReturn()
+
+        val budget = objectMapper.readValue(budgetResult.response.contentAsString, BudgetResponse::class.java)
+
+        // Add User 2 as collaborator
+        val addCollaboratorRequest = AddCollaboratorRequest(budgetId = budget.id, email = user2Email)
+        mockMvc.perform(
+            post("/api/budgets/${budget.id}/collaborators")
+                .header("Authorization", "Bearer $user1AuthToken")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(addCollaboratorRequest))
+        )
+
+        // User 2 creates entry
+        val entryRequest = CreateBudgetEntryRequest(
+            amount = BigDecimal("150.00"),
+            description = "User 2 Entry",
+            category = "Test",
+            type = EntryType.OUTCOME
+        )
+
+        val entryResult = mockMvc.perform(
+            post("/api/budgets/${budget.id}/entries")
+                .header("Authorization", "Bearer $user2AuthToken")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(entryRequest))
+        ).andReturn()
+
+        val entry = objectMapper.readValue(entryResult.response.contentAsString, BudgetEntryResponse::class.java)
+
+        // When - User 1 deletes User 2's entry (both have access)
+        mockMvc.perform(
+            delete("/api/budgets/${budget.id}/entries/${entry.id}")
+                .header("Authorization", "Bearer $user1AuthToken")
+        )
+            .andExpect(status().isNoContent)
+
+        // Then - Entry should be deleted
+        mockMvc.perform(
+            get("/api/budgets/${budget.id}/entries")
+                .header("Authorization", "Bearer $user1AuthToken")
+        )
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.length()").value(0))
+    }
+
+    // Delete Collaborator Tests
+
+    @Test
+    fun `should remove collaborator successfully`() {
+        // Given - User 1 creates budget and adds User 2 as collaborator
+        val createBudgetRequest = CreateBudgetRequest(name = "Team Budget", amount = BigDecimal("3000.00"))
+
+        val budgetResult = mockMvc.perform(
+            post("/api/budgets")
+                .header("Authorization", "Bearer $user1AuthToken")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(createBudgetRequest))
+        ).andReturn()
+
+        val budget = objectMapper.readValue(budgetResult.response.contentAsString, BudgetResponse::class.java)
+
+        val addCollaboratorRequest = AddCollaboratorRequest(budgetId = budget.id, email = user2Email)
+        mockMvc.perform(
+            post("/api/budgets/${budget.id}/collaborators")
+                .header("Authorization", "Bearer $user1AuthToken")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(addCollaboratorRequest))
+        )
+
+        // Verify User 2 has access
+        mockMvc.perform(
+            get("/api/budgets")
+                .header("Authorization", "Bearer $user2AuthToken")
+        )
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.length()").value(1))
+
+        // When - Remove User 2 as collaborator
+        mockMvc.perform(
+            delete("/api/budgets/${budget.id}/collaborators/$user2Email")
+                .header("Authorization", "Bearer $user1AuthToken")
+        )
+            .andExpect(status().isNoContent)
+
+        // Then - User 2 should no longer have access
+        mockMvc.perform(
+            get("/api/budgets")
+                .header("Authorization", "Bearer $user2AuthToken")
+        )
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.length()").value(0))
+
+        // And collaborators list should only have User 1
+        mockMvc.perform(
+            get("/api/budgets/${budget.id}/collaborators")
+                .header("Authorization", "Bearer $user1AuthToken")
+        )
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.length()").value(1))
+            .andExpect(jsonPath("$[0].email").value(user1Email))
+    }
+
+    @Test
+    fun `should not allow removing last collaborator`() {
+        // Given - User 1 creates budget (is the only collaborator)
+        val createBudgetRequest = CreateBudgetRequest(name = "Solo Budget", amount = BigDecimal("1000.00"))
+
+        val budgetResult = mockMvc.perform(
+            post("/api/budgets")
+                .header("Authorization", "Bearer $user1AuthToken")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(createBudgetRequest))
+        ).andReturn()
+
+        val budget = objectMapper.readValue(budgetResult.response.contentAsString, BudgetResponse::class.java)
+
+        // When - Try to remove User 1 (the only collaborator)
+        mockMvc.perform(
+            delete("/api/budgets/${budget.id}/collaborators/$user1Email")
+                .header("Authorization", "Bearer $user1AuthToken")
+        )
+            .andExpect(status().isConflict)
+
+        // Then - User 1 should still have access
+        mockMvc.perform(
+            get("/api/budgets")
+                .header("Authorization", "Bearer $user1AuthToken")
+        )
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.length()").value(1))
+    }
+
+    @Test
+    fun `should not allow removing collaborator without budget access`() {
+        // Given - User 1 creates budget
+        val createBudgetRequest = CreateBudgetRequest(name = "Private Budget", amount = BigDecimal("1000.00"))
+
+        val budgetResult = mockMvc.perform(
+            post("/api/budgets")
+                .header("Authorization", "Bearer $user1AuthToken")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(createBudgetRequest))
+        ).andReturn()
+
+        val budget = objectMapper.readValue(budgetResult.response.contentAsString, BudgetResponse::class.java)
+
+        // When - User 2 tries to remove User 1 from their own budget
+        mockMvc.perform(
+            delete("/api/budgets/${budget.id}/collaborators/$user1Email")
+                .header("Authorization", "Bearer $user2AuthToken")
+        )
+            .andExpect(status().isBadRequest)
+    }
+
+    // Delete Budget Tests
+
+    @Test
+    fun `should delete budget successfully`() {
+        // Given - Create budget with entries and collaborators
+        val createBudgetRequest = CreateBudgetRequest(name = "Budget to Delete", amount = BigDecimal("2000.00"))
+
+        val budgetResult = mockMvc.perform(
+            post("/api/budgets")
+                .header("Authorization", "Bearer $user1AuthToken")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(createBudgetRequest))
+        ).andReturn()
+
+        val budget = objectMapper.readValue(budgetResult.response.contentAsString, BudgetResponse::class.java)
+
+        // Add collaborator
+        val addCollaboratorRequest = AddCollaboratorRequest(budgetId = budget.id, email = user2Email)
+        mockMvc.perform(
+            post("/api/budgets/${budget.id}/collaborators")
+                .header("Authorization", "Bearer $user1AuthToken")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(addCollaboratorRequest))
+        )
+
+        // Add entry
+        val entryRequest = CreateBudgetEntryRequest(
+            amount = BigDecimal("100.00"),
+            description = "Test Entry",
+            category = "Test",
+            type = EntryType.OUTCOME
+        )
+        mockMvc.perform(
+            post("/api/budgets/${budget.id}/entries")
+                .header("Authorization", "Bearer $user1AuthToken")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(entryRequest))
+        )
+
+        // When - Delete the budget
+        mockMvc.perform(
+            delete("/api/budgets/${budget.id}")
+                .header("Authorization", "Bearer $user1AuthToken")
+        )
+            .andExpect(status().isNoContent)
+
+        // Then - Budget should not be accessible by User 1
+        mockMvc.perform(
+            get("/api/budgets")
+                .header("Authorization", "Bearer $user1AuthToken")
+        )
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.length()").value(0))
+
+        // And Budget should not be accessible by User 2
+        mockMvc.perform(
+            get("/api/budgets")
+                .header("Authorization", "Bearer $user2AuthToken")
+        )
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.length()").value(0))
+    }
+
+    @Test
+    fun `should delete budget with cascade deletion of entries and collaborators`() {
+        // Given - Create budget with multiple entries and collaborators
+        val createBudgetRequest = CreateBudgetRequest(name = "Complex Budget", amount = BigDecimal("5000.00"))
+
+        val budgetResult = mockMvc.perform(
+            post("/api/budgets")
+                .header("Authorization", "Bearer $user1AuthToken")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(createBudgetRequest))
+        ).andReturn()
+
+        val budget = objectMapper.readValue(budgetResult.response.contentAsString, BudgetResponse::class.java)
+
+        // Add collaborator
+        val addCollaboratorRequest = AddCollaboratorRequest(budgetId = budget.id, email = user2Email)
+        mockMvc.perform(
+            post("/api/budgets/${budget.id}/collaborators")
+                .header("Authorization", "Bearer $user1AuthToken")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(addCollaboratorRequest))
+        )
+
+        // Add multiple entries
+        val entry1 = CreateBudgetEntryRequest(BigDecimal("100.00"), "Entry 1", "Cat1", EntryType.OUTCOME)
+        val entry2 = CreateBudgetEntryRequest(BigDecimal("200.00"), "Entry 2", "Cat2", EntryType.INCOME)
+        val entry3 = CreateBudgetEntryRequest(BigDecimal("300.00"), "Entry 3", "Cat3", EntryType.OUTCOME)
+
+        mockMvc.perform(
+            post("/api/budgets/${budget.id}/entries")
+                .header("Authorization", "Bearer $user1AuthToken")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(entry1))
+        )
+
+        mockMvc.perform(
+            post("/api/budgets/${budget.id}/entries")
+                .header("Authorization", "Bearer $user1AuthToken")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(entry2))
+        )
+
+        mockMvc.perform(
+            post("/api/budgets/${budget.id}/entries")
+                .header("Authorization", "Bearer $user2AuthToken")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(entry3))
+        )
+
+        // Verify entries exist
+        mockMvc.perform(
+            get("/api/budgets/${budget.id}/entries")
+                .header("Authorization", "Bearer $user1AuthToken")
+        )
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.length()").value(3))
+
+        // When - Delete the budget
+        mockMvc.perform(
+            delete("/api/budgets/${budget.id}")
+                .header("Authorization", "Bearer $user1AuthToken")
+        )
+            .andExpect(status().isNoContent)
+
+        // Then - Budget and all entries should be deleted
+        mockMvc.perform(
+            get("/api/budgets")
+                .header("Authorization", "Bearer $user1AuthToken")
+        )
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.length()").value(0))
+    }
+
+    @Test
+    fun `should not allow deleting budget without access`() {
+        // Given - User 1 creates budget
+        val createBudgetRequest = CreateBudgetRequest(name = "Private Budget", amount = BigDecimal("1000.00"))
+
+        val budgetResult = mockMvc.perform(
+            post("/api/budgets")
+                .header("Authorization", "Bearer $user1AuthToken")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(createBudgetRequest))
+        ).andReturn()
+
+        val budget = objectMapper.readValue(budgetResult.response.contentAsString, BudgetResponse::class.java)
+
+        // When - User 2 tries to delete User 1's budget
+        mockMvc.perform(
+            delete("/api/budgets/${budget.id}")
+                .header("Authorization", "Bearer $user2AuthToken")
+        )
+            .andExpect(status().isBadRequest)
+
+        // Then - Budget should still exist
+        mockMvc.perform(
+            get("/api/budgets")
+                .header("Authorization", "Bearer $user1AuthToken")
+        )
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.length()").value(1))
     }
 
     // Complete Workflow Test
@@ -417,7 +826,7 @@ class BudgetManagementIntegrationTest {
         val createBudgetRequest = CreateBudgetRequest(name = "Family Budget", amount = BigDecimal("5000.00"))
 
         val budgetResult = mockMvc.perform(
-            post("/api/budgets/create_budget")
+            post("/api/budgets")
                 .header("Authorization", "Bearer $user1AuthToken")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(createBudgetRequest))
@@ -429,31 +838,31 @@ class BudgetManagementIntegrationTest {
         val addCollaboratorRequest = AddCollaboratorRequest(budgetId = budget.id, email = user2Email)
 
         mockMvc.perform(
-            post("/api/budgets/add_collaborator")
+            post("/api/budgets/${budget.id}/collaborators")
                 .header("Authorization", "Bearer $user1AuthToken")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(addCollaboratorRequest))
         ).andExpect(status().isCreated)
 
         // Step 3: User 1 adds entry
-        val entry1Request = PutEntryRequest(
-            null, budget.id, BigDecimal("300.00"), "User 1 Entry", "Shopping", EntryType.OUTCOME
+        val entry1Request = CreateBudgetEntryRequest(
+            BigDecimal("300.00"), "User 1 Entry", "Shopping", EntryType.OUTCOME
         )
 
         mockMvc.perform(
-            put("/api/budgets/put_entry")
+            post("/api/budgets/${budget.id}/entries")
                 .header("Authorization", "Bearer $user1AuthToken")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(entry1Request))
         ).andExpect(status().isCreated)
 
         // Step 4: User 2 adds entry (as collaborator)
-        val entry2Request = PutEntryRequest(
-            null, budget.id, BigDecimal("500.00"), "User 2 Entry", "Income", EntryType.INCOME
+        val entry2Request = CreateBudgetEntryRequest(
+            BigDecimal("500.00"), "User 2 Entry", "Income", EntryType.INCOME
         )
 
         mockMvc.perform(
-            put("/api/budgets/put_entry")
+            post("/api/budgets/${budget.id}/entries")
                 .header("Authorization", "Bearer $user2AuthToken")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(entry2Request))
@@ -461,17 +870,15 @@ class BudgetManagementIntegrationTest {
 
         // Step 5: Both users can see all entries
         val user1Entries = mockMvc.perform(
-            get("/api/budgets/get_entries")
+            get("/api/budgets/${budget.id}/entries")
                 .header("Authorization", "Bearer $user1AuthToken")
-                .param("budgetId", budget.id.toString())
         )
             .andExpect(status().isOk)
             .andReturn()
 
         val user2Entries = mockMvc.perform(
-            get("/api/budgets/get_entries")
+            get("/api/budgets/${budget.id}/entries")
                 .header("Authorization", "Bearer $user2AuthToken")
-                .param("budgetId", budget.id.toString())
         )
             .andExpect(status().isOk)
             .andReturn()

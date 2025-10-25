@@ -1,6 +1,6 @@
 # Postman Request Collection - BudgetHunter API
 
-**Note:** This API now follows RESTful conventions. Legacy endpoints (with verbs in URLs) are still available but deprecated. Use the new RESTful endpoints for all new integrations.
+**Note:** This API follows RESTful conventions with resource-based URLs and proper HTTP methods (GET, POST, PUT, DELETE).
 
 ## 1. Sign Up
 
@@ -112,8 +112,6 @@ Copy the `authToken` value for authenticated requests and save the `refreshToken
 }
 ```
 
-**Legacy URL (Deprecated):** `POST /api/budgets/create_budget`
-
 ---
 
 ## 5. Get Budgets
@@ -140,8 +138,6 @@ Copy the `authToken` value for authenticated requests and save the `refreshToken
   }
 ]
 ```
-
-**Legacy URL (Deprecated):** `GET /api/budgets/get_budgets`
 
 ---
 
@@ -171,8 +167,6 @@ Copy the `authToken` value for authenticated requests and save the `refreshToken
 }
 ```
 
-**Legacy URL (Deprecated):** `POST /api/budgets/add_collaborator`
-
 ---
 
 ## 7. Get Collaborators
@@ -197,8 +191,6 @@ Copy the `authToken` value for authenticated requests and save the `refreshToken
   }
 ]
 ```
-
-**Legacy URL (Deprecated):** `GET /api/budgets/get_collaborators?budgetId=1`
 
 ---
 
@@ -241,8 +233,6 @@ Copy the `authToken` value for authenticated requests and save the `refreshToken
 ]
 ```
 
-**Legacy URL (Deprecated):** `GET /api/budgets/get_entries?budgetId=1`
-
 ---
 
 ## 9. Create Budget Entry
@@ -278,8 +268,6 @@ Copy the `authToken` value for authenticated requests and save the `refreshToken
   "modificationDate": "2025-10-02T23:45:00"
 }
 ```
-
-**Legacy URL (Deprecated):** `PUT /api/budgets/put_entry` (with budgetId in body, no id field)
 
 ---
 
@@ -317,8 +305,6 @@ Copy the `authToken` value for authenticated requests and save the `refreshToken
 }
 ```
 
-**Legacy URL (Deprecated):** `PUT /api/budgets/put_entry` (with both id and budgetId in body)
-
 ---
 
 ## 11. Subscribe to Budget Entry Events (SSE)
@@ -354,8 +340,6 @@ data: {
   }
 }
 ```
-
-**Legacy URL (Deprecated):** `GET /api/budgets/new_entry?budgetId=1`
 
 **Note:** For testing in a browser, use the included `test-sse.html` file. Standard Postman doesn't support SSE well. The curl command will keep the connection open and display events as they arrive.
 

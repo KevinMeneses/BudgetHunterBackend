@@ -88,7 +88,7 @@ class ConcurrentBudgetEntryTest {
         )
 
         val result = mockMvc.perform(
-            post("/api/budgets/create_budget")
+            post("/api/budgets")
                 .header("Authorization", "Bearer $user1AuthToken")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request))
@@ -98,14 +98,14 @@ class ConcurrentBudgetEntryTest {
 
         // Add user 2 and user 3 as collaborators
         mockMvc.perform(
-            post("/api/budgets/add_collaborator")
+            post("/api/budgets/${budget.id}/collaborators")
                 .header("Authorization", "Bearer $user1AuthToken")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(AddCollaboratorRequest(budget.id, user2Email)))
         )
 
         mockMvc.perform(
-            post("/api/budgets/add_collaborator")
+            post("/api/budgets/${budget.id}/collaborators")
                 .header("Authorization", "Bearer $user1AuthToken")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(AddCollaboratorRequest(budget.id, user3Email)))
@@ -129,9 +129,7 @@ class ConcurrentBudgetEntryTest {
         // When - Create entries rapidly from different users
         users.forEach { (_, authToken, userName) ->
             repeat(numEntriesPerUser) { index ->
-                val entryRequest = PutEntryRequest(
-                    id = null,
-                    budgetId = budgetId,
+                val entryRequest = CreateBudgetEntryRequest(
                     amount = BigDecimal("${(index + 1) * 10}.00"),
                     description = "$userName Entry $index",
                     category = "Category $index",
@@ -139,7 +137,7 @@ class ConcurrentBudgetEntryTest {
                 )
 
                 mockMvc.perform(
-                    put("/api/budgets/put_entry")
+                    post("/api/budgets/${budgetId}/entries")
                         .header("Authorization", "Bearer $authToken")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(entryRequest))
@@ -150,9 +148,8 @@ class ConcurrentBudgetEntryTest {
 
         // Then - Verify all entries were created
         val entriesResult = mockMvc.perform(
-            get("/api/budgets/get_entries")
+            get("/api/budgets/${budgetId}/entries")
                 .header("Authorization", "Bearer $user1AuthToken")
-                .param("budgetId", budgetId.toString())
         ).andReturn()
 
         val entries = objectMapper.readValue(entriesResult.response.contentAsString, Array<BudgetEntryResponse>::class.java)
@@ -172,9 +169,7 @@ class ConcurrentBudgetEntryTest {
     @Test
     fun `multiple users should be able to update same entry in succession with proper audit trail`() {
         // Given - Create an initial entry
-        val createRequest = PutEntryRequest(
-            id = null,
-            budgetId = budgetId,
+        val createRequest = CreateBudgetEntryRequest(
             amount = BigDecimal("100.00"),
             description = "Initial Entry",
             category = "Test",
@@ -182,7 +177,7 @@ class ConcurrentBudgetEntryTest {
         )
 
         val createResult = mockMvc.perform(
-            put("/api/budgets/put_entry")
+            post("/api/budgets/${budgetId}/entries")
                 .header("Authorization", "Bearer $user1AuthToken")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(createRequest))
@@ -201,9 +196,7 @@ class ConcurrentBudgetEntryTest {
 
         // When - Multiple users update the same entry
         users.forEachIndexed { userIndex, (_, authToken, userName) ->
-            val updateRequest = PutEntryRequest(
-                id = entryId,
-                budgetId = budgetId,
+            val updateRequest = UpdateBudgetEntryRequest(
                 amount = BigDecimal("${(userIndex + 1) * 100}.00"),
                 description = "$userName Update",
                 category = "Updated",
@@ -211,7 +204,7 @@ class ConcurrentBudgetEntryTest {
             )
 
             mockMvc.perform(
-                put("/api/budgets/put_entry")
+                put("/api/budgets/${budgetId}/entries/${entryId}")
                     .header("Authorization", "Bearer $authToken")
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(objectMapper.writeValueAsString(updateRequest))
@@ -221,9 +214,8 @@ class ConcurrentBudgetEntryTest {
 
         // Then - Verify the final state
         val finalResult = mockMvc.perform(
-            get("/api/budgets/get_entries")
+            get("/api/budgets/${budgetId}/entries")
                 .header("Authorization", "Bearer $user1AuthToken")
-                .param("budgetId", budgetId.toString())
         ).andReturn()
 
         val entries = objectMapper.readValue(finalResult.response.contentAsString, Array<BudgetEntryResponse>::class.java)
@@ -248,13 +240,15 @@ class ConcurrentBudgetEntryTest {
                 else -> user3AuthToken
             }
 
-            val createRequest = PutEntryRequest(
-                null, budgetId, BigDecimal("${(index + 1) * 100}.00"),
-                "Initial Entry $index", "Cat$index", EntryType.OUTCOME
+            val createRequest = CreateBudgetEntryRequest(
+                amount = BigDecimal("${(index + 1) * 100}.00"),
+                description = "Initial Entry $index",
+                category = "Cat$index",
+                type = EntryType.OUTCOME
             )
 
             val result = mockMvc.perform(
-                put("/api/budgets/put_entry")
+                post("/api/budgets/${budgetId}/entries")
                     .header("Authorization", "Bearer $authToken")
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(objectMapper.writeValueAsString(createRequest))
@@ -275,13 +269,15 @@ class ConcurrentBudgetEntryTest {
 
             if (index % 2 == 0) {
                 // Create new entry
-                val createRequest = PutEntryRequest(
-                    null, budgetId, BigDecimal("${index * 10}.00"),
-                    "Rapid Create $index", "CatX", EntryType.OUTCOME
+                val createRequest = CreateBudgetEntryRequest(
+                    amount = BigDecimal("${index * 10}.00"),
+                    description = "Rapid Create $index",
+                    category = "CatX",
+                    type = EntryType.OUTCOME
                 )
 
                 mockMvc.perform(
-                    put("/api/budgets/put_entry")
+                    post("/api/budgets/${budgetId}/entries")
                         .header("Authorization", "Bearer $authToken")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(createRequest))
@@ -292,13 +288,15 @@ class ConcurrentBudgetEntryTest {
             } else {
                 // Update existing entry
                 val entryToUpdate = initialEntries[index % initialEntries.size]
-                val updateRequest = PutEntryRequest(
-                    entryToUpdate, budgetId, BigDecimal("999.99"),
-                    "Updated $index", "UpdatedCat", EntryType.INCOME
+                val updateRequest = UpdateBudgetEntryRequest(
+                    amount = BigDecimal("999.99"),
+                    description = "Updated $index",
+                    category = "UpdatedCat",
+                    type = EntryType.INCOME
                 )
 
                 mockMvc.perform(
-                    put("/api/budgets/put_entry")
+                    put("/api/budgets/${budgetId}/entries/${entryToUpdate}")
                         .header("Authorization", "Bearer $authToken")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(updateRequest))
@@ -311,9 +309,8 @@ class ConcurrentBudgetEntryTest {
 
         // Then - Verify final database state is consistent
         val finalResult = mockMvc.perform(
-            get("/api/budgets/get_entries")
+            get("/api/budgets/${budgetId}/entries")
                 .header("Authorization", "Bearer $user1AuthToken")
-                .param("budgetId", budgetId.toString())
         ).andReturn()
 
         val finalEntries = objectMapper.readValue(finalResult.response.contentAsString, Array<BudgetEntryResponse>::class.java)
@@ -342,9 +339,8 @@ class ConcurrentBudgetEntryTest {
 
         users.forEach { authToken ->
             mockMvc.perform(
-                get("/api/budgets/new_entry")
+                get("/api/budgets/${budgetId}/entries/stream")
                     .header("Authorization", "Bearer $authToken")
-                    .param("budgetId", budgetId.toString())
                     .accept("text/event-stream")
             )
                 .andExpect(status().isOk)
@@ -354,13 +350,15 @@ class ConcurrentBudgetEntryTest {
         val numEntries = 10
         repeat(numEntries) { index ->
             val authToken = users[index % users.size]
-            val entryRequest = PutEntryRequest(
-                null, budgetId, BigDecimal("${index * 50}.00"),
-                "SSE Entry $index", "SSE", EntryType.OUTCOME
+            val entryRequest = CreateBudgetEntryRequest(
+                amount = BigDecimal("${index * 50}.00"),
+                description = "SSE Entry $index",
+                category = "SSE",
+                type = EntryType.OUTCOME
             )
 
             mockMvc.perform(
-                put("/api/budgets/put_entry")
+                post("/api/budgets/${budgetId}/entries")
                     .header("Authorization", "Bearer $authToken")
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(objectMapper.writeValueAsString(entryRequest))
@@ -370,9 +368,8 @@ class ConcurrentBudgetEntryTest {
 
         // Then - Verify all entries were persisted correctly
         val entriesResult = mockMvc.perform(
-            get("/api/budgets/get_entries")
+            get("/api/budgets/${budgetId}/entries")
                 .header("Authorization", "Bearer $user1AuthToken")
-                .param("budgetId", budgetId.toString())
         ).andReturn()
 
         val entries = objectMapper.readValue(entriesResult.response.contentAsString, Array<BudgetEntryResponse>::class.java)
@@ -402,13 +399,15 @@ class ConcurrentBudgetEntryTest {
             when {
                 // First 10 iterations: only creates
                 iteration < 10 -> {
-                    val createRequest = PutEntryRequest(
-                        null, budgetId, BigDecimal("${iteration * 25}.00"),
-                        "Interleaved Create $iteration", "Create", EntryType.OUTCOME
+                    val createRequest = CreateBudgetEntryRequest(
+                        amount = BigDecimal("${iteration * 25}.00"),
+                        description = "Interleaved Create $iteration",
+                        category = "Create",
+                        type = EntryType.OUTCOME
                     )
 
                     val result = mockMvc.perform(
-                        put("/api/budgets/put_entry")
+                        post("/api/budgets/${budgetId}/entries")
                             .header("Authorization", "Bearer $authToken")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(createRequest))
@@ -423,13 +422,15 @@ class ConcurrentBudgetEntryTest {
                 else -> {
                     if (iteration % 2 == 0) {
                         // Create
-                        val createRequest = PutEntryRequest(
-                            null, budgetId, BigDecimal("${iteration * 25}.00"),
-                            "Late Create $iteration", "Create", EntryType.INCOME
+                        val createRequest = CreateBudgetEntryRequest(
+                            amount = BigDecimal("${iteration * 25}.00"),
+                            description = "Late Create $iteration",
+                            category = "Create",
+                            type = EntryType.INCOME
                         )
 
                         val result = mockMvc.perform(
-                            put("/api/budgets/put_entry")
+                            post("/api/budgets/${budgetId}/entries")
                                 .header("Authorization", "Bearer $authToken")
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(objectMapper.writeValueAsString(createRequest))
@@ -442,13 +443,15 @@ class ConcurrentBudgetEntryTest {
                     } else {
                         // Update a random existing entry
                         val idToUpdate = createdIds.random()
-                        val updateRequest = PutEntryRequest(
-                            idToUpdate, budgetId, BigDecimal("777.77"),
-                            "Updated $iteration", "Updated", EntryType.INCOME
+                        val updateRequest = UpdateBudgetEntryRequest(
+                            amount = BigDecimal("777.77"),
+                            description = "Updated $iteration",
+                            category = "Updated",
+                            type = EntryType.INCOME
                         )
 
                         mockMvc.perform(
-                            put("/api/budgets/put_entry")
+                            put("/api/budgets/${budgetId}/entries/${idToUpdate}")
                                 .header("Authorization", "Bearer $authToken")
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(objectMapper.writeValueAsString(updateRequest))
@@ -461,9 +464,8 @@ class ConcurrentBudgetEntryTest {
 
         // Then - Verify data consistency
         val finalResult = mockMvc.perform(
-            get("/api/budgets/get_entries")
+            get("/api/budgets/${budgetId}/entries")
                 .header("Authorization", "Bearer $user1AuthToken")
-                .param("budgetId", budgetId.toString())
         ).andReturn()
 
         val finalEntries = objectMapper.readValue(finalResult.response.contentAsString, Array<BudgetEntryResponse>::class.java)

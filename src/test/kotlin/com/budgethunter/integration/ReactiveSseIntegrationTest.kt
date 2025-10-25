@@ -84,7 +84,7 @@ class ReactiveSseIntegrationTest {
         )
 
         val result = mockMvc.perform(
-            post("/api/budgets/create_budget")
+            post("/api/budgets")
                 .header("Authorization", "Bearer $authToken")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request))
@@ -135,9 +135,7 @@ class ReactiveSseIntegrationTest {
         Thread.sleep(100)
 
         // When - Create a budget entry
-        val entryRequest = PutEntryRequest(
-            id = null,
-            budgetId = budgetId,
+        val entryRequest = CreateBudgetEntryRequest(
             amount = BigDecimal("150.00"),
             description = "Test Entry",
             category = "Food",
@@ -145,7 +143,7 @@ class ReactiveSseIntegrationTest {
         )
 
         mockMvc.perform(
-            put("/api/budgets/put_entry")
+            post("/api/budgets/${budgetId}/entries")
                 .header("Authorization", "Bearer $authToken")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(entryRequest))
@@ -174,9 +172,7 @@ class ReactiveSseIntegrationTest {
     @Test
     fun `should receive SSE event when budget entry is updated`() {
         // Given - Create an initial entry
-        val createRequest = PutEntryRequest(
-            id = null,
-            budgetId = budgetId,
+        val createRequest = CreateBudgetEntryRequest(
             amount = BigDecimal("100.00"),
             description = "Initial Entry",
             category = "Transport",
@@ -184,7 +180,7 @@ class ReactiveSseIntegrationTest {
         )
 
         val createResult = mockMvc.perform(
-            put("/api/budgets/put_entry")
+            post("/api/budgets/${budgetId}/entries")
                 .header("Authorization", "Bearer $authToken")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(createRequest))
@@ -200,9 +196,7 @@ class ReactiveSseIntegrationTest {
         Thread.sleep(100)
 
         // When - Update the entry
-        val updateRequest = PutEntryRequest(
-            id = createdEntry.id,
-            budgetId = budgetId,
+        val updateRequest = UpdateBudgetEntryRequest(
             amount = BigDecimal("250.00"),
             description = "Updated Entry",
             category = "Transport",
@@ -210,7 +204,7 @@ class ReactiveSseIntegrationTest {
         )
 
         mockMvc.perform(
-            put("/api/budgets/put_entry")
+            put("/api/budgets/${budgetId}/entries/${createdEntry.id}")
                 .header("Authorization", "Bearer $authToken")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(updateRequest))
@@ -237,7 +231,7 @@ class ReactiveSseIntegrationTest {
         // Given - Two budgets
         val budget2Request = CreateBudgetRequest(name = "Budget 2", amount = BigDecimal("2000.00"))
         val budget2Result = mockMvc.perform(
-            post("/api/budgets/create_budget")
+            post("/api/budgets")
                 .header("Authorization", "Bearer $authToken")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(budget2Request))
@@ -256,9 +250,7 @@ class ReactiveSseIntegrationTest {
         Thread.sleep(100)
 
         // When - Create entry in budget 1
-        val entry1 = PutEntryRequest(
-            id = null,
-            budgetId = budgetId,
+        val entry1 = CreateBudgetEntryRequest(
             amount = BigDecimal("100.00"),
             description = "Budget 1 Entry",
             category = "Cat1",
@@ -266,7 +258,7 @@ class ReactiveSseIntegrationTest {
         )
 
         mockMvc.perform(
-            put("/api/budgets/put_entry")
+            post("/api/budgets/${budgetId}/entries")
                 .header("Authorization", "Bearer $authToken")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(entry1))
@@ -275,9 +267,7 @@ class ReactiveSseIntegrationTest {
         Thread.sleep(200)
 
         // And - Create entry in budget 2
-        val entry2 = PutEntryRequest(
-            id = null,
-            budgetId = budget2.id,
+        val entry2 = CreateBudgetEntryRequest(
             amount = BigDecimal("200.00"),
             description = "Budget 2 Entry",
             category = "Cat2",
@@ -285,7 +275,7 @@ class ReactiveSseIntegrationTest {
         )
 
         mockMvc.perform(
-            put("/api/budgets/put_entry")
+            post("/api/budgets/${budget2.id}/entries")
                 .header("Authorization", "Bearer $authToken")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(entry2))
@@ -316,7 +306,7 @@ class ReactiveSseIntegrationTest {
         val user2Token = createAndAuthenticateUser(user2Email, user2Name, userPassword)
 
         mockMvc.perform(
-            post("/api/budgets/add_collaborator")
+            post("/api/budgets/${budgetId}/collaborators")
                 .header("Authorization", "Bearer $authToken")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(AddCollaboratorRequest(budgetId, user2Email)))
@@ -330,16 +320,14 @@ class ReactiveSseIntegrationTest {
         Thread.sleep(100)
 
         // When - User 1 creates an entry
-        val entry1 = PutEntryRequest(
-            id = null,
-            budgetId = budgetId,
+        val entry1 = CreateBudgetEntryRequest(
             amount = BigDecimal("50.00"),
             description = "User 1 Entry",
             category = "Food",
             type = EntryType.OUTCOME
         )
         mockMvc.perform(
-            put("/api/budgets/put_entry")
+            post("/api/budgets/${budgetId}/entries")
                 .header("Authorization", "Bearer $authToken")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(entry1))
@@ -348,16 +336,14 @@ class ReactiveSseIntegrationTest {
         Thread.sleep(200)
 
         // And - User 2 creates an entry
-        val entry2 = PutEntryRequest(
-            id = null,
-            budgetId = budgetId,
+        val entry2 = CreateBudgetEntryRequest(
             amount = BigDecimal("75.00"),
             description = "User 2 Entry",
             category = "Transport",
             type = EntryType.OUTCOME
         )
         mockMvc.perform(
-            put("/api/budgets/put_entry")
+            post("/api/budgets/${budgetId}/entries")
                 .header("Authorization", "Bearer $user2Token")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(entry2))
@@ -406,9 +392,7 @@ class ReactiveSseIntegrationTest {
         assertEquals(3, reactiveSseService.getSubscriberCount(budgetId))
 
         // When - A single entry is created
-        val entryRequest = PutEntryRequest(
-            id = null,
-            budgetId = budgetId,
+        val entryRequest = CreateBudgetEntryRequest(
             amount = BigDecimal("999.99"),
             description = "Multicast Test",
             category = "Test",
@@ -416,7 +400,7 @@ class ReactiveSseIntegrationTest {
         )
 
         mockMvc.perform(
-            put("/api/budgets/put_entry")
+            post("/api/budgets/${budgetId}/entries")
                 .header("Authorization", "Bearer $authToken")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(entryRequest))

@@ -71,7 +71,7 @@ class SseIntegrationTest {
         )
 
         val result = mockMvc.perform(
-            post("/api/budgets/create_budget")
+            post("/api/budgets")
                 .header("Authorization", "Bearer $authToken")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request))
@@ -87,9 +87,8 @@ class SseIntegrationTest {
     fun `should establish SSE connection successfully with authentication`() {
         // When & Then - SSE endpoint should return 200 OK and an SseEmitter
         mockMvc.perform(
-            get("/api/budgets/new_entry")
+            get("/api/budgets/${budgetId}/entries/stream")
                 .header("Authorization", "Bearer $authToken")
-                .param("budgetId", budgetId.toString())
                 .accept("text/event-stream")
         )
             .andExpect(status().isOk)
@@ -99,8 +98,7 @@ class SseIntegrationTest {
     fun `should reject SSE connection without authentication`() {
         // When & Then
         mockMvc.perform(
-            get("/api/budgets/new_entry")
-                .param("budgetId", budgetId.toString())
+            get("/api/budgets/${budgetId}/entries/stream")
                 .accept("text/event-stream")
         )
             .andExpect(status().isForbidden)
@@ -119,9 +117,8 @@ class SseIntegrationTest {
         // The exception is thrown during controller execution
         try {
             mockMvc.perform(
-                get("/api/budgets/new_entry")
+                get("/api/budgets/${budgetId}/entries/stream")
                     .header("Authorization", "Bearer $otherUserToken")
-                    .param("budgetId", budgetId.toString())
                     .accept("text/event-stream")
             )
             fail("Should have thrown an exception")
@@ -136,9 +133,8 @@ class SseIntegrationTest {
         // When & Then - The exception is thrown during controller execution
         try {
             mockMvc.perform(
-                get("/api/budgets/new_entry")
+                get("/api/budgets/99999/entries/stream")
                     .header("Authorization", "Bearer $authToken")
-                    .param("budgetId", "99999")
                     .accept("text/event-stream")
             )
             fail("Should have thrown an exception")
@@ -154,17 +150,14 @@ class SseIntegrationTest {
     fun `should receive SSE event when budget entry is created`() {
         // Verify SSE endpoint is accessible
         mockMvc.perform(
-            get("/api/budgets/new_entry")
+            get("/api/budgets/${budgetId}/entries/stream")
                 .header("Authorization", "Bearer $authToken")
-                .param("budgetId", budgetId.toString())
                 .accept("text/event-stream")
         )
             .andExpect(status().isOk)
 
         // Create a budget entry which should trigger SSE event
-        val entryRequest = PutEntryRequest(
-            id = null,
-            budgetId = budgetId,
+        val entryRequest = CreateBudgetEntryRequest(
             amount = BigDecimal("100.00"),
             description = "Test Entry",
             category = "Test",
@@ -172,7 +165,7 @@ class SseIntegrationTest {
         )
 
         val result = mockMvc.perform(
-            put("/api/budgets/put_entry")
+            post("/api/budgets/${budgetId}/entries")
                 .header("Authorization", "Bearer $authToken")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(entryRequest))
@@ -190,9 +183,7 @@ class SseIntegrationTest {
     @Test
     fun `should receive SSE event when budget entry is updated`() {
         // Given - Create an entry first
-        val createRequest = PutEntryRequest(
-            id = null,
-            budgetId = budgetId,
+        val createRequest = CreateBudgetEntryRequest(
             amount = BigDecimal("100.00"),
             description = "Original",
             category = "Test",
@@ -200,7 +191,7 @@ class SseIntegrationTest {
         )
 
         val createResult = mockMvc.perform(
-            put("/api/budgets/put_entry")
+            post("/api/budgets/${budgetId}/entries")
                 .header("Authorization", "Bearer $authToken")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(createRequest))
@@ -210,17 +201,14 @@ class SseIntegrationTest {
 
         // Verify SSE endpoint is accessible
         mockMvc.perform(
-            get("/api/budgets/new_entry")
+            get("/api/budgets/${budgetId}/entries/stream")
                 .header("Authorization", "Bearer $authToken")
-                .param("budgetId", budgetId.toString())
                 .accept("text/event-stream")
         )
             .andExpect(status().isOk)
 
         // When - Update the entry (should trigger SSE event)
-        val updateRequest = PutEntryRequest(
-            id = createdEntry.id,
-            budgetId = budgetId,
+        val updateRequest = UpdateBudgetEntryRequest(
             amount = BigDecimal("200.00"),
             description = "Updated",
             category = "Updated",
@@ -228,7 +216,7 @@ class SseIntegrationTest {
         )
 
         val updateResult = mockMvc.perform(
-            put("/api/budgets/put_entry")
+            put("/api/budgets/${budgetId}/entries/${createdEntry.id}")
                 .header("Authorization", "Bearer $authToken")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(updateRequest))
@@ -261,7 +249,7 @@ class SseIntegrationTest {
         )
 
         mockMvc.perform(
-            post("/api/budgets/add_collaborator")
+            post("/api/budgets/${budgetId}/collaborators")
                 .header("Authorization", "Bearer $authToken")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(addCollaboratorRequest))
@@ -269,17 +257,15 @@ class SseIntegrationTest {
 
         // When & Then - Both users should be able to connect
         mockMvc.perform(
-            get("/api/budgets/new_entry")
+            get("/api/budgets/${budgetId}/entries/stream")
                 .header("Authorization", "Bearer $authToken")
-                .param("budgetId", budgetId.toString())
                 .accept("text/event-stream")
         )
             .andExpect(status().isOk)
 
         mockMvc.perform(
-            get("/api/budgets/new_entry")
+            get("/api/budgets/${budgetId}/entries/stream")
                 .header("Authorization", "Bearer $user2Token")
-                .param("budgetId", budgetId.toString())
                 .accept("text/event-stream")
         )
             .andExpect(status().isOk)
@@ -295,7 +281,7 @@ class SseIntegrationTest {
         )
 
         val budget2Result = mockMvc.perform(
-            post("/api/budgets/create_budget")
+            post("/api/budgets")
                 .header("Authorization", "Bearer $authToken")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(budget2Request))
@@ -306,31 +292,35 @@ class SseIntegrationTest {
 
         // Verify both SSE connections can be established
         mockMvc.perform(
-            get("/api/budgets/new_entry")
+            get("/api/budgets/${budget1Id}/entries/stream")
                 .header("Authorization", "Bearer $authToken")
-                .param("budgetId", budget1Id.toString())
                 .accept("text/event-stream")
         )
             .andExpect(status().isOk)
 
         mockMvc.perform(
-            get("/api/budgets/new_entry")
+            get("/api/budgets/${budget2Id}/entries/stream")
                 .header("Authorization", "Bearer $authToken")
-                .param("budgetId", budget2Id.toString())
                 .accept("text/event-stream")
         )
             .andExpect(status().isOk)
 
         // Create entries in both budgets (each would trigger budget-specific SSE events)
-        val entry1 = PutEntryRequest(
-            null, budget1Id, BigDecimal("50.00"), "Budget 1 Entry", "Cat1", EntryType.OUTCOME
+        val entry1 = CreateBudgetEntryRequest(
+            amount = BigDecimal("50.00"),
+            description = "Budget 1 Entry",
+            category = "Cat1",
+            type = EntryType.OUTCOME
         )
-        val entry2 = PutEntryRequest(
-            null, budget2Id, BigDecimal("100.00"), "Budget 2 Entry", "Cat2", EntryType.OUTCOME
+        val entry2 = CreateBudgetEntryRequest(
+            amount = BigDecimal("100.00"),
+            description = "Budget 2 Entry",
+            category = "Cat2",
+            type = EntryType.OUTCOME
         )
 
         mockMvc.perform(
-            put("/api/budgets/put_entry")
+            post("/api/budgets/${budget1Id}/entries")
                 .header("Authorization", "Bearer $authToken")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(entry1))
@@ -338,7 +328,7 @@ class SseIntegrationTest {
             .andExpect(status().isCreated)
 
         mockMvc.perform(
-            put("/api/budgets/put_entry")
+            post("/api/budgets/${budget2Id}/entries")
                 .header("Authorization", "Bearer $authToken")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(entry2))
@@ -368,7 +358,7 @@ class SseIntegrationTest {
         )
 
         mockMvc.perform(
-            post("/api/budgets/add_collaborator")
+            post("/api/budgets/${budgetId}/collaborators")
                 .header("Authorization", "Bearer $user1Token")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(addCollaboratorRequest))
@@ -376,28 +366,29 @@ class SseIntegrationTest {
 
         // Both establish SSE connections
         mockMvc.perform(
-            get("/api/budgets/new_entry")
+            get("/api/budgets/${budgetId}/entries/stream")
                 .header("Authorization", "Bearer $user1Token")
-                .param("budgetId", budgetId.toString())
                 .accept("text/event-stream")
         )
             .andExpect(status().isOk)
 
         mockMvc.perform(
-            get("/api/budgets/new_entry")
+            get("/api/budgets/${budgetId}/entries/stream")
                 .header("Authorization", "Bearer $user2Token")
-                .param("budgetId", budgetId.toString())
                 .accept("text/event-stream")
         )
             .andExpect(status().isOk)
 
         // When - User 1 creates an entry
-        val entryRequest = PutEntryRequest(
-            null, budgetId, BigDecimal("75.00"), "User 1 Entry", "Food", EntryType.OUTCOME
+        val entryRequest = CreateBudgetEntryRequest(
+            amount = BigDecimal("75.00"),
+            description = "User 1 Entry",
+            category = "Food",
+            type = EntryType.OUTCOME
         )
 
         val result = mockMvc.perform(
-            put("/api/budgets/put_entry")
+            post("/api/budgets/${budgetId}/entries")
                 .header("Authorization", "Bearer $user1Token")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(entryRequest))
@@ -410,12 +401,15 @@ class SseIntegrationTest {
         assertEquals(user1Email, response.createdByEmail)
 
         // When - User 2 creates an entry
-        val entry2Request = PutEntryRequest(
-            null, budgetId, BigDecimal("125.00"), "User 2 Entry", "Transport", EntryType.OUTCOME
+        val entry2Request = CreateBudgetEntryRequest(
+            amount = BigDecimal("125.00"),
+            description = "User 2 Entry",
+            category = "Transport",
+            type = EntryType.OUTCOME
         )
 
         val result2 = mockMvc.perform(
-            put("/api/budgets/put_entry")
+            post("/api/budgets/${budgetId}/entries")
                 .header("Authorization", "Bearer $user2Token")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(entry2Request))
@@ -429,9 +423,8 @@ class SseIntegrationTest {
 
         // Verify both entries exist
         val entriesResult = mockMvc.perform(
-            get("/api/budgets/get_entries")
+            get("/api/budgets/${budgetId}/entries")
                 .header("Authorization", "Bearer $user1Token")
-                .param("budgetId", budgetId.toString())
         ).andReturn()
 
         val entries = objectMapper.readValue(entriesResult.response.contentAsString, Array<BudgetEntryResponse>::class.java)

@@ -4,9 +4,10 @@
 This document tracks the implementation progress of API endpoints and features as defined in the system architecture diagram.
 
 **🔄 API Refactored to RESTful Standards (2025-10-21)**
+**✅ Legacy Endpoints Removed (2025-10-25)**
 - All endpoints now follow RESTful conventions (resources as nouns, path parameters)
-- Legacy endpoints maintained with @Deprecated for backward compatibility
-- Documentation updated with both new RESTful and legacy endpoint formats
+- Legacy deprecated endpoints have been removed from codebase
+- All tests updated to use new RESTful endpoints (127 tests passing)
 
 ---
 
@@ -42,10 +43,8 @@ This document tracks the implementation progress of API endpoints and features a
 
 ## Budget Management Endpoints
 
-### POST /api/budgets (RESTful)
-**Status: ✅ COMPLETE + REFACTORED**
-- ✅ RESTful endpoint: `POST /api/budgets`
-- ✅ Legacy endpoint: `POST /api/budgets/create_budget` (@Deprecated)
+### POST /api/budgets
+**Status: ✅ COMPLETE**
 - ✅ Controller endpoint implemented
 - ✅ Service layer implemented (BudgetService)
 - ✅ Repository layer implemented (BudgetRepository, UserBudgetRepository)
@@ -54,10 +53,8 @@ This document tracks the implementation progress of API endpoints and features a
 - ✅ Creates UserBudget junction entry
 - ✅ JWT authentication and authorization
 
-### GET /api/budgets (RESTful)
-**Status: ✅ COMPLETE + REFACTORED**
-- ✅ RESTful endpoint: `GET /api/budgets`
-- ✅ Legacy endpoint: `GET /api/budgets/get_budgets` (@Deprecated)
+### GET /api/budgets
+**Status: ✅ COMPLETE**
 - ✅ Controller endpoint implemented
 - ✅ Service layer implemented (BudgetService)
 - ✅ Repository layer implemented (custom JPQL query)
@@ -69,10 +66,8 @@ This document tracks the implementation progress of API endpoints and features a
 
 ## Collaboration Endpoints
 
-### POST /api/budgets/{budgetId}/collaborators (RESTful)
-**Status: ✅ COMPLETE + REFACTORED**
-- ✅ RESTful endpoint: `POST /api/budgets/{budgetId}/collaborators`
-- ✅ Legacy endpoint: `POST /api/budgets/add_collaborator` (@Deprecated)
+### POST /api/budgets/{budgetId}/collaborators
+**Status: ✅ COMPLETE**
 - ✅ Controller endpoint implemented
 - ✅ Service layer refactored (budgetId as path parameter)
 - ✅ Repository layer implemented (UserBudgetRepository)
@@ -82,10 +77,8 @@ This document tracks the implementation progress of API endpoints and features a
 - ✅ Prevents duplicate collaborators
 - ✅ Returns comprehensive response with budget and collaborator info
 
-### GET /api/budgets/{budgetId}/collaborators (RESTful)
-**Status: ✅ COMPLETE + REFACTORED**
-- ✅ RESTful endpoint: `GET /api/budgets/{budgetId}/collaborators`
-- ✅ Legacy endpoint: `GET /api/budgets/get_collaborators?budgetId={id}` (@Deprecated)
+### GET /api/budgets/{budgetId}/collaborators
+**Status: ✅ COMPLETE**
 - ✅ Controller endpoint implemented
 - ✅ Service layer implemented (BudgetService)
 - ✅ Repository layer implemented (custom JPQL query)
@@ -97,10 +90,8 @@ This document tracks the implementation progress of API endpoints and features a
 
 ## Budget Entry Endpoints
 
-### GET /api/budgets/{budgetId}/entries (RESTful)
-**Status: ✅ COMPLETE + REFACTORED**
-- ✅ RESTful endpoint: `GET /api/budgets/{budgetId}/entries`
-- ✅ Legacy endpoint: `GET /api/budgets/get_entries?budgetId={id}` (@Deprecated)
+### GET /api/budgets/{budgetId}/entries
+**Status: ✅ COMPLETE**
 - ✅ Controller endpoint implemented
 - ✅ Service layer implemented (BudgetService.getEntriesByBudgetId)
 - ✅ Repository layer implemented (BudgetEntryRepository)
@@ -108,10 +99,8 @@ This document tracks the implementation progress of API endpoints and features a
 - ✅ Returns list of all entries for a budget
 - ✅ Validates user access to budget
 
-### POST /api/budgets/{budgetId}/entries (RESTful)
-**Status: ✅ COMPLETE + REFACTORED**
-- ✅ RESTful endpoint: `POST /api/budgets/{budgetId}/entries`
-- ✅ Legacy endpoint: `PUT /api/budgets/put_entry` (without id) (@Deprecated)
+### POST /api/budgets/{budgetId}/entries
+**Status: ✅ COMPLETE**
 - ✅ Controller endpoint implemented
 - ✅ Service layer implemented (BudgetService.createEntry)
 - ✅ Repository layer implemented (BudgetEntryRepository)
@@ -122,10 +111,8 @@ This document tracks the implementation progress of API endpoints and features a
 - ✅ Returns HTTP 201 Created
 - ✅ Triggers SSE notification to stream endpoint
 
-### PUT /api/budgets/{budgetId}/entries/{entryId} (RESTful)
-**Status: ✅ COMPLETE + REFACTORED**
-- ✅ RESTful endpoint: `PUT /api/budgets/{budgetId}/entries/{entryId}`
-- ✅ Legacy endpoint: `PUT /api/budgets/put_entry` (with id) (@Deprecated)
+### PUT /api/budgets/{budgetId}/entries/{entryId}
+**Status: ✅ COMPLETE**
 - ✅ Controller endpoint implemented
 - ✅ Service layer implemented (BudgetService.updateEntry)
 - ✅ Repository layer implemented (BudgetEntryRepository)
@@ -137,10 +124,8 @@ This document tracks the implementation progress of API endpoints and features a
 - ✅ Returns HTTP 200 OK
 - ✅ Triggers SSE notification to stream endpoint
 
-### GET /api/budgets/{budgetId}/entries/stream (RESTful SSE)
-**Status: ✅ COMPLETE - REFACTORED TO REACTIVE + RESTFUL**
-- ✅ RESTful endpoint: `GET /api/budgets/{budgetId}/entries/stream`
-- ✅ Legacy endpoint: `GET /api/budgets/new_entry?budgetId={id}` (@Deprecated)
+### GET /api/budgets/{budgetId}/entries/stream (SSE)
+**Status: ✅ COMPLETE**
 - ✅ **Reactive SSE implementation using Flux (Reactor)**
 - ✅ ReactiveSseService using Sinks for multicast broadcasting
 - ✅ Controller returns Flux<ServerSentEvent<BudgetEntryEvent>>
@@ -157,9 +142,8 @@ This document tracks the implementation progress of API endpoints and features a
   - Multi-collaborator event broadcasting
   - Multicast to multiple subscribers
 
-### DELETE /api/budgets/{budgetId}/entries/{entryId} (RESTful)
+### DELETE /api/budgets/{budgetId}/entries/{entryId}
 **Status: ✅ COMPLETE**
-- ✅ RESTful endpoint: `DELETE /api/budgets/{budgetId}/entries/{entryId}`
 - ✅ Controller endpoint implemented
 - ✅ Service layer implemented (BudgetService.deleteEntry)
 - ✅ Repository layer implemented (BudgetEntryRepository)
@@ -172,9 +156,8 @@ This document tracks the implementation progress of API endpoints and features a
 
 ## Collaboration Deletion Endpoints
 
-### DELETE /api/budgets/{budgetId}/collaborators/{collaboratorEmail} (RESTful)
+### DELETE /api/budgets/{budgetId}/collaborators/{collaboratorEmail}
 **Status: ✅ COMPLETE**
-- ✅ RESTful endpoint: `DELETE /api/budgets/{budgetId}/collaborators/{collaboratorEmail}`
 - ✅ Controller endpoint implemented
 - ✅ Service layer implemented (BudgetService.removeCollaborator)
 - ✅ Repository layer enhanced (UserBudgetRepository.countByBudgetId)
@@ -188,9 +171,8 @@ This document tracks the implementation progress of API endpoints and features a
 
 ## Budget Deletion Endpoints
 
-### DELETE /api/budgets/{budgetId} (RESTful)
+### DELETE /api/budgets/{budgetId}
 **Status: ✅ COMPLETE**
-- ✅ RESTful endpoint: `DELETE /api/budgets/{budgetId}`
 - ✅ Controller endpoint implemented
 - ✅ Service layer implemented (BudgetService.deleteBudget)
 - ✅ Repository layer enhanced (BudgetEntryRepository.deleteByBudgetId, UserBudgetRepository.deleteByBudgetId)
@@ -245,16 +227,17 @@ All endpoints from the system architecture diagram have been successfully implem
   - ✅ Controller Total: 26 tests, all passing with MockK
 - [x] Add integration tests ✅
   - ✅ AuthenticationIntegrationTest: 9 tests (sign up, sign in, refresh token flows)
-  - ✅ BudgetManagementIntegrationTest: 11 tests (budget CRUD, collaborators, entries, workflows)
+  - ✅ BudgetManagementIntegrationTest: 20 tests (budget CRUD, collaborators, entries, DELETE operations, workflows)
   - ✅ SseIntegrationTest: 9 tests (SSE connections, authorization, events, multi-user collaboration)
   - ✅ ConcurrentBudgetEntryTest: 5 tests (rapid multi-user operations, data consistency, audit trail)
-  - ✅ Integration Total: 34 tests, all passing with MockMvc + H2
+  - ✅ ReactiveSseIntegrationTest: 6 tests (reactive SSE with actual event capture)
+  - ✅ Integration Total: 49 tests, all passing with MockMvc + H2
 - [x] Add SSE connection/disconnection tests ✅
 - [x] Test concurrent budget entry updates ✅
 - [x] Add tests that capture and verify actual SSE event data ✅
-- [x] **Complete Test Summary: 123 total tests - 0 failures, 0 errors** ✅
+- [x] **Complete Test Summary: 132 total tests - 0 failures, 0 errors** ✅
   - Unit Tests: 83 (Services: 39, Controllers: 44)
-  - Integration Tests: 40 (Auth: 9, Budget: 11, SSE: 9, Concurrent: 5, Reactive SSE: 6)
+  - Integration Tests: 49 (Auth: 9, Budget: 20, SSE: 9, Concurrent: 5, Reactive SSE: 6)
 
 ### Security & Performance
 - [x] Implement JWT authentication ✅
@@ -268,10 +251,13 @@ All endpoints from the system architecture diagram have been successfully implem
 - [x] ✅ **Refactor to RESTful conventions** (completed 2025-10-21)
   - Resources as nouns instead of verbs in URLs
   - Path parameters instead of query parameters for resource identification
-  - Proper HTTP methods (GET, POST, PUT) for CRUD operations
-  - Legacy endpoints maintained with @Deprecated
+  - Proper HTTP methods (GET, POST, PUT, DELETE) for CRUD operations
+- [x] ✅ **Remove legacy deprecated endpoints** (completed 2025-10-25)
+  - All deprecated endpoints removed from controllers
+  - All tests updated to use RESTful endpoints
+  - Codebase fully migrated to RESTful API design
 - [x] ✅ Add GET /api/budgets/{budgetId}/entries endpoint (list all entries)
-- [x] ✅ **Add DELETE endpoints (budget, entry, collaborator)** (completed 2025-10-25)
+- [x] ✅ Add DELETE endpoints (budget, entry, collaborator) (completed 2025-10-25)
 - [ ] Add pagination for GET endpoints
 - [ ] Add filtering/sorting for budget entries
 - [ ] Add GET /api/budgets/{id} endpoint (get single budget)
@@ -311,7 +297,7 @@ All endpoints from the system architecture diagram have been successfully implem
 - `postman_requests.md` - API documentation and examples
 - `test-sse.html` - Interactive SSE test client
 
-### Test Files (123 total tests)
+### Test Files (132 total tests)
 
 **Service Tests (39 tests)**
 - `UserServiceTest.kt` - Unit tests for user authentication (9 tests)
@@ -320,15 +306,15 @@ All endpoints from the system architecture diagram have been successfully implem
 
 **Controller Tests (44 tests)**
 - `UserControllerTest.kt` - Unit tests for user endpoints (8 tests)
-- `BudgetControllerTest.kt` - Unit tests for budget endpoints (36 tests)
+- `BudgetControllerTest.kt` - Unit tests for budget endpoints including DELETE operations (36 tests)
 
-**Integration Tests (40 tests)**
+**Integration Tests (49 tests)**
 - `AuthenticationIntegrationTest.kt` - E2E authentication flows (9 tests)
-- `BudgetManagementIntegrationTest.kt` - E2E budget management & collaboration (11 tests)
+- `BudgetManagementIntegrationTest.kt` - E2E budget CRUD, collaborators, entries, DELETE operations (20 tests)
 - `SseIntegrationTest.kt` - E2E SSE connections, authorization & real-time events (9 tests)
 - `ConcurrentBudgetEntryTest.kt` - Rapid multi-user operations and data consistency (5 tests)
 - `ReactiveSseIntegrationTest.kt` - Reactive Flux-based SSE with actual event capture (6 tests)
 
 ---
 
-**Last Updated:** 2025-10-25 (DELETE Endpoints Implementation)
+**Last Updated:** 2025-10-25 (Legacy Deprecated Endpoints Removed - Full RESTful Migration Complete)
