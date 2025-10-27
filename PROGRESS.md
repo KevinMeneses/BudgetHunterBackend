@@ -268,8 +268,14 @@ All endpoints from the system architecture diagram have been successfully implem
   - OpenAPI JSON spec available at `/v3/api-docs`
   - Security scheme configured for JWT Bearer authentication
   - Detailed endpoint descriptions with request/response examples
-- [ ] Add pagination for GET endpoints
-- [ ] Add filtering/sorting for budget entries
+- [x] ✅ **Add pagination for GET endpoints** (completed 2025-10-26)
+  - GET /api/budgets now supports optional pagination (page, size, sortBy, sortDirection)
+  - GET /api/budgets/{budgetId}/entries now supports optional pagination
+  - Backward compatible: returns all results when pagination params not provided
+  - PageResponse DTO with metadata (page, size, totalElements, totalPages, isFirst, isLast)
+  - Sorting support for multiple fields (budgets: id, name, amount; entries: modificationDate, creationDate, amount, etc.)
+  - Documentation updated (Swagger annotations, postman_requests.md)
+- [ ] Add filtering for budget entries (by type, category, date range)
 - [ ] Add GET /api/budgets/{id} endpoint (get single budget)
 
 ### Data & Database
@@ -326,4 +332,4 @@ All endpoints from the system architecture diagram have been successfully implem
 
 ---
 
-**Last Updated:** 2025-10-25 (API Documentation Added - Swagger/OpenAPI Integration Complete)
+**Last Updated:** 2025-10-26 (Pagination Added - GET Endpoints Now Support Optional Pagination)

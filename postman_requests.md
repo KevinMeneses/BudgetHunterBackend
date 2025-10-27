@@ -133,9 +133,15 @@ Copy the `authToken` value for authenticated requests and save the `refreshToken
 **Headers:**
 - Authorization: Bearer YOUR_JWT_TOKEN_HERE
 
+**Query Parameters (Optional):**
+- `page`: Page number (0-indexed), e.g., `0`
+- `size`: Number of items per page, e.g., `20`
+- `sortBy`: Field to sort by (`id`, `name`, `amount`), default: `id`
+- `sortDirection`: Sort direction (`asc` or `desc`), default: `asc`
+
 **Body:** None
 
-**Expected Response (200 OK):**
+**Expected Response (200 OK) - Without Pagination:**
 ```json
 [
   {
@@ -149,6 +155,33 @@ Copy the `authToken` value for authenticated requests and save the `refreshToken
     "amount": 2000.00
   }
 ]
+```
+
+**Example with Pagination:**
+**URL:** `http://localhost:8080/api/budgets?page=0&size=10&sortBy=name&sortDirection=asc`
+
+**Expected Response (200 OK) - With Pagination:**
+```json
+{
+  "content": [
+    {
+      "id": 1,
+      "name": "Monthly Budget",
+      "amount": 5000.00
+    },
+    {
+      "id": 2,
+      "name": "Vacation Budget",
+      "amount": 2000.00
+    }
+  ],
+  "page": 0,
+  "size": 10,
+  "totalElements": 2,
+  "totalPages": 1,
+  "isFirst": true,
+  "isLast": true
+}
 ```
 
 ---
@@ -213,9 +246,15 @@ Copy the `authToken` value for authenticated requests and save the `refreshToken
 **Headers:**
 - Authorization: Bearer YOUR_JWT_TOKEN_HERE
 
+**Query Parameters (Optional):**
+- `page`: Page number (0-indexed), e.g., `0`
+- `size`: Number of items per page, e.g., `20`
+- `sortBy`: Field to sort by (`modificationDate`, `creationDate`, `amount`, `description`, `category`, `type`), default: `modificationDate`
+- `sortDirection`: Sort direction (`asc` or `desc`), default: `desc`
+
 **Body:** None
 
-**Expected Response (200 OK):**
+**Expected Response (200 OK) - Without Pagination:**
 ```json
 [
   {
@@ -243,6 +282,35 @@ Copy the `authToken` value for authenticated requests and save the `refreshToken
     "modificationDate": "2025-10-01T09:00:00"
   }
 ]
+```
+
+**Example with Pagination:**
+**URL:** `http://localhost:8080/api/budgets/1/entries?page=0&size=20&sortBy=modificationDate&sortDirection=desc`
+
+**Expected Response (200 OK) - With Pagination:**
+```json
+{
+  "content": [
+    {
+      "id": 1,
+      "budgetId": 1,
+      "amount": 150.00,
+      "description": "Grocery shopping",
+      "category": "Food",
+      "type": "OUTCOME",
+      "createdByEmail": "test@example.com",
+      "updatedByEmail": "test@example.com",
+      "creationDate": "2025-10-02T23:45:00",
+      "modificationDate": "2025-10-02T23:50:00"
+    }
+  ],
+  "page": 0,
+  "size": 20,
+  "totalElements": 1,
+  "totalPages": 1,
+  "isFirst": true,
+  "isLast": true
+}
 ```
 
 ---
@@ -435,7 +503,12 @@ curl -X POST http://localhost:8080/api/budgets \
 
 ### Get Budgets
 ```bash
+# Get all budgets (no pagination)
 curl -X GET http://localhost:8080/api/budgets \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN"
+
+# Get budgets with pagination
+curl -X GET "http://localhost:8080/api/budgets?page=0&size=10&sortBy=name&sortDirection=asc" \
   -H "Authorization: Bearer YOUR_JWT_TOKEN"
 ```
 
@@ -455,7 +528,12 @@ curl -X GET http://localhost:8080/api/budgets/1/collaborators \
 
 ### Get Budget Entries
 ```bash
+# Get all entries (no pagination)
 curl -X GET http://localhost:8080/api/budgets/1/entries \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN"
+
+# Get entries with pagination
+curl -X GET "http://localhost:8080/api/budgets/1/entries?page=0&size=20&sortBy=modificationDate&sortDirection=desc" \
   -H "Authorization: Bearer YOUR_JWT_TOKEN"
 ```
 

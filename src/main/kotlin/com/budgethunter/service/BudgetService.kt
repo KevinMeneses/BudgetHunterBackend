@@ -9,6 +9,9 @@ import com.budgethunter.repository.BudgetEntryRepository
 import com.budgethunter.repository.BudgetRepository
 import com.budgethunter.repository.UserBudgetRepository
 import com.budgethunter.repository.UserRepository
+import org.springframework.data.domain.Page
+import org.springframework.data.domain.PageRequest
+import org.springframework.data.domain.Sort
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.time.LocalDateTime
@@ -57,6 +60,26 @@ class BudgetService(
     fun getBudgetsByUserEmail(userEmail: String): List<BudgetResponse> {
         val budgets = userBudgetRepository.findBudgetsByUserEmail(userEmail)
         return budgets.map { budget ->
+            BudgetResponse(
+                id = budget.id!!,
+                name = budget.name,
+                amount = budget.amount
+            )
+        }
+    }
+
+    @Transactional(readOnly = true)
+    fun getBudgetsByUserEmail(userEmail: String, page: Int, size: Int, sortBy: String = "id", sortDirection: String = "asc"): PageResponse<BudgetResponse> {
+        val sort = if (sortDirection.lowercase() == "desc") {
+            Sort.by(sortBy).descending()
+        } else {
+            Sort.by(sortBy).ascending()
+        }
+
+        val pageable = PageRequest.of(page, size, sort)
+        val budgetsPage = userBudgetRepository.findBudgetsByUserEmail(userEmail, pageable)
+
+        return budgetsPage.toPageResponse { budget ->
             BudgetResponse(
                 id = budget.id!!,
                 name = budget.name,
@@ -127,6 +150,26 @@ class BudgetService(
 
         val entries = budgetEntryRepository.findByBudgetId(budgetId)
         return entries.map { it.toResponse() }
+    }
+
+    @Transactional(readOnly = true)
+    fun getEntriesByBudgetId(budgetId: Long, authenticatedUserEmail: String, page: Int, size: Int, sortBy: String = "modificationDate", sortDirection: String = "desc"): PageResponse<BudgetEntryResponse> {
+        verifyUserHasAccessToBudget(budgetId, authenticatedUserEmail)
+
+        if (!budgetRepository.existsById(budgetId)) {
+            throw IllegalArgumentException("Budget not found with id: $budgetId")
+        }
+
+        val sort = if (sortDirection.lowercase() == "desc") {
+            Sort.by(sortBy).descending()
+        } else {
+            Sort.by(sortBy).ascending()
+        }
+
+        val pageable = PageRequest.of(page, size, sort)
+        val entriesPage = budgetEntryRepository.findByBudgetId(budgetId, pageable)
+
+        return entriesPage.toPageResponse { it.toResponse() }
     }
 
     @Transactional
@@ -343,5 +386,17 @@ class BudgetService(
         // Broadcast to both old and new SSE implementations
         sseService.broadcastBudgetEntryEvent(budgetEntry.budget.id, event)
         reactiveSseService.broadcastEvent(budgetEntry.budget.id, event)
+    }
+
+    private fun <T, R> Page<T>.toPageResponse(transform: (T) -> R): PageResponse<R> {
+        return PageResponse(
+            content = this.content.map(transform),
+            page = this.number,
+            size = this.size,
+            totalElements = this.totalElements,
+            totalPages = this.totalPages,
+            isFirst = this.isFirst,
+            isLast = this.isLast
+        )
     }
 }

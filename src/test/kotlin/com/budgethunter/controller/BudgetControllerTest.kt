@@ -99,12 +99,14 @@ class BudgetControllerTest {
         every { budgetService.getBudgetsByUserEmail(testUserEmail) } returns expectedBudgets
 
         // When
-        val response = budgetController.getBudgets(authentication)
+        val response = budgetController.getBudgets(null, null, "id", "asc", authentication)
 
         // Then
         assertEquals(HttpStatus.OK, response.statusCode)
-        assertEquals(expectedBudgets, response.body)
-        assertEquals(2, response.body?.size)
+        @Suppress("UNCHECKED_CAST")
+        val budgets = response.body as List<BudgetResponse>
+        assertEquals(expectedBudgets, budgets)
+        assertEquals(2, budgets.size)
         verify(exactly = 1) { budgetService.getBudgetsByUserEmail(testUserEmail) }
     }
 
@@ -114,12 +116,14 @@ class BudgetControllerTest {
         every { budgetService.getBudgetsByUserEmail(testUserEmail) } returns emptyList()
 
         // When
-        val response = budgetController.getBudgets(authentication)
+        val response = budgetController.getBudgets(null, null, "id", "asc", authentication)
 
         // Then
         assertEquals(HttpStatus.OK, response.statusCode)
         assertNotNull(response.body)
-        assertTrue(response.body!!.isEmpty())
+        @Suppress("UNCHECKED_CAST")
+        val budgets = response.body as List<BudgetResponse>
+        assertTrue(budgets.isEmpty())
         verify(exactly = 1) { budgetService.getBudgetsByUserEmail(testUserEmail) }
     }
 
@@ -270,12 +274,14 @@ class BudgetControllerTest {
         every { budgetService.getEntriesByBudgetId(budgetId, testUserEmail) } returns expectedEntries
 
         // When
-        val response = budgetController.getEntries(budgetId, authentication)
+        val response = budgetController.getEntries(budgetId, null, null, "modificationDate", "desc", authentication)
 
         // Then
         assertEquals(HttpStatus.OK, response.statusCode)
-        assertEquals(expectedEntries, response.body)
-        assertEquals(2, response.body?.size)
+        @Suppress("UNCHECKED_CAST")
+        val entries = response.body as List<BudgetEntryResponse>
+        assertEquals(expectedEntries, entries)
+        assertEquals(2, entries.size)
         verify(exactly = 1) { budgetService.getEntriesByBudgetId(budgetId, testUserEmail) }
     }
 
@@ -287,12 +293,14 @@ class BudgetControllerTest {
         every { budgetService.getEntriesByBudgetId(budgetId, testUserEmail) } returns emptyList()
 
         // When
-        val response = budgetController.getEntries(budgetId, authentication)
+        val response = budgetController.getEntries(budgetId, null, null, "modificationDate", "desc", authentication)
 
         // Then
         assertEquals(HttpStatus.OK, response.statusCode)
         assertNotNull(response.body)
-        assertTrue(response.body!!.isEmpty())
+        @Suppress("UNCHECKED_CAST")
+        val entries = response.body as List<BudgetEntryResponse>
+        assertTrue(entries.isEmpty())
         verify(exactly = 1) { budgetService.getEntriesByBudgetId(budgetId, testUserEmail) }
     }
 
@@ -306,7 +314,7 @@ class BudgetControllerTest {
 
         // When & Then
         val exception = org.junit.jupiter.api.assertThrows<IllegalArgumentException> {
-            budgetController.getEntries(budgetId, authentication)
+            budgetController.getEntries(budgetId, null, null, "modificationDate", "desc", authentication)
         }
 
         assertTrue(exception.message!!.contains("don't have access"))

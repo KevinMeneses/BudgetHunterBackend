@@ -65,7 +65,7 @@ class BudgetController(
     @GetMapping
     @Operation(
         summary = "Get all budgets for authenticated user",
-        description = "Retrieves all budgets that the authenticated user has access to, including owned budgets and budgets where the user is a collaborator."
+        description = "Retrieves all budgets that the authenticated user has access to, including owned budgets and budgets where the user is a collaborator. Supports optional pagination via query parameters."
     )
     @ApiResponses(
         value = [
@@ -81,10 +81,28 @@ class BudgetController(
             )
         ]
     )
-    fun getBudgets(authentication: Authentication): ResponseEntity<List<BudgetResponse>> {
+    fun getBudgets(
+        @Parameter(description = "Page number (0-indexed). If not provided, returns all results", required = false)
+        @RequestParam(required = false) page: Int?,
+        @Parameter(description = "Number of items per page", required = false, example = "20")
+        @RequestParam(required = false) size: Int?,
+        @Parameter(description = "Field to sort by (id, name, amount)", required = false, example = "id")
+        @RequestParam(required = false, defaultValue = "id") sortBy: String,
+        @Parameter(description = "Sort direction (asc or desc)", required = false, example = "asc")
+        @RequestParam(required = false, defaultValue = "asc") sortDirection: String,
+        authentication: Authentication
+    ): ResponseEntity<*> {
         val userEmail = authentication.principal as String
-        val budgets = budgetService.getBudgetsByUserEmail(userEmail)
-        return ResponseEntity.ok(budgets)
+
+        return if (page != null && size != null) {
+            // Return paginated response
+            val paginatedBudgets = budgetService.getBudgetsByUserEmail(userEmail, page, size, sortBy, sortDirection)
+            ResponseEntity.ok(paginatedBudgets)
+        } else {
+            // Return all results (legacy behavior)
+            val budgets = budgetService.getBudgetsByUserEmail(userEmail)
+            ResponseEntity.ok(budgets)
+        }
     }
 
     @PostMapping("/{budgetId}/collaborators")
@@ -271,7 +289,7 @@ class BudgetController(
     @GetMapping("/{budgetId}/entries")
     @Operation(
         summary = "Get all budget entries",
-        description = "Retrieves all income and expense entries for the specified budget. Only users with access to the budget can view its entries."
+        description = "Retrieves all income and expense entries for the specified budget. Only users with access to the budget can view its entries. Supports optional pagination via query parameters."
     )
     @ApiResponses(
         value = [
@@ -300,11 +318,27 @@ class BudgetController(
     fun getEntries(
         @Parameter(description = "ID of the budget", required = true)
         @PathVariable budgetId: Long,
+        @Parameter(description = "Page number (0-indexed). If not provided, returns all results", required = false)
+        @RequestParam(required = false) page: Int?,
+        @Parameter(description = "Number of items per page", required = false, example = "20")
+        @RequestParam(required = false) size: Int?,
+        @Parameter(description = "Field to sort by (modificationDate, creationDate, amount, description, category, type)", required = false, example = "modificationDate")
+        @RequestParam(required = false, defaultValue = "modificationDate") sortBy: String,
+        @Parameter(description = "Sort direction (asc or desc)", required = false, example = "desc")
+        @RequestParam(required = false, defaultValue = "desc") sortDirection: String,
         authentication: Authentication
-    ): ResponseEntity<List<BudgetEntryResponse>> {
+    ): ResponseEntity<*> {
         val userEmail = authentication.principal as String
-        val entries = budgetService.getEntriesByBudgetId(budgetId, userEmail)
-        return ResponseEntity.ok(entries)
+
+        return if (page != null && size != null) {
+            // Return paginated response
+            val paginatedEntries = budgetService.getEntriesByBudgetId(budgetId, userEmail, page, size, sortBy, sortDirection)
+            ResponseEntity.ok(paginatedEntries)
+        } else {
+            // Return all results (legacy behavior)
+            val entries = budgetService.getEntriesByBudgetId(budgetId, userEmail)
+            ResponseEntity.ok(entries)
+        }
     }
 
     @GetMapping("/{budgetId}/entries/stream", produces = [MediaType.TEXT_EVENT_STREAM_VALUE])
