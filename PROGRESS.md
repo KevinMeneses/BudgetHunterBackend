@@ -246,7 +246,24 @@ All endpoints from the system architecture diagram have been successfully implem
 - [x] ✅ **Security dependency updates** (completed 2025-10-25)
   - Apache Commons Lang upgraded to 3.18.0 (fixes CVE - Uncontrolled Recursion vulnerability)
   - SpringDoc OpenAPI upgraded to 2.6.0 (secure, latest stable version)
-- [ ] Add rate limiting
+- [x] ✅ **Add rate limiting** (completed 2025-11-03)
+  - **Implementation:** Token Bucket algorithm using Bucket4j 8.10.1
+  - **Configuration:** 100 requests/minute per IP address (customizable)
+  - **Features:**
+    - IP-based rate limiting with proxy support (X-Forwarded-For, X-Real-IP)
+    - Helpful response headers (X-Rate-Limit-Remaining, X-Rate-Limit-Retry-After-Seconds)
+    - Clear JSON error messages on HTTP 429 (Too Many Requests)
+    - Thread-safe bucket management with ConcurrentHashMap
+    - Continuous token refill (greedy strategy)
+    - Profile-based activation (production only)
+  - **Files:**
+    - `RateLimitConfig.kt` - Token bucket configuration and management
+    - `RateLimitInterceptor.kt` - Request interceptor that enforces rate limits
+    - `WebMvcConfig.kt` - Spring MVC configuration with production profile detection
+  - **Status:** Fully implemented and tested (132 tests passing)
+  - **Activation:** Switch profile in `application.properties` from `debug` to `production` (or use command line/env var)
+  - **Testing:** Manually verified with curl (10-token bucket: 100% success, HTTP 429 after exhaustion)
+  - **Documentation:** Extensive inline comments explaining Token Bucket algorithm, configuration options, and customization examples
 - [ ] Implement CORS configuration for production
 - [ ] Add request/response logging
 
@@ -332,4 +349,4 @@ All endpoints from the system architecture diagram have been successfully implem
 
 ---
 
-**Last Updated:** 2025-10-26 (Pagination Added - GET Endpoints Now Support Optional Pagination)
+**Last Updated:** 2025-11-03 (Rate Limiting Implemented - Token Bucket Algorithm with Bucket4j)
