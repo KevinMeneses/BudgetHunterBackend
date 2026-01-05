@@ -196,7 +196,7 @@ class BudgetService(
         val savedEntry = budgetEntryRepository.save(newEntry)
         val response = savedEntry.toResponse()
 
-        broadcastBudgetEntryEvent(savedEntry, user)
+        broadcastBudgetEntryEvent(savedEntry, user, BudgetEntryAction.CREATED)
 
         return response
     }
@@ -227,7 +227,7 @@ class BudgetService(
         val savedEntry = budgetEntryRepository.save(updatedEntry)
         val response = savedEntry.toResponse()
 
-        broadcastBudgetEntryEvent(savedEntry, user)
+        broadcastBudgetEntryEvent(savedEntry, user, BudgetEntryAction.UPDATED)
 
         return response
     }
@@ -242,7 +242,8 @@ class BudgetService(
         val user = userRepository.findById(authenticatedUserEmail)
             .orElseThrow { IllegalArgumentException("User not found with email: $authenticatedUserEmail") }
 
-        val budgetEntry = if (request.id != null) {
+        val isUpdate = request.id != null
+        val budgetEntry = if (isUpdate) {
             updateExistingEntry(request, budget, user)
         } else {
             createNewEntry(request, budget, user)
@@ -250,7 +251,8 @@ class BudgetService(
 
         val response = budgetEntry.toResponse()
 
-        broadcastBudgetEntryEvent(budgetEntry, user)
+        val action = if (isUpdate) BudgetEntryAction.UPDATED else BudgetEntryAction.CREATED
+        broadcastBudgetEntryEvent(budgetEntry, user, action)
 
         return response
     }
@@ -332,7 +334,12 @@ class BudgetService(
             throw IllegalArgumentException("Budget entry $entryId does not belong to budget $budgetId")
         }
 
+        val user = userRepository.findById(authenticatedUserEmail)
+            .orElseThrow { IllegalArgumentException("User not found with email: $authenticatedUserEmail") }
+
         budgetEntryRepository.deleteById(entryId)
+
+        broadcastBudgetEntryEvent(entry, user, BudgetEntryAction.DELETED)
     }
 
     @Transactional
@@ -358,6 +365,7 @@ class BudgetService(
         userBudgetRepository.deleteById(userBudgetId)
     }
 
+    @Transactional(readOnly = true)
     fun verifyUserHasAccessToBudget(budgetId: Long, userEmail: String) {
         val userBudgetId = UserBudgetId(budgetId = budgetId, userEmail = userEmail)
         if (!userBudgetRepository.existsById(userBudgetId)) {
@@ -365,18 +373,11 @@ class BudgetService(
         }
     }
 
-    private fun broadcastBudgetEntryEvent(budgetEntry: BudgetEntry, user: com.budgethunter.model.User) {
+    private fun broadcastBudgetEntryEvent(budgetEntry: BudgetEntry, user: com.budgethunter.model.User, action: BudgetEntryAction) {
         val event = BudgetEntryEvent(
-            budgetEntry = BudgetEntryEventData(
-                id = budgetEntry.id!!,
-                budgetId = budgetEntry.budget.id!!,
-                amount = budgetEntry.amount,
-                description = budgetEntry.description,
-                category = budgetEntry.category,
-                type = budgetEntry.type,
-                creationDate = budgetEntry.creationDate,
-                modificationDate = budgetEntry.modificationDate
-            ),
+            budgetId = budgetEntry.budget.id!!,
+            entryId = budgetEntry.id!!,
+            action = action,
             userInfo = UserEventInfo(
                 email = user.email,
                 name = user.name

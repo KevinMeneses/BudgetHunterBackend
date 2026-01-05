@@ -398,22 +398,15 @@ Copy the `authToken` value for authenticated requests and save the `refreshToken
 
 **Response:**
 - Content-Type: text/event-stream
-- Streaming connection that sends events when budget entries are created/updated
+- Streaming connection that sends lightweight notifications when budget entries are created/updated/deleted
 
 **Event Format:**
 ```json
 event: budget-entry
 data: {
-  "budgetEntry": {
-    "id": 123,
-    "budgetId": 1,
-    "amount": 150.00,
-    "description": "Grocery shopping",
-    "category": "Food",
-    "type": "OUTCOME",
-    "creationDate": "2025-10-02T10:30:00",
-    "modificationDate": "2025-10-02T10:30:00"
-  },
+  "budgetId": 1,
+  "entryId": 123,
+  "action": "CREATED",
   "userInfo": {
     "email": "user@example.com",
     "name": "John Doe"
@@ -421,7 +414,17 @@ data: {
 }
 ```
 
-**Note:** For testing in a browser, use the included `test-sse.html` file. Standard Postman doesn't support SSE well. The curl command will keep the connection open and display events as they arrive.
+**Action Types:**
+- `CREATED` - A new entry was created
+- `UPDATED` - An existing entry was modified
+- `DELETED` - An entry was deleted
+
+**Client-Side Workflow:**
+When you receive an event:
+1. If `action` is `CREATED` or `UPDATED`: Call `GET /api/budgets/{budgetId}/entries/{entryId}` to fetch the complete entry data
+2. If `action` is `DELETED`: Remove the entry from your local state (no need to fetch)
+
+**Note:** For testing in a browser, use the included `test-sse.html` file. Standard Postman doesn't support SSE well. The curl command will keep the connection open and display events as they arrive. This notification-based approach reduces bandwidth by ~90% compared to sending full entry data in events.
 
 ---
 

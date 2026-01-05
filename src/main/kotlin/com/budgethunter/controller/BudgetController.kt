@@ -376,8 +376,17 @@ class BudgetController(
         authentication: Authentication
     ): Flux<ServerSentEvent<BudgetEntryEvent>> {
         val userEmail = authentication.principal as String
-        budgetService.verifyUserHasAccessToBudget(budgetId, userEmail)
 
+        // Verify access synchronously in a completed transaction
+        // before returning the reactive Flux
+        try {
+            budgetService.verifyUserHasAccessToBudget(budgetId, userEmail)
+        } catch (e: Exception) {
+            // If access check fails, return error as Flux
+            return Flux.error(e)
+        }
+
+        // Return reactive stream without holding any database connection
         return reactiveSseService.subscribeToEvents(budgetId)
             .map { event ->
                 ServerSentEvent.builder(event)

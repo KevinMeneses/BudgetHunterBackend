@@ -1,24 +1,17 @@
 package com.budgethunter.dto
 
-import com.budgethunter.model.EntryType
-import java.math.BigDecimal
-import java.time.LocalDateTime
-
 data class BudgetEntryEvent(
-    val budgetEntry: BudgetEntryEventData,
+    val budgetId: Long,
+    val entryId: Long,
+    val action: BudgetEntryAction,
     val userInfo: UserEventInfo
 )
 
-data class BudgetEntryEventData(
-    val id: Long,
-    val budgetId: Long,
-    val amount: BigDecimal,
-    val description: String,
-    val category: String,
-    val type: EntryType,
-    val creationDate: LocalDateTime,
-    val modificationDate: LocalDateTime
-)
+enum class BudgetEntryAction {
+    CREATED,
+    UPDATED,
+    DELETED
+}
 
 data class UserEventInfo(
     val email: String,
