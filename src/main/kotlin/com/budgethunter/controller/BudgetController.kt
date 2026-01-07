@@ -386,13 +386,24 @@ class BudgetController(
             return Flux.error(e)
         }
 
-        // Return reactive stream without holding any database connection
-        return reactiveSseService.subscribeToEvents(budgetId)
+        // Create event stream
+        val eventStream = reactiveSseService.subscribeToEvents(budgetId)
             .map { event ->
                 ServerSentEvent.builder(event)
                     .event("budget-entry")
                     .build()
             }
+
+        // Create heartbeat stream (SSE comment every 30 seconds to keep connection alive)
+        val heartbeatStream = Flux.interval(java.time.Duration.ofSeconds(30))
+            .map {
+                ServerSentEvent.builder<BudgetEntryEvent>()
+                    .comment("keep-alive")
+                    .build()
+            }
+
+        // Merge event stream with heartbeat stream
+        return Flux.merge(eventStream, heartbeatStream)
     }
 
     @DeleteMapping("/{budgetId}")
