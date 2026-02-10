@@ -1,6 +1,7 @@
 package com.budgethunter.service
 
 import com.budgethunter.dto.*
+import com.budgethunter.exception.ForbiddenAccessException
 import com.budgethunter.model.Budget
 import com.budgethunter.model.BudgetEntry
 import com.budgethunter.model.UserBudget
@@ -369,7 +370,7 @@ class BudgetService(
     fun verifyUserHasAccessToBudget(budgetId: Long, userEmail: String) {
         val userBudgetId = UserBudgetId(budgetId = budgetId, userEmail = userEmail)
         if (!userBudgetRepository.existsById(userBudgetId)) {
-            throw IllegalArgumentException("You don't have access to budget with id: $budgetId")
+            throw ForbiddenAccessException("You don't have access to budget with id: $budgetId")
         }
     }
 

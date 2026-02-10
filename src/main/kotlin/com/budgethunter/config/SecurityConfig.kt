@@ -14,7 +14,8 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 @Configuration
 @EnableWebSecurity
 class SecurityConfig(
-    private val jwtAuthenticationFilter: JwtAuthenticationFilter
+    private val jwtAuthenticationFilter: JwtAuthenticationFilter,
+    private val customAuthenticationEntryPoint: CustomAuthenticationEntryPoint
 ) {
 
     @Bean
@@ -39,6 +40,9 @@ class SecurityConfig(
                         "/swagger-ui.html"
                     ).permitAll()
                     .anyRequest().authenticated()
+            }
+            .exceptionHandling { exceptionHandling ->
+                exceptionHandling.authenticationEntryPoint(customAuthenticationEntryPoint)
             }
             .headers { headers ->
                 headers.frameOptions { it.sameOrigin() } // For H2 console

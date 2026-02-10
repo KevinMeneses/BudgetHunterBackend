@@ -97,7 +97,7 @@ class BudgetManagementIntegrationTest {
     }
 
     @Test
-    fun `should return 403 when creating budget without authentication`() {
+    fun `should return 401 when creating budget without authentication`() {
         // Given
         val request = CreateBudgetRequest(
             name = "Test Budget",
@@ -110,7 +110,7 @@ class BudgetManagementIntegrationTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request))
         )
-            .andExpect(status().isForbidden)
+            .andExpect(status().isUnauthorized)
     }
 
     // Get Budgets Tests
@@ -230,7 +230,7 @@ class BudgetManagementIntegrationTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(addCollaboratorRequest))
         )
-            .andExpect(status().isBadRequest)
+            .andExpect(status().isForbidden)
     }
 
     @Test
@@ -484,7 +484,7 @@ class BudgetManagementIntegrationTest {
             delete("/api/budgets/${budget.id}/entries/${entry.id}")
                 .header("Authorization", "Bearer $user2AuthToken")
         )
-            .andExpect(status().isBadRequest)
+            .andExpect(status().isForbidden)
     }
 
     @Test
@@ -649,7 +649,7 @@ class BudgetManagementIntegrationTest {
             delete("/api/budgets/${budget.id}/collaborators/$user1Email")
                 .header("Authorization", "Bearer $user2AuthToken")
         )
-            .andExpect(status().isBadRequest)
+            .andExpect(status().isForbidden)
     }
 
     // Delete Budget Tests
@@ -807,7 +807,7 @@ class BudgetManagementIntegrationTest {
             delete("/api/budgets/${budget.id}")
                 .header("Authorization", "Bearer $user2AuthToken")
         )
-            .andExpect(status().isBadRequest)
+            .andExpect(status().isForbidden)
 
         // Then - Budget should still exist
         mockMvc.perform(
