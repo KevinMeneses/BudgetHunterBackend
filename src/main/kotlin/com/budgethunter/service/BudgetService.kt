@@ -90,6 +90,27 @@ class BudgetService(
     }
 
     @Transactional
+    fun updateBudget(budgetId: Long, request: UpdateBudgetRequest, authenticatedUserEmail: String): BudgetResponse {
+        verifyUserHasAccessToBudget(budgetId, authenticatedUserEmail)
+
+        val budget = budgetRepository.findById(budgetId)
+            .orElseThrow { IllegalArgumentException("Budget not found with id: $budgetId") }
+
+        val updatedBudget = budget.copy(
+            name = request.name,
+            amount = request.amount
+        )
+
+        val savedBudget = budgetRepository.save(updatedBudget)
+
+        return BudgetResponse(
+            id = savedBudget.id!!,
+            name = savedBudget.name,
+            amount = savedBudget.amount
+        )
+    }
+
+    @Transactional
     fun addCollaborator(budgetId: Long, request: AddCollaboratorRequest, authenticatedUserEmail: String): CollaboratorResponse {
         verifyUserHasAccessToBudget(budgetId, authenticatedUserEmail)
 

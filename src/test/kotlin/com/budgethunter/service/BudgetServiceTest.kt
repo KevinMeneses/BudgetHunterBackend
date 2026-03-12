@@ -150,6 +150,91 @@ class BudgetServiceTest {
         verify(exactly = 1) { userBudgetRepository.findBudgetsByUserEmail(testUserEmail) }
     }
 
+    // UpdateBudget Tests
+
+    @Test
+    fun `updateBudget should update budget successfully`() {
+        // Given
+        val budgetId = 1L
+        val request = UpdateBudgetRequest(
+            name = "Updated Budget Name",
+            amount = BigDecimal("3500.00")
+        )
+        val existingBudget = Budget(
+            id = budgetId,
+            name = "Old Budget Name",
+            amount = BigDecimal("2000.00")
+        )
+        val updatedBudget = existingBudget.copy(
+            name = request.name,
+            amount = request.amount
+        )
+        val userBudgetId = UserBudgetId(budgetId = budgetId, userEmail = testUserEmail)
+
+        every { userBudgetRepository.existsById(userBudgetId) } returns true
+        every { budgetRepository.findById(budgetId) } returns Optional.of(existingBudget)
+        every { budgetRepository.save(any()) } returns updatedBudget
+
+        // When
+        val result = budgetService.updateBudget(budgetId, request, testUserEmail)
+
+        // Then
+        assertEquals(budgetId, result.id)
+        assertEquals(request.name, result.name)
+        assertEquals(request.amount, result.amount)
+
+        verify(exactly = 1) { userBudgetRepository.existsById(userBudgetId) }
+        verify(exactly = 1) { budgetRepository.findById(budgetId) }
+        verify(exactly = 1) { budgetRepository.save(any()) }
+    }
+
+    @Test
+    fun `updateBudget should throw exception when budget not found`() {
+        // Given
+        val budgetId = 999L
+        val request = UpdateBudgetRequest(
+            name = "Updated Budget",
+            amount = BigDecimal("2000.00")
+        )
+        val userBudgetId = UserBudgetId(budgetId = budgetId, userEmail = testUserEmail)
+
+        every { userBudgetRepository.existsById(userBudgetId) } returns true
+        every { budgetRepository.findById(budgetId) } returns Optional.empty()
+
+        // When & Then
+        val exception = assertThrows<IllegalArgumentException> {
+            budgetService.updateBudget(budgetId, request, testUserEmail)
+        }
+
+        assertEquals("Budget not found with id: $budgetId", exception.message)
+        verify(exactly = 1) { userBudgetRepository.existsById(userBudgetId) }
+        verify(exactly = 1) { budgetRepository.findById(budgetId) }
+        verify(exactly = 0) { budgetRepository.save(any()) }
+    }
+
+    @Test
+    fun `updateBudget should throw exception when user has no access to budget`() {
+        // Given
+        val budgetId = 1L
+        val request = UpdateBudgetRequest(
+            name = "Updated Budget",
+            amount = BigDecimal("2000.00")
+        )
+        val userBudgetId = UserBudgetId(budgetId = budgetId, userEmail = testUserEmail)
+
+        every { userBudgetRepository.existsById(userBudgetId) } returns false
+
+        // When & Then
+        val exception = assertThrows<com.budgethunter.exception.ForbiddenAccessException> {
+            budgetService.updateBudget(budgetId, request, testUserEmail)
+        }
+
+        assertTrue(exception.message!!.contains("don't have access to budget with id: $budgetId"))
+        verify(exactly = 1) { userBudgetRepository.existsById(userBudgetId) }
+        verify(exactly = 0) { budgetRepository.findById(budgetId) }
+        verify(exactly = 0) { budgetRepository.save(any()) }
+    }
+
     // AddCollaborator Tests
 
     @Test

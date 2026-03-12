@@ -105,6 +105,51 @@ class BudgetController(
         }
     }
 
+    @PutMapping("/{budgetId}")
+    @Operation(
+        summary = "Update a budget",
+        description = "Updates an existing budget's name and/or amount. Only users with access to the budget can update it."
+    )
+    @ApiResponses(
+        value = [
+            ApiResponse(
+                responseCode = "200",
+                description = "Budget successfully updated",
+                content = [Content(schema = Schema(implementation = BudgetResponse::class))]
+            ),
+            ApiResponse(
+                responseCode = "400",
+                description = "Invalid request - validation errors (e.g., missing name, invalid amount)",
+                content = [Content()]
+            ),
+            ApiResponse(
+                responseCode = "401",
+                description = "Unauthorized - missing or invalid JWT token",
+                content = [Content()]
+            ),
+            ApiResponse(
+                responseCode = "403",
+                description = "Forbidden - user does not have access to this budget",
+                content = [Content()]
+            ),
+            ApiResponse(
+                responseCode = "404",
+                description = "Budget not found",
+                content = [Content()]
+            )
+        ]
+    )
+    fun updateBudget(
+        @Parameter(description = "ID of the budget to update", required = true)
+        @PathVariable budgetId: Long,
+        @Valid @RequestBody request: UpdateBudgetRequest,
+        authentication: Authentication
+    ): ResponseEntity<BudgetResponse> {
+        val userEmail = authentication.principal as String
+        val response = budgetService.updateBudget(budgetId, request, userEmail)
+        return ResponseEntity.ok(response)
+    }
+
     @PostMapping("/{budgetId}/collaborators")
     @Operation(
         summary = "Add a collaborator to a budget",

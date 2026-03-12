@@ -186,7 +186,36 @@ Copy the `authToken` value for authenticated requests and save the `refreshToken
 
 ---
 
-## 6. Add Collaborator
+## 6. Update Budget
+
+**Method:** PUT
+**URL:** `http://localhost:8080/api/budgets/1`
+**Headers:**
+- Content-Type: application/json
+- Authorization: Bearer YOUR_JWT_TOKEN_HERE
+
+**Body (raw JSON):**
+```json
+{
+  "name": "Updated Monthly Budget",
+  "amount": 6000.00
+}
+```
+
+**Expected Response (200 OK):**
+```json
+{
+  "id": 1,
+  "name": "Updated Monthly Budget",
+  "amount": 6000.00
+}
+```
+
+**Note:** Updates the name and amount of an existing budget. The authenticated user must have access to the budget.
+
+---
+
+## 7. Add Collaborator
 
 **Method:** POST
 **URL:** `http://localhost:8080/api/budgets/1/collaborators`
@@ -513,6 +542,14 @@ curl -X GET http://localhost:8080/api/budgets \
 # Get budgets with pagination
 curl -X GET "http://localhost:8080/api/budgets?page=0&size=10&sortBy=name&sortDirection=asc" \
   -H "Authorization: Bearer YOUR_JWT_TOKEN"
+```
+
+### Update Budget
+```bash
+curl -X PUT http://localhost:8080/api/budgets/1 \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN" \
+  -d '{"name":"Updated Monthly Budget","amount":6000.00}'
 ```
 
 ### Add Collaborator

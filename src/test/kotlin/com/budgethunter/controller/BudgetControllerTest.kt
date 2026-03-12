@@ -127,6 +127,79 @@ class BudgetControllerTest {
         verify(exactly = 1) { budgetService.getBudgetsByUserEmail(testUserEmail) }
     }
 
+    // UpdateBudget Tests
+
+    @Test
+    fun `updateBudget should return ok status with updated budget response`() {
+        // Given
+        val budgetId = 1L
+        val request = UpdateBudgetRequest(
+            name = "Updated Budget Name",
+            amount = BigDecimal("3500.00")
+        )
+        val expectedResponse = BudgetResponse(
+            id = budgetId,
+            name = request.name,
+            amount = request.amount
+        )
+
+        every { budgetService.updateBudget(budgetId, request, testUserEmail) } returns expectedResponse
+
+        // When
+        val response = budgetController.updateBudget(budgetId, request, authentication)
+
+        // Then
+        assertEquals(HttpStatus.OK, response.statusCode)
+        assertEquals(expectedResponse, response.body)
+        assertEquals(budgetId, response.body?.id)
+        assertEquals(request.name, response.body?.name)
+        assertEquals(request.amount, response.body?.amount)
+        verify(exactly = 1) { budgetService.updateBudget(budgetId, request, testUserEmail) }
+        verify(exactly = 1) { authentication.principal }
+    }
+
+    @Test
+    fun `updateBudget should propagate exception when budget not found`() {
+        // Given
+        val budgetId = 999L
+        val request = UpdateBudgetRequest(
+            name = "Updated Budget",
+            amount = BigDecimal("2000.00")
+        )
+
+        every { budgetService.updateBudget(budgetId, request, testUserEmail) } throws
+            IllegalArgumentException("Budget not found with id: $budgetId")
+
+        // When & Then
+        val exception = org.junit.jupiter.api.assertThrows<IllegalArgumentException> {
+            budgetController.updateBudget(budgetId, request, authentication)
+        }
+
+        assertEquals("Budget not found with id: $budgetId", exception.message)
+        verify(exactly = 1) { budgetService.updateBudget(budgetId, request, testUserEmail) }
+    }
+
+    @Test
+    fun `updateBudget should propagate exception when user has no access`() {
+        // Given
+        val budgetId = 1L
+        val request = UpdateBudgetRequest(
+            name = "Updated Budget",
+            amount = BigDecimal("2000.00")
+        )
+
+        every { budgetService.updateBudget(budgetId, request, testUserEmail) } throws
+            IllegalArgumentException("You don't have access to budget with id: $budgetId")
+
+        // When & Then
+        val exception = org.junit.jupiter.api.assertThrows<IllegalArgumentException> {
+            budgetController.updateBudget(budgetId, request, authentication)
+        }
+
+        assertTrue(exception.message!!.contains("don't have access"))
+        verify(exactly = 1) { budgetService.updateBudget(budgetId, request, testUserEmail) }
+    }
+
     // AddCollaborator Tests
 
     @Test
