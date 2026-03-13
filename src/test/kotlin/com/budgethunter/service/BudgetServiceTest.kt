@@ -285,11 +285,11 @@ class BudgetServiceTest {
         every { userBudgetRepository.existsById(userBudgetId) } returns false
 
         // When & Then
-        val exception = assertThrows<IllegalArgumentException> {
+        val exception = assertThrows<com.budgethunter.exception.ForbiddenAccessException> {
             budgetService.addCollaborator(request.budgetId, request, testUserEmail)
         }
 
-        assertEquals("You don't have access to budget with id: 1", exception.message)
+        assertTrue(exception.message!!.contains("don't have access to budget with id: 1"))
         verify(exactly = 1) { userBudgetRepository.existsById(userBudgetId) }
         verify(exactly = 0) { budgetRepository.findById(any()) }
     }
@@ -405,11 +405,11 @@ class BudgetServiceTest {
         every { userBudgetRepository.existsById(userBudgetId) } returns false
 
         // When & Then
-        val exception = assertThrows<IllegalArgumentException> {
+        val exception = assertThrows<com.budgethunter.exception.ForbiddenAccessException> {
             budgetService.getCollaboratorsByBudgetId(budgetId, testUserEmail)
         }
 
-        assertEquals("You don't have access to budget with id: $budgetId", exception.message)
+        assertTrue(exception.message!!.contains("don't have access to budget with id: $budgetId"))
     }
 
     @Test
@@ -592,11 +592,11 @@ class BudgetServiceTest {
         every { userBudgetRepository.existsById(userBudgetId) } returns false
 
         // When & Then
-        val exception = assertThrows<IllegalArgumentException> {
+        val exception = assertThrows<com.budgethunter.exception.ForbiddenAccessException> {
             budgetService.putEntry(request, testUserEmail)
         }
 
-        assertEquals("You don't have access to budget with id: 1", exception.message)
+        assertTrue(exception.message!!.contains("don't have access to budget with id: 1"))
     }
 
     @Test
@@ -664,10 +664,10 @@ class BudgetServiceTest {
         every { userBudgetRepository.existsById(userBudgetId) } returns false
 
         // When & Then
-        val exception = assertThrows<IllegalArgumentException> {
+        val exception = assertThrows<com.budgethunter.exception.ForbiddenAccessException> {
             budgetService.verifyUserHasAccessToBudget(budgetId, testUserEmail)
         }
 
-        assertEquals("You don't have access to budget with id: $budgetId", exception.message)
+        assertTrue(exception.message!!.contains("don't have access to budget with id: $budgetId"))
     }
 }

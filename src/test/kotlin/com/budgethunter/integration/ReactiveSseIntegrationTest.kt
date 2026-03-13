@@ -155,13 +155,11 @@ class ReactiveSseIntegrationTest {
         // Then - Should have received exactly 1 event
         assertEquals(1, receivedEvents.size)
 
-        // And - Event should contain correct data
+        // And - Event should contain correct notification data
         val event = receivedEvents[0]
-        assertEquals(budgetId, event.budgetEntry.budgetId)
-        assertEquals("Test Entry", event.budgetEntry.description)
-        assertEquals(BigDecimal("150.00"), event.budgetEntry.amount)
-        assertEquals("Food", event.budgetEntry.category)
-        assertEquals(EntryType.OUTCOME, event.budgetEntry.type)
+        assertEquals(budgetId, event.budgetId)
+        assertNotNull(event.entryId)
+        assertEquals(BudgetEntryAction.CREATED, event.action)
         assertEquals(userEmail, event.userInfo.email)
         assertEquals(userName, event.userInfo.name)
 
@@ -215,11 +213,11 @@ class ReactiveSseIntegrationTest {
         // Then - Should have received exactly 1 event (the update)
         assertEquals(1, receivedEvents.size)
 
-        // And - Event should contain updated data
+        // And - Event should contain updated notification data
         val event = receivedEvents[0]
-        assertEquals(budgetId, event.budgetEntry.budgetId)
-        assertEquals("Updated Entry", event.budgetEntry.description)
-        assertEquals(BigDecimal("250.00"), event.budgetEntry.amount)
+        assertEquals(budgetId, event.budgetId)
+        assertNotNull(event.entryId)
+        assertEquals(BudgetEntryAction.UPDATED, event.action)
         assertEquals(userEmail, event.userInfo.email)
 
         // Cleanup
@@ -285,13 +283,13 @@ class ReactiveSseIntegrationTest {
 
         // Then - Budget 1 subscriber should have received only budget 1 event
         assertEquals(1, budget1Events.size)
-        assertEquals("Budget 1 Entry", budget1Events[0].budgetEntry.description)
-        assertEquals(budgetId, budget1Events[0].budgetEntry.budgetId)
+        assertEquals(budgetId, budget1Events[0].budgetId)
+        assertEquals(BudgetEntryAction.CREATED, budget1Events[0].action)
 
         // And - Budget 2 subscriber should have received only budget 2 event
         assertEquals(1, budget2Events.size)
-        assertEquals("Budget 2 Entry", budget2Events[0].budgetEntry.description)
-        assertEquals(budget2.id, budget2Events[0].budgetEntry.budgetId)
+        assertEquals(budget2.id, budget2Events[0].budgetId)
+        assertEquals(BudgetEntryAction.CREATED, budget2Events[0].action)
 
         // Cleanup
         subscription1.dispose()
@@ -356,15 +354,15 @@ class ReactiveSseIntegrationTest {
 
         // And - First event should be from user 1
         val event1 = receivedEvents[0]
-        assertEquals("User 1 Entry", event1.budgetEntry.description)
-        assertEquals(BigDecimal("50.00"), event1.budgetEntry.amount)
+        assertEquals(budgetId, event1.budgetId)
+        assertEquals(BudgetEntryAction.CREATED, event1.action)
         assertEquals(userEmail, event1.userInfo.email)
         assertEquals(userName, event1.userInfo.name)
 
         // And - Second event should be from user 2
         val event2 = receivedEvents[1]
-        assertEquals("User 2 Entry", event2.budgetEntry.description)
-        assertEquals(BigDecimal("75.00"), event2.budgetEntry.amount)
+        assertEquals(budgetId, event2.budgetId)
+        assertEquals(BudgetEntryAction.CREATED, event2.action)
         assertEquals(user2Email, event2.userInfo.email)
         assertEquals(user2Name, event2.userInfo.name)
 
@@ -413,12 +411,11 @@ class ReactiveSseIntegrationTest {
         assertEquals(1, subscriber2Events.size)
         assertEquals(1, subscriber3Events.size)
 
-        // And - All events should have the same data
+        // And - All events should have the same notification data
         listOf(subscriber1Events[0], subscriber2Events[0], subscriber3Events[0]).forEach { event ->
-            assertEquals("Multicast Test", event.budgetEntry.description)
-            assertEquals(BigDecimal("999.99"), event.budgetEntry.amount)
-            assertEquals(EntryType.INCOME, event.budgetEntry.type)
-            assertEquals(budgetId, event.budgetEntry.budgetId)
+            assertEquals(budgetId, event.budgetId)
+            assertNotNull(event.entryId)
+            assertEquals(BudgetEntryAction.CREATED, event.action)
         }
 
         // Cleanup

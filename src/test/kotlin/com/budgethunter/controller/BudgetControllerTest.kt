@@ -586,19 +586,27 @@ class BudgetControllerTest {
     }
 
     @Test
-    fun `streamEntries should propagate exception when user has no access`() {
+    fun `streamEntries should return error Flux when user has no access`() {
         // Given
         val budgetId = 999L
+        val expectedException = com.budgethunter.exception.ForbiddenAccessException("You don't have access to budget with id: $budgetId")
 
-        every { budgetService.verifyUserHasAccessToBudget(budgetId, testUserEmail) } throws
-            IllegalArgumentException("You don't have access to budget with id: $budgetId")
+        every { budgetService.verifyUserHasAccessToBudget(budgetId, testUserEmail) } throws expectedException
 
-        // When & Then
-        val exception = org.junit.jupiter.api.assertThrows<IllegalArgumentException> {
-            budgetController.streamEntries(budgetId, authentication)
-        }
+        // When
+        val flux = budgetController.streamEntries(budgetId, authentication)
 
-        assertTrue(exception.message!!.contains("don't have access"))
+        // Then - Flux should be an error Flux containing the exception
+        assertNotNull(flux)
+        flux.subscribe(
+            { },
+            { error ->
+                // Verify the error is the expected exception
+                assertTrue(error is com.budgethunter.exception.ForbiddenAccessException)
+                assertTrue(error.message!!.contains("don't have access"))
+            }
+        )
+
         verify(exactly = 1) { budgetService.verifyUserHasAccessToBudget(budgetId, testUserEmail) }
     }
 

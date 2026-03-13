@@ -1,17 +1,14 @@
 package com.budgethunter.service
 
+import com.budgethunter.dto.BudgetEntryAction
 import com.budgethunter.dto.BudgetEntryEvent
-import com.budgethunter.dto.BudgetEntryEventData
 import com.budgethunter.dto.UserEventInfo
-import com.budgethunter.model.EntryType
 import com.fasterxml.jackson.databind.ObjectMapper
 import io.mockk.*
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
-import java.math.BigDecimal
-import java.time.LocalDateTime
 
 class SseServiceTest {
 
@@ -207,22 +204,15 @@ class SseServiceTest {
         // Given
         val budgetId = 1L
         val event = BudgetEntryEvent(
-            budgetEntry = BudgetEntryEventData(
-                id = 123L,
-                budgetId = budgetId,
-                amount = BigDecimal("500.00"),
-                description = "Test Entry",
-                category = "Test Category",
-                type = EntryType.INCOME,
-                creationDate = LocalDateTime.of(2025, 1, 1, 10, 0),
-                modificationDate = LocalDateTime.of(2025, 1, 1, 10, 0)
-            ),
+            budgetId = budgetId,
+            entryId = 123L,
+            action = BudgetEntryAction.CREATED,
             userInfo = UserEventInfo(
                 email = "user@example.com",
                 name = "Test User"
             )
         )
-        val expectedJson = """{"budgetEntry":{"id":123,"amount":"500.00"},"userInfo":{"email":"user@example.com"}}"""
+        val expectedJson = """{"budgetId":1,"entryId":123,"action":"CREATED","userInfo":{"email":"user@example.com"}}"""
 
         every { objectMapper.writeValueAsString(event) } returns expectedJson
 
@@ -276,16 +266,9 @@ class SseServiceTest {
 
     private fun createTestEvent(): BudgetEntryEvent {
         return BudgetEntryEvent(
-            budgetEntry = BudgetEntryEventData(
-                id = 1L,
-                budgetId = 1L,
-                amount = BigDecimal("100.00"),
-                description = "Test Entry",
-                category = "Test",
-                type = EntryType.OUTCOME,
-                creationDate = LocalDateTime.now(),
-                modificationDate = LocalDateTime.now()
-            ),
+            budgetId = 1L,
+            entryId = 1L,
+            action = BudgetEntryAction.CREATED,
             userInfo = UserEventInfo(
                 email = "test@example.com",
                 name = "Test User"
