@@ -31,6 +31,7 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer
 @Configuration
 class WebMvcConfig(
     private val rateLimitInterceptor: RateLimitInterceptor,
+    private val requestLoggingInterceptor: RequestLoggingInterceptor,
     private val environment: org.springframework.core.env.Environment
 ) : WebMvcConfigurer {
 
@@ -40,6 +41,11 @@ class WebMvcConfig(
      * @param registry The interceptor registry where we add our interceptors
      */
     override fun addInterceptors(registry: InterceptorRegistry) {
+        // REQUEST LOGGING: Log all incoming requests and responses
+        // This runs BEFORE rate limiting so we can see rate-limited requests in logs
+        registry.addInterceptor(requestLoggingInterceptor)
+            .addPathPatterns("/**")
+
         // RATE LIMITING: Enabled ONLY in production
         // During tests and default dev mode, rate limiting is disabled to avoid
         // interfering with test scenarios

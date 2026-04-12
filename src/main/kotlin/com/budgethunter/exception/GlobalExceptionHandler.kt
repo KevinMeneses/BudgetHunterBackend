@@ -1,5 +1,6 @@
 package com.budgethunter.exception
 
+import org.slf4j.LoggerFactory
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.security.authentication.BadCredentialsException
@@ -16,8 +17,11 @@ data class ErrorResponse(
 @RestControllerAdvice
 class GlobalExceptionHandler {
 
+    private val logger = LoggerFactory.getLogger(GlobalExceptionHandler::class.java)
+
     @ExceptionHandler(IllegalArgumentException::class)
     fun handleIllegalArgumentException(ex: IllegalArgumentException): ResponseEntity<ErrorResponse> {
+        logger.warn("Bad request: ${ex.message}")
         val errorResponse = ErrorResponse(
             status = HttpStatus.BAD_REQUEST.value(),
             message = ex.message ?: "Invalid request"
@@ -27,6 +31,7 @@ class GlobalExceptionHandler {
 
     @ExceptionHandler(IllegalStateException::class)
     fun handleIllegalStateException(ex: IllegalStateException): ResponseEntity<ErrorResponse> {
+        logger.warn("Conflict: ${ex.message}")
         val errorResponse = ErrorResponse(
             status = HttpStatus.CONFLICT.value(),
             message = ex.message ?: "Conflict"
@@ -36,6 +41,7 @@ class GlobalExceptionHandler {
 
     @ExceptionHandler(BadCredentialsException::class)
     fun handleBadCredentialsException(ex: BadCredentialsException): ResponseEntity<ErrorResponse> {
+        logger.warn("Authentication failed: ${ex.message}")
         val errorResponse = ErrorResponse(
             status = HttpStatus.UNAUTHORIZED.value(),
             message = ex.message ?: "Invalid credentials"
@@ -45,6 +51,7 @@ class GlobalExceptionHandler {
 
     @ExceptionHandler(ForbiddenAccessException::class)
     fun handleForbiddenAccessException(ex: ForbiddenAccessException): ResponseEntity<ErrorResponse> {
+        logger.warn("Forbidden access: ${ex.message}")
         val errorResponse = ErrorResponse(
             status = HttpStatus.FORBIDDEN.value(),
             message = ex.message ?: "Access denied"
@@ -55,6 +62,7 @@ class GlobalExceptionHandler {
     @ExceptionHandler(MethodArgumentNotValidException::class)
     fun handleValidationExceptions(ex: MethodArgumentNotValidException): ResponseEntity<ErrorResponse> {
         val errors = ex.bindingResult.fieldErrors.map { "${it.field}: ${it.defaultMessage}" }
+        logger.warn("Validation failed: $errors")
         val errorResponse = ErrorResponse(
             status = HttpStatus.BAD_REQUEST.value(),
             message = "Validation failed",
@@ -65,6 +73,9 @@ class GlobalExceptionHandler {
 
     @ExceptionHandler(Exception::class)
     fun handleGenericException(ex: Exception): ResponseEntity<ErrorResponse> {
+        // Log unexpected errors with full stack trace for debugging
+        logger.error("Unexpected error occurred: ${ex.message}", ex)
+
         val errorResponse = ErrorResponse(
             status = HttpStatus.INTERNAL_SERVER_ERROR.value(),
             message = "An unexpected error occurred"

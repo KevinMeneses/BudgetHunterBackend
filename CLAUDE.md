@@ -155,6 +155,7 @@ docker-compose up -d
 - PostgreSQL production support
 - Docker deployment ready
 - Health check endpoints (Actuator with liveness/readiness probes)
+- Request/response logging with file rotation
 - Comprehensive test coverage (133 tests)
 
 See **PROGRESS.md** for detailed implementation status and roadmap.

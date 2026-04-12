@@ -265,7 +265,26 @@ All endpoints from the system architecture diagram have been successfully implem
   - **Testing:** Manually verified with curl (10-token bucket: 100% success, HTTP 429 after exhaustion)
   - **Documentation:** Extensive inline comments explaining Token Bucket algorithm, configuration options, and customization examples
 - [ ] Implement CORS configuration for production
-- [ ] Add request/response logging
+- [x] ✅ **Add request/response logging** (completed 2026-04-12)
+  - **Implementation:** SLF4J with Logback via Spring Boot properties
+  - **Components:**
+    - RequestLoggingInterceptor for HTTP request/response logging
+    - GlobalExceptionHandler with logging for all exception types
+    - Profile-based configuration (DEBUG level in dev, INFO in production)
+  - **Features:**
+    - Logs HTTP method, URI, status code, user, and duration
+    - File-based logging in production (logs/budgethunter.log)
+    - Log rotation (10MB per file, 30 days retention, 1GB total cap)
+    - Separate error log file (logs/budgethunter-error.log)
+    - Skips health check endpoints to reduce noise
+    - Full stack traces for unexpected errors
+  - **Files:**
+    - `RequestLoggingInterceptor.kt` - HTTP request/response interceptor
+    - `GlobalExceptionHandler.kt` - Enhanced with logging
+    - `application-debug.properties` - Development logging config
+    - `application-production.properties` - Production logging config with file output
+  - **Documentation:** Complete guide in LOGGING.md (420 lines)
+  - **Status:** Fully implemented and tested (133 tests, logging working in all profiles)
 
 ### API Enhancements
 - [x] ✅ **Refactor to RESTful conventions** (completed 2025-10-21)
