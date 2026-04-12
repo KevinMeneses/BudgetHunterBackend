@@ -334,8 +334,21 @@ All endpoints from the system architecture diagram have been successfully implem
 - [x] Add global exception handler ✅
 - [x] Implement DTOs for error responses ✅
 - [ ] Create custom exception classes
-- [ ] Add health check endpoint
-- [ ] Add metrics/monitoring (Actuator)
+- [x] ✅ **Add health check endpoint** (completed 2026-04-12)
+  - **Implementation:** Spring Boot Actuator 3.3.4
+  - **Endpoints:**
+    - `/actuator/health` - General health status
+    - `/actuator/health/liveness` - Liveness probe (for container orchestration)
+    - `/actuator/health/readiness` - Readiness probe (includes DB check)
+  - **Features:**
+    - Public access (no authentication required) for monitoring
+    - Profile-based configuration (detailed in debug, basic in production)
+    - Automatic database connectivity check
+    - Docker healthcheck integration ready
+    - Kubernetes liveness/readiness probe support
+  - **Security:** Configured in SecurityConfig.kt to allow public access
+  - **Documentation:** Complete guide in HEALTH_CHECK.md
+- [ ] Add metrics/monitoring (Actuator - optional, basic health checks sufficient for MVP)
 
 ---
 
@@ -377,4 +390,4 @@ All endpoints from the system architecture diagram have been successfully implem
 
 ---
 
-**Last Updated:** 2025-11-08 (PostgreSQL Migration Complete - Production-Ready Database Configuration)
+**Last Updated:** 2026-04-12 (Health Check Endpoints Complete - Production Monitoring Ready)

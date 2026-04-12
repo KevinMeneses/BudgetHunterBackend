@@ -285,10 +285,33 @@ openssl rand -base64 32
 
 ### 1. Health Check
 
+The application includes Spring Boot Actuator health endpoints for monitoring:
+
 ```bash
-# Check if the application is running
+# General health check (should return {"status":"UP"})
 curl http://localhost:8080/actuator/health
 
+# Liveness probe (for Kubernetes/Docker - checks if app is alive)
+curl http://localhost:8080/actuator/health/liveness
+
+# Readiness probe (checks if app is ready - includes DB check)
+curl http://localhost:8080/actuator/health/readiness
+
+# Expected response when healthy:
+# {
+#   "status": "UP",
+#   "groups": ["liveness", "readiness"]
+# }
+```
+
+**For production monitoring**, configure your monitoring service (UptimeRobot, Pingdom, etc.) to check:
+- **URL**: `https://your-domain.com/actuator/health`
+- **Expected**: HTTP 200 with `"status":"UP"`
+- **Interval**: 5 minutes
+
+See `HEALTH_CHECK.md` for complete health check documentation.
+
+```bash
 # Check Swagger UI
 curl http://localhost:8080/swagger-ui/index.html
 ```

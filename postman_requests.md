@@ -14,6 +14,48 @@ The Swagger UI provides:
 - JWT authentication support (click "Authorize" button to add your token)
 - Detailed descriptions and examples for each endpoint
 
+## 🏥 Health Check Endpoints
+
+These endpoints are used for monitoring and container orchestration (Kubernetes, Docker). They don't require authentication.
+
+### Health Check (General)
+**Method:** GET
+**URL:** `http://localhost:8080/actuator/health`
+**Headers:** None required
+**Expected Response (200 OK):**
+```json
+{
+  "status": "UP",
+  "groups": ["liveness", "readiness"]
+}
+```
+
+### Liveness Probe
+**Method:** GET
+**URL:** `http://localhost:8080/actuator/health/liveness`
+**Headers:** None required
+**Expected Response (200 OK):**
+```json
+{
+  "status": "UP"
+}
+```
+**Use:** Container orchestration (Kubernetes/Docker) to detect if the app needs to be restarted.
+
+### Readiness Probe
+**Method:** GET
+**URL:** `http://localhost:8080/actuator/health/readiness`
+**Headers:** None required
+**Expected Response (200 OK):**
+```json
+{
+  "status": "UP"
+}
+```
+**Use:** Load balancers to determine if the instance should receive requests (includes DB check).
+
+---
+
 ## 1. Sign Up
 
 **Method:** POST
@@ -243,7 +285,7 @@ Copy the `authToken` value for authenticated requests and save the `refreshToken
 
 ---
 
-## 7. Get Collaborators
+## 8. Get Collaborators
 
 **Method:** GET
 **URL:** `http://localhost:8080/api/budgets/1/collaborators`
@@ -268,7 +310,7 @@ Copy the `authToken` value for authenticated requests and save the `refreshToken
 
 ---
 
-## 8. Get Budget Entries
+## 9. Get Budget Entries
 
 **Method:** GET
 **URL:** `http://localhost:8080/api/budgets/1/entries`
@@ -344,7 +386,7 @@ Copy the `authToken` value for authenticated requests and save the `refreshToken
 
 ---
 
-## 9. Create Budget Entry
+## 10. Create Budget Entry
 
 **Method:** POST
 **URL:** `http://localhost:8080/api/budgets/1/entries`
@@ -380,7 +422,7 @@ Copy the `authToken` value for authenticated requests and save the `refreshToken
 
 ---
 
-## 10. Update Budget Entry
+## 11. Update Budget Entry
 
 **Method:** PUT
 **URL:** `http://localhost:8080/api/budgets/1/entries/1`
@@ -416,7 +458,7 @@ Copy the `authToken` value for authenticated requests and save the `refreshToken
 
 ---
 
-## 11. Subscribe to Budget Entry Events (SSE)
+## 12. Subscribe to Budget Entry Events (SSE)
 
 **Method:** GET
 **URL:** `http://localhost:8080/api/budgets/1/entries/stream`
@@ -457,7 +499,7 @@ When you receive an event:
 
 ---
 
-## 12. Delete Budget Entry
+## 13. Delete Budget Entry
 
 **Method:** DELETE
 **URL:** `http://localhost:8080/api/budgets/1/entries/1`
@@ -472,7 +514,7 @@ When you receive an event:
 
 ---
 
-## 13. Remove Collaborator
+## 14. Remove Collaborator
 
 **Method:** DELETE
 **URL:** `http://localhost:8080/api/budgets/1/collaborators/collaborator@example.com`
@@ -487,7 +529,7 @@ When you receive an event:
 
 ---
 
-## 14. Delete Budget
+## 15. Delete Budget
 
 **Method:** DELETE
 **URL:** `http://localhost:8080/api/budgets/1`
@@ -625,4 +667,16 @@ curl -X DELETE http://localhost:8080/api/budgets/1/collaborators/collaborator@ex
 ```bash
 curl -X DELETE http://localhost:8080/api/budgets/1 \
   -H "Authorization: Bearer YOUR_JWT_TOKEN"
+```
+
+### Health Check
+```bash
+# General health status
+curl http://localhost:8080/actuator/health
+
+# Liveness probe (for Kubernetes)
+curl http://localhost:8080/actuator/health/liveness
+
+# Readiness probe (includes DB check)
+curl http://localhost:8080/actuator/health/readiness
 ```

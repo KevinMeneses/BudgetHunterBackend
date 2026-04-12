@@ -154,6 +154,7 @@ docker-compose up -d
 - Pagination support
 - PostgreSQL production support
 - Docker deployment ready
-- Comprehensive test coverage (132 tests)
+- Health check endpoints (Actuator with liveness/readiness probes)
+- Comprehensive test coverage (133 tests)
 
 See **PROGRESS.md** for detailed implementation status and roadmap.

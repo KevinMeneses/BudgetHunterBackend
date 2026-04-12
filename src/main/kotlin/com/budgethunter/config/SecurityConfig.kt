@@ -37,7 +37,9 @@ class SecurityConfig(
                         "/h2-console/**",
                         "/swagger-ui/**",
                         "/v3/api-docs/**",
-                        "/swagger-ui.html"
+                        "/swagger-ui.html",
+                        "/actuator/health/**",
+                        "/actuator/health"
                     ).permitAll()
                     .anyRequest().authenticated()
             }
