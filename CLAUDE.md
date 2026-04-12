@@ -69,14 +69,39 @@ The application uses a relational database with the following core entities:
 - **Audit Trail**: `BudgetEntry` tracks who created/updated entries with optional `createdBy`/`updatedBy` references
 - **Enums**: `EntryType` enum distinguishes between INCOME and EXPENSE entries
 
-## Development Database
+## Database Configuration
 
-The application is configured to use H2 in-memory database for development:
+The application uses **profile-based database configuration**:
+
+### Development (`debug` profile - default)
+- **Database**: H2 in-memory database
 - **Console**: Access at `http://localhost:8080/h2-console` when app is running
 - **JDBC URL**: `jdbc:h2:mem:budgethunter`
 - **Username**: `sa`
 - **Password**: (empty)
 - **Schema**: Auto-generated via `spring.jpa.hibernate.ddl-auto=update`
+- **Configuration**: `application-debug.properties`
+
+### Production (`production` profile)
+- **Database**: PostgreSQL 12+
+- **JDBC URL**: Configurable via `DATABASE_URL` environment variable
+- **Schema**: Available in `database/schema.sql`
+- **Connection Pool**: HikariCP with optimized settings
+- **Configuration**: `application-production.properties`
+- **See**: `DEPLOYMENT.md` for full production setup guide
+
+### Switching Profiles
+
+```bash
+# Via application.properties (change spring.profiles.active)
+spring.profiles.active=production
+
+# Via environment variable
+export SPRING_PROFILES_ACTIVE=production
+
+# Via command line
+./gradlew bootRun --args='--spring.profiles.active=production'
+```
 
 ## Code Organization
 
@@ -90,12 +115,45 @@ src/main/kotlin/com/budgethunter/
     └── BudgetEntry.kt
 ```
 
-## Future Development Considerations
+## Deployment
 
-Based on the project structure, expect to implement:
-- Controllers/REST endpoints for CRUD operations
-- Repository layer (Spring Data JPA repositories)
-- Service layer for business logic
-- DTOs for request/response objects
-- Security configuration for authentication/authorization
-- Migration from H2 to PostgreSQL for production
+### Local Development
+```bash
+./gradlew bootRun
+```
+Access H2 console at http://localhost:8080/h2-console
+
+### Production Deployment
+
+See **DEPLOYMENT.md** for comprehensive production deployment guide including:
+- PostgreSQL database setup
+- Docker deployment options
+- Environment variable configuration
+- Security checklist
+- Troubleshooting guide
+
+Quick production deployment with Docker Compose:
+```bash
+# Copy and configure environment variables
+cp .env.example .env
+# Edit .env with your secure values
+
+# Start PostgreSQL + Application
+docker-compose up -d
+```
+
+## Project Status
+
+✅ **Production-Ready Features:**
+- Complete RESTful API (11 endpoints)
+- JWT authentication with refresh tokens
+- Budget management and collaboration
+- Real-time updates via Server-Sent Events (SSE)
+- Rate limiting (Token Bucket algorithm)
+- OpenAPI/Swagger documentation
+- Pagination support
+- PostgreSQL production support
+- Docker deployment ready
+- Comprehensive test coverage (132 tests)
+
+See **PROGRESS.md** for detailed implementation status and roadmap.

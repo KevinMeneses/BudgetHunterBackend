@@ -45,3 +45,12 @@ bin/
 # Application
 application-local.properties
 application-local.yml
+
+# Environment variables and secrets
+.env
+.env.local
+.env.*.local
+
+# Database
+*.db
+*.sql.backup
