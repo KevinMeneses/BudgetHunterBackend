@@ -1,74 +1,58 @@
-version: '3.8'
-
 services:
-  # PostgreSQL Database
   postgres:
     image: postgres:16-alpine
     container_name: budgethunter-postgres
     environment:
       POSTGRES_DB: budgethunter
       POSTGRES_USER: budgethunter_user
-      POSTGRES_PASSWORD: ${DATABASE_PASSWORD:-changeme}
-      PGDATA: /var/lib/postgresql/data/pgdata
+      POSTGRES_PASSWORD: ${DATABASE_PASSWORD}
+    ports:
+      - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./database/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql
-    ports:
-      - "${POSTGRES_PORT:-5432}:5432"
+      - ./database/schema.sql:/docker-entrypoint-initdb.d/schema.sql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U budgethunter_user -d budgethunter"]
       interval: 10s
       timeout: 5s
       retries: 5
-      start_period: 10s
+    restart: unless-stopped
     networks:
       - budgethunter-network
-    restart: unless-stopped
 
-  # BudgetHunter Backend Application
   backend:
-    build:
-      context: .
-      dockerfile: Dockerfile
+    image: eclipse-temurin:17-jre
     container_name: budgethunter-backend
     depends_on:
       postgres:
         condition: service_healthy
     environment:
-      # Spring Profile
-      SPRING_PROFILES_ACTIVE: production
-
-      # Database Configuration
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-production}
       DATABASE_URL: jdbc:postgresql://postgres:5432/budgethunter
       DATABASE_USERNAME: budgethunter_user
-      DATABASE_PASSWORD: ${DATABASE_PASSWORD:-changeme}
-
-      # JWT Configuration
-      JWT_SECRET: ${JWT_SECRET:-please-change-this-to-a-secure-random-value-at-least-256-bits}
-      JWT_EXPIRATION: ${JWT_EXPIRATION:-86400000}
-      JWT_REFRESH_EXPIRATION: ${JWT_REFRESH_EXPIRATION:-604800000}
-
-      # Server Configuration
-      PORT: 8080
-
-      # Java Options
-      JAVA_OPTS: "-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -Djava.security.egd=file:/dev/./urandom"
+      DATABASE_PASSWORD: ${DATABASE_PASSWORD}
+      JWT_SECRET: ${JWT_SECRET}
     ports:
-      - "${APP_PORT:-8080}:8080"
-    networks:
-      - budgethunter-network
-    restart: unless-stopped
+      - "8080:8080"
+    volumes:
+      - ./app.jar:/app/app.jar:ro
+      - ./logs:/app/logs
+    working_dir: /app
+    command: ["java", "-jar", "/app/app.jar"]
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/actuator/health"]
+      test: ["CMD", "sh", "-c", "wget --no-verbose --tries=1 --spider http://localhost:8080/actuator/health || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 60s
-
-networks:
-  budgethunter-network:
-    driver: bridge
+    restart: unless-stopped
+    networks:
+      - budgethunter-network
 
 volumes:
   postgres_data:
     driver: local
+
+networks:
+  budgethunter-network:
+    driver: bridge

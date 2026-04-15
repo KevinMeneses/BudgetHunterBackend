@@ -50,6 +50,7 @@ application-local.yml
 .env
 .env.local
 .env.*.local
+.env.server
 
 # Database
 *.db
