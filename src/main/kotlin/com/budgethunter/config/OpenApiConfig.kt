@@ -39,7 +39,7 @@ class OpenApiConfig {
                     .contact(
                         Contact()
                             .name("BudgetHunter Team")
-                            .email("kevmeneses@gmail.com.com")
+                            .email("support@budgethunter.com")
                     )
                     .license(
                         License()

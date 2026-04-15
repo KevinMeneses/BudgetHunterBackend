@@ -78,17 +78,58 @@ ssh root@YOUR_SERVER_IP "docker stats --no-stream"
 
 ## URLs de Producción
 
-- **API Base**: http://YOUR_SERVER_IP:8080
-- **Health Check**: http://YOUR_SERVER_IP:8080/actuator/health
-- **Swagger UI**: http://YOUR_SERVER_IP:8080/swagger-ui/index.html
+### HTTPS (Recomendado - Con SSL)
+- **API Base**: https://budgethunter.duckdns.org
+- **Health Check**: https://budgethunter.duckdns.org/actuator/health
+- **Swagger UI**: https://budgethunter.duckdns.org/swagger-ui/index.html
+
+### HTTP (Legacy - Redirige a HTTPS)
+- **API Base**: http://budgethunter.duckdns.org (redirige automáticamente a HTTPS)
+
+**Nota**: El tráfico HTTP se redirige automáticamente a HTTPS. Usa siempre HTTPS en tu app móvil.
+
+## Configuración SSL/HTTPS
+
+### Estado Actual
+✅ SSL configurado con Let's Encrypt
+✅ Dominio: `budgethunter.duckdns.org`
+✅ Certificado válido hasta Julio 2026
+✅ Renovación automática cada 90 días
+
+### Comandos SSL
+
+```bash
+# Ver estado del certificado
+ssh root@YOUR_SERVER_IP "certbot certificates"
+
+# Test de renovación (no renueva realmente)
+ssh root@YOUR_SERVER_IP "certbot renew --dry-run"
+
+# Renovar manualmente (si es necesario)
+ssh root@YOUR_SERVER_IP "certbot renew"
+
+# Ver logs de Nginx
+ssh root@YOUR_SERVER_IP "tail -f /var/log/nginx/access.log"
+
+# Reiniciar Nginx
+ssh root@YOUR_SERVER_IP "systemctl restart nginx"
+```
+
+### Reconfigurar SSL (si cambias de dominio)
+
+```bash
+./setup-ssl.sh NEW_DOMAIN.duckdns.org your@email.com
+```
 
 ## Estructura de Archivos
 
 ```
 BudgetHunterBackend/
 ├── deploy.sh              # Script de deployment (USA ESTE)
+├── setup-ssl.sh           # Script de configuración SSL
 ├── docker-compose.yml     # Configuración de producción
 ├── .env                   # Variables de entorno (NO COMMITEAR)
+├── .env.server            # IP del servidor (NO COMMITEAR)
 └── database/
     └── schema.sql         # Schema de base de datos
 ```
@@ -148,11 +189,34 @@ ssh root@YOUR_SERVER_IP "free -h"
 
 ## Próximos Pasos
 
-1. ✅ Configurar monitoreo con UptimeRobot (ver MONITORING.md)
-2. ⏳ Configurar dominio personalizado (opcional)
-3. ⏳ Configurar SSL/HTTPS (opcional, cuando tengas dominio)
-4. ⏳ Configurar backups automáticos
+1. ✅ SSL/HTTPS configurado con Let's Encrypt
+2. ⏳ Configurar monitoreo con UptimeRobot (ver MONITORING.md)
+3. ⏳ Configurar backups automáticos
+4. ⏳ Actualizar app móvil con URL HTTPS
+
+## Actualizar App Móvil
+
+Para usar HTTPS en tu app Android, actualiza la URL base:
+
+### Antes (HTTP sin SSL):
+```kotlin
+// En tu archivo de configuración (ej: Constants.kt o NetworkModule.kt)
+const val BASE_URL = "http://YOUR_SERVER_IP:8080"
+```
+
+### Ahora (HTTPS con SSL):
+```kotlin
+const val BASE_URL = "https://budgethunter.duckdns.org"
+```
+
+**Nota**: No necesitas el puerto `:8080` porque HTTPS usa el puerto 443 por defecto.
+
+### Verificar en tu app:
+1. Actualiza la constante `BASE_URL`
+2. Recompila la app
+3. Prueba login/sign up
+4. Todas las requests ahora irán por HTTPS 🔒
 
 ---
 
-**Última actualización**: 2026-04-14
+**Última actualización**: 2026-04-15

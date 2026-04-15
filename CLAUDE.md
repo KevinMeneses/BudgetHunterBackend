@@ -154,8 +154,12 @@ docker-compose up -d
 - Pagination support
 - PostgreSQL production support
 - Docker deployment ready
+- **SSL/HTTPS with Let's Encrypt** (auto-renewing certificates)
+- **Custom domain** (budgethunter.duckdns.org)
+- **Nginx reverse proxy** with security headers
 - Health check endpoints (Actuator with liveness/readiness probes)
 - Request/response logging with file rotation
+- **Automated deployment scripts** (deploy.sh, setup-ssl.sh)
 - Comprehensive test coverage (133 tests)
 
 See **PROGRESS.md** for detailed implementation status and roadmap.

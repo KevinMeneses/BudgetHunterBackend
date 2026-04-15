@@ -462,10 +462,79 @@ chmod +x /opt/budgethunter/backup.sh
 - Public IP address for API access
 
 🔜 Recommended next actions:
-1. Set up UptimeRobot monitoring
-2. Configure domain name (if you have one)
-3. Set up SSL/HTTPS
-4. Enable automatic backups
+1. ✅ Set up SSL/HTTPS (see below)
+2. Set up UptimeRobot monitoring (see MONITORING.md)
+3. Enable automatic backups
+4. Update mobile app with HTTPS URL
+
+---
+
+## Step 7: Configure SSL/HTTPS (Recommended)
+
+Once your API is running, secure it with HTTPS using a free domain and SSL certificate.
+
+### 7.1 - Get a Free Domain (DuckDNS)
+
+1. Go to https://www.duckdns.org
+2. Sign in with Google/GitHub
+3. Create a subdomain (e.g., `yourappp`)
+4. Point it to your droplet IP
+5. Copy your DuckDNS token
+
+**Example:**
+- Domain: `yourapp.duckdns.org`
+- IP: Your droplet IP
+- Token: (save this for next step)
+
+### 7.2 - Run SSL Setup Script
+
+From your Mac (in the project directory):
+
+```bash
+./setup-ssl.sh yourapp.duckdns.org your@email.com
+```
+
+The script will:
+1. ✅ Install Nginx (reverse proxy)
+2. ✅ Install Certbot (SSL certificate manager)
+3. ✅ Obtain free SSL certificate from Let's Encrypt
+4. ✅ Configure automatic certificate renewal
+5. ✅ Set up HTTP → HTTPS redirect
+6. ✅ Update firewall
+
+**Duration:** ~5 minutes
+
+### 7.3 - Verify HTTPS
+
+Test your secure API:
+
+```bash
+# Health check with HTTPS
+curl https://yourapp.duckdns.org/actuator/health
+
+# Expected: {"status":"UP","groups":["liveness","readiness"]}
+```
+
+### 7.4 - Update Mobile App
+
+Change your API base URL in the Android app:
+
+```kotlin
+// Before
+const val BASE_URL = "http://YOUR_DROPLET_IP:8080"
+
+// After
+const val BASE_URL = "https://yourapp.duckdns.org"
+```
+
+### Certificate Auto-Renewal
+
+The SSL certificate automatically renews every 90 days via systemd timer.
+
+Check certificate status:
+```bash
+ssh root@YOUR_DROPLET_IP "certbot certificates"
+```
 
 ---
 
@@ -476,4 +545,4 @@ cd /opt/budgethunter
 docker compose logs -f
 ```
 
-**Last Updated:** 2026-04-12
+**Last Updated:** 2026-04-15
