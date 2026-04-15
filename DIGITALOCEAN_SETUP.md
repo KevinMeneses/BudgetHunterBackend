@@ -463,7 +463,7 @@ chmod +x /opt/budgethunter/backup.sh
 
 🔜 Recommended next actions:
 1. ✅ Set up SSL/HTTPS (see below)
-2. Set up UptimeRobot monitoring (see MONITORING.md)
+2. ✅ Set up UptimeRobot monitoring (see MONITORING.md)
 3. Enable automatic backups
 4. Update mobile app with HTTPS URL
 

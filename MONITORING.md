@@ -60,7 +60,7 @@ Dashboard → Add New Monitor
 
 Monitor Type: HTTP(s)
 Friendly Name: BudgetHunter API - Health Check
-URL: https://your-domain.com/actuator/health
+URL: https://budgethunter.duckdns.org/actuator/health
 Monitoring Interval: 5 minutes
 Monitor Timeout: 30 seconds
 ```

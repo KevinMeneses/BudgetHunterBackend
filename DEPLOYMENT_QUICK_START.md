@@ -183,14 +183,14 @@ ssh root@YOUR_SERVER_IP "free -h"
 
 ## Costos
 
-- **Droplet 1GB RAM**: $12/mes
-- **Droplet 2GB RAM**: $18/mes (recomendado para producción)
-- **Backups**: +20% del costo del droplet
+- **Droplet 1GB RAM**: $6/mes
+- **Droplet 2GB RAM**: $12/mes (si necesitas más recursos)
+- **Backups**: +20% del costo del droplet (opcional)
 
 ## Próximos Pasos
 
 1. ✅ SSL/HTTPS configurado con Let's Encrypt
-2. ⏳ Configurar monitoreo con UptimeRobot (ver MONITORING.md)
+2. ✅ Monitoreo configurado con UptimeRobot (ver MONITORING.md)
 3. ⏳ Configurar backups automáticos
 4. ⏳ Actualizar app móvil con URL HTTPS
 

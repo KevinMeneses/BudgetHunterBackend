@@ -320,7 +320,7 @@ If you buy a custom domain (e.g., `budgethunter.com`):
 | Certbot | **FREE** | Open source |
 | **TOTAL** | **$0** | No additional cost! |
 
-**Note**: You only pay for the DigitalOcean droplet ($12/month).
+**Note**: You only pay for the DigitalOcean droplet ($6/month for 1GB RAM).
 
 ---
 

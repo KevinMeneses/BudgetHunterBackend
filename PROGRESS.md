@@ -339,6 +339,19 @@ All endpoints from the system architecture diagram have been successfully implem
     - Security checklist and best practices
     - Troubleshooting guide
     - Production optimization tips
+  - **SSL/HTTPS Configuration (completed 2026-04-15):**
+    - Free domain via DuckDNS: `budgethunter.duckdns.org`
+    - SSL certificate via Let's Encrypt (auto-renewing every 90 days)
+    - Nginx reverse proxy with automatic HTTP→HTTPS redirect
+    - Automated setup script: `setup-ssl.sh`
+    - Complete documentation: `SSL_SETUP.md`
+    - Firewall configured (ports 80, 443 open; 8080 internal only)
+  - **Production Monitoring (completed 2026-04-15):**
+    - UptimeRobot configured for health checks
+    - Monitors: `https://budgethunter.duckdns.org/actuator/health`
+    - Email alerts on downtime
+    - 5-minute check interval
+    - Complete guide: `MONITORING.md`
   - **Environment variables:**
     - Support for `DATABASE_URL`, `DATABASE_USERNAME`, `DATABASE_PASSWORD`
     - Secure JWT secret configuration via `JWT_SECRET`
@@ -367,7 +380,11 @@ All endpoints from the system architecture diagram have been successfully implem
     - Kubernetes liveness/readiness probe support
   - **Security:** Configured in SecurityConfig.kt to allow public access
   - **Documentation:** Complete guide in HEALTH_CHECK.md
-- [ ] Add metrics/monitoring (Actuator - optional, basic health checks sufficient for MVP)
+- [x] ✅ **Add metrics/monitoring** (completed 2026-04-15)
+  - UptimeRobot monitoring configured
+  - Monitoring endpoint: `https://budgethunter.duckdns.org/actuator/health`
+  - Email alerts enabled for downtime
+  - Complete guide: `MONITORING.md`
 
 ---
 
@@ -409,4 +426,4 @@ All endpoints from the system architecture diagram have been successfully implem
 
 ---
 
-**Last Updated:** 2026-04-12 (Health Check Endpoints Complete - Production Monitoring Ready)
+**Last Updated:** 2026-04-15 (SSL/HTTPS & Production Monitoring Complete - Deployed to DigitalOcean)
