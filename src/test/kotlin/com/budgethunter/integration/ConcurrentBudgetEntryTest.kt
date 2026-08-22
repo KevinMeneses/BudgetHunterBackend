@@ -2,6 +2,7 @@ package com.budgethunter.integration
 
 import com.budgethunter.dto.*
 import com.budgethunter.model.EntryType
+import com.budgethunter.service.ReactiveSseService
 import com.fasterxml.jackson.databind.ObjectMapper
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.BeforeEach
@@ -15,6 +16,7 @@ import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
 import org.springframework.transaction.annotation.Transactional
 import java.math.BigDecimal
+import java.time.Duration
 
 /**
  * Concurrent Budget Entry Tests
@@ -37,6 +39,9 @@ class ConcurrentBudgetEntryTest {
 
     @Autowired
     private lateinit var objectMapper: ObjectMapper
+
+    @Autowired
+    private lateinit var reactiveSseService: ReactiveSseService
 
     private val user1Email = "concurrent-user1@example.com"
     private val user2Email = "concurrent-user2@example.com"
@@ -334,16 +339,16 @@ class ConcurrentBudgetEntryTest {
 
     @Test
     fun `SSE subscriptions should handle rapid entry creations correctly`() {
-        // Given - Establish SSE connections for all users
+        // Given - One subscriber per user.
+        //
+        // Subscribing through the service rather than through MockMvc is deliberate: the
+        // stream emits a keep-alive as soon as it is subscribed, and MockHttpServletResponse
+        // is not thread-safe, so a MockMvc-held stream races the test's own requests. The
+        // sink is what we actually want to assert on anyway.
         val users = listOf(user1AuthToken, user2AuthToken, user3AuthToken)
-
-        users.forEach { authToken ->
-            mockMvc.perform(
-                get("/api/budgets/${budgetId}/entries/stream")
-                    .header("Authorization", "Bearer $authToken")
-                    .accept("text/event-stream")
-            )
-                .andExpect(status().isOk)
+        val received = users.map { mutableListOf<BudgetEntryEvent>() }
+        val subscriptions = received.map { events ->
+            reactiveSseService.subscribeToEvents(budgetId).subscribe { events.add(it) }
         }
 
         // When - Create multiple entries rapidly (which trigger SSE events)
@@ -366,7 +371,17 @@ class ConcurrentBudgetEntryTest {
                 .andExpect(status().isCreated)
         }
 
-        // Then - Verify all entries were persisted correctly
+        // Then - Every subscriber received every event, none lost or duplicated
+        awaitUntil { received.all { it.size == numEntries } }
+        received.forEach { events ->
+            assertEquals(numEntries, events.size)
+            assertEquals(numEntries, events.map { it.entryId }.distinct().size)
+            assertTrue(events.all { it.budgetId == budgetId })
+        }
+
+        subscriptions.forEach { it.dispose() }
+
+        // And - Verify all entries were persisted correctly
         val entriesResult = mockMvc.perform(
             get("/api/budgets/${budgetId}/entries")
                 .header("Authorization", "Bearer $user1AuthToken")
@@ -379,6 +394,14 @@ class ConcurrentBudgetEntryTest {
         assertTrue(entries.any { it.createdByEmail == user1Email })
         assertTrue(entries.any { it.createdByEmail == user2Email })
         assertTrue(entries.any { it.createdByEmail == user3Email })
+    }
+
+    /** Polls [condition] until it holds, or fails after a second. */
+    private fun awaitUntil(condition: () -> Boolean) {
+        val deadline = System.nanoTime() + Duration.ofSeconds(1).toNanos()
+        while (!condition() && System.nanoTime() < deadline) {
+            Thread.sleep(10)
+        }
     }
 
     @Test

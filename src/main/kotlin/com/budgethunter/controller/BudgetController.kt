@@ -11,6 +11,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse
 import io.swagger.v3.oas.annotations.responses.ApiResponses
 import io.swagger.v3.oas.annotations.security.SecurityRequirement
 import io.swagger.v3.oas.annotations.tags.Tag
+import jakarta.servlet.http.HttpServletResponse
 import jakarta.validation.Valid
 import org.springframework.http.HttpStatus
 import org.springframework.http.MediaType
@@ -19,6 +20,7 @@ import org.springframework.http.codec.ServerSentEvent
 import org.springframework.security.core.Authentication
 import org.springframework.web.bind.annotation.*
 import reactor.core.publisher.Flux
+import java.time.Duration
 
 @RestController
 @RequestMapping("/api/budgets")
@@ -28,6 +30,17 @@ class BudgetController(
     private val budgetService: BudgetService,
     private val reactiveSseService: ReactiveSseService
 ) {
+
+    companion object {
+        /**
+         * nginx-specific header: disables `proxy_buffering` for a single response,
+         * without having to change the server configuration.
+         */
+        const val X_ACCEL_BUFFERING_HEADER = "X-Accel-Buffering"
+
+        /** Interval between SSE keep-alive comments on the entries stream. */
+        val HEARTBEAT_INTERVAL: Duration = Duration.ofSeconds(15)
+    }
 
     @PostMapping
     @Operation(
@@ -418,7 +431,8 @@ class BudgetController(
     fun streamEntries(
         @Parameter(description = "ID of the budget to subscribe to", required = true)
         @PathVariable budgetId: Long,
-        authentication: Authentication
+        authentication: Authentication,
+        response: HttpServletResponse
     ): Flux<ServerSentEvent<BudgetEntryEvent>> {
         val userEmail = authentication.principal as String
 
@@ -431,6 +445,12 @@ class BudgetController(
             return Flux.error(e)
         }
 
+        // Tell nginx (and any other proxy that honours it) not to buffer this response.
+        // With the default `proxy_buffering on`, nginx holds back headers and small chunks
+        // until its buffer fills or the upstream closes, so the client receives nothing
+        // for the entire lifetime of the stream.
+        response.setHeader(X_ACCEL_BUFFERING_HEADER, "no")
+
         // Create event stream
         val eventStream = reactiveSseService.subscribeToEvents(budgetId)
             .map { event ->
@@ -439,8 +459,11 @@ class BudgetController(
                     .build()
             }
 
-        // Create heartbeat stream (SSE comment every 30 seconds to keep connection alive)
-        val heartbeatStream = Flux.interval(java.time.Duration.ofSeconds(30))
+        // Create heartbeat stream (SSE comment used to keep the connection alive).
+        // The first heartbeat is emitted immediately so the client can confirm the
+        // connection right away and the response headers are flushed on subscribe;
+        // the 15s interval keeps idle time below the typical 60s proxy read timeout.
+        val heartbeatStream = Flux.interval(Duration.ZERO, HEARTBEAT_INTERVAL)
             .map {
                 ServerSentEvent.builder<BudgetEntryEvent>()
                     .comment("keep-alive")

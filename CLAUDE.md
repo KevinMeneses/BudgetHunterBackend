@@ -36,6 +36,18 @@ BudgetHunter Backend is a collaborative budget tracking application API built wi
 ./gradlew clean build
 ```
 
+Tests always run under the `debug` profile (H2 in-memory, rate limiting off), pinned by
+`src/test/resources/application.properties`. Without it they would inherit
+`spring.profiles.active=production` from the main config and fail to start for lack of a
+PostgreSQL server.
+
+⚠️ That file **shadows** `src/main/resources/application.properties` — same name on the
+classpath, test resources win, main is never loaded. Any property added to the main file
+must be mirrored there or the tests will silently run against a different configuration
+than production. `spring.jpa.open-in-view=false` is mirrored for exactly this reason:
+it exists to prevent transaction leaks in the streaming endpoints, so the SSE tests must
+run with it off too.
+
 ## Database Architecture
 
 The application uses a relational database with the following core entities:
@@ -148,7 +160,7 @@ docker-compose up -d
 - Complete RESTful API (11 endpoints)
 - JWT authentication with refresh tokens
 - Budget management and collaboration
-- Real-time updates via Server-Sent Events (SSE)
+- Real-time updates via Server-Sent Events (SSE, proxy-buffering safe)
 - Rate limiting (Token Bucket algorithm)
 - OpenAPI/Swagger documentation
 - Pagination support
@@ -160,6 +172,6 @@ docker-compose up -d
 - Health check endpoints (Actuator with liveness/readiness probes)
 - Request/response logging with file rotation
 - **Automated deployment scripts** (deploy.sh, setup-ssl.sh)
-- Comprehensive test coverage (133 tests)
+- Comprehensive test coverage (126 tests)
 
 See **PROGRESS.md** for detailed implementation status and roadmap.

@@ -142,6 +142,61 @@ ssh root@YOUR_SERVER_IP "certbot renew --force-renewal"
    - Forwards original IP, host, protocol
    - Enables WebSocket support (for SSE)
 
+### SSE Streaming (`/api/budgets/{id}/entries/stream`)
+
+**Nginx buffers proxied responses by default (`proxy_buffering on`).** For a normal
+JSON response that is harmless, but for a Server-Sent Events stream it is fatal:
+Nginx withholds the status line and every small chunk until its buffer fills or the
+upstream closes the connection. Since an SSE stream never closes and only sends a
+few bytes at a time, **the client receives absolutely nothing** — not even the HTTP
+status line — and eventually times out.
+
+Symptom: `GET /api/budgets/{id}/entries` returns fine and the stream endpoint returns
+`401` instantly without a token, but with a valid token the request hangs and returns
+0 bytes.
+
+**Primary fix (already in the app):** `streamEntries` sets `X-Accel-Buffering: no` on
+the response. Nginx honours this header and disables buffering for that response only,
+with no server config change required. The backend also emits its first `:keep-alive`
+comment immediately on subscribe (then every 15s), so headers are flushed right away.
+
+**Backup fix (recommended on the server):** give the stream its own `location` block.
+`setup-ssl.sh` writes this automatically for new deployments:
+
+```nginx
+location ~ ^/api/budgets/[0-9]+/entries/stream$ {
+    proxy_pass http://localhost:8080;
+    proxy_buffering off;
+    proxy_cache off;
+    proxy_http_version 1.1;
+    proxy_set_header Connection "";
+    proxy_read_timeout 3600s;
+}
+```
+
+Notes:
+- `proxy_http_version 1.1` + `proxy_set_header Connection ""` keeps the upstream
+  connection alive and chunked instead of falling back to HTTP/1.0.
+- `proxy_read_timeout 3600s` must be larger than the 15s heartbeat interval; the
+  default is 60s, which would drop idle streams.
+- Place this block **before** `location /`, and remember Nginx picks regex locations
+  over the `/` prefix match anyway.
+
+**Diagnosing which layer is at fault** — bypass Nginx from the VPS itself:
+
+```bash
+# Directly against Spring, no proxy in between
+curl -N -H "Accept: text/event-stream" -H "Authorization: Bearer <token>" \
+  http://localhost:8080/api/budgets/3/entries/stream
+
+# Through Nginx
+curl -N -H "Accept: text/event-stream" -H "Authorization: Bearer <token>" \
+  https://budgethunter.duckdns.org/api/budgets/3/entries/stream
+```
+
+Both should print `:keep-alive` immediately. If only the first one does, Nginx is
+buffering — apply the `location` block above and reload.
+
 ### Useful Commands
 
 ```bash

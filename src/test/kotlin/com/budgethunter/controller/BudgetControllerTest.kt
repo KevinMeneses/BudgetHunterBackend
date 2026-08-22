@@ -10,8 +10,12 @@ import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.springframework.http.HttpStatus
+import org.springframework.mock.web.MockHttpServletResponse
 import org.springframework.security.core.Authentication
+import reactor.core.publisher.Flux
+import reactor.test.StepVerifier
 import java.math.BigDecimal
+import java.time.Duration
 import java.time.LocalDateTime
 
 class BudgetControllerTest {
@@ -574,15 +578,66 @@ class BudgetControllerTest {
     fun `streamEntries should verify access and return Flux when user has access`() {
         // Given
         val budgetId = 1L
+        val response = MockHttpServletResponse()
 
         every { budgetService.verifyUserHasAccessToBudget(budgetId, testUserEmail) } just Runs
 
         // When
-        val flux = budgetController.streamEntries(budgetId, authentication)
+        val flux = budgetController.streamEntries(budgetId, authentication, response)
 
         // Then
         assertNotNull(flux)
         verify(exactly = 1) { budgetService.verifyUserHasAccessToBudget(budgetId, testUserEmail) }
+    }
+
+    @Test
+    fun `streamEntries should disable proxy buffering via X-Accel-Buffering header`() {
+        // Given
+        val budgetId = 1L
+        val response = MockHttpServletResponse()
+
+        every { budgetService.verifyUserHasAccessToBudget(budgetId, testUserEmail) } just Runs
+
+        // When
+        budgetController.streamEntries(budgetId, authentication, response)
+
+        // Then - nginx must not buffer this response, otherwise nothing reaches the client
+        assertEquals("no", response.getHeader(BudgetController.X_ACCEL_BUFFERING_HEADER))
+    }
+
+    @Test
+    fun `streamEntries should emit a keep-alive comment immediately on subscribe`() {
+        // Given - no budget events at all, only the heartbeat can emit
+        val budgetId = 1L
+        val response = MockHttpServletResponse()
+
+        every { budgetService.verifyUserHasAccessToBudget(budgetId, testUserEmail) } just Runs
+        every { reactiveSseService.subscribeToEvents(budgetId) } returns Flux.never()
+
+        // When
+        val flux = budgetController.streamEntries(budgetId, authentication, response)
+
+        // Then - the first heartbeat arrives right away, well before the 15s interval
+        StepVerifier.create(flux)
+            .assertNext { event -> assertEquals("keep-alive", event.comment()) }
+            .thenCancel()
+            .verify(Duration.ofSeconds(2))
+    }
+
+    @Test
+    fun `streamEntries should not set X-Accel-Buffering header when access is denied`() {
+        // Given
+        val budgetId = 999L
+        val response = MockHttpServletResponse()
+
+        every { budgetService.verifyUserHasAccessToBudget(budgetId, testUserEmail) } throws
+            com.budgethunter.exception.ForbiddenAccessException("You don't have access to budget with id: $budgetId")
+
+        // When
+        budgetController.streamEntries(budgetId, authentication, response)
+
+        // Then - the header belongs to the stream, not to the error response
+        assertNull(response.getHeader(BudgetController.X_ACCEL_BUFFERING_HEADER))
     }
 
     @Test
@@ -594,7 +649,7 @@ class BudgetControllerTest {
         every { budgetService.verifyUserHasAccessToBudget(budgetId, testUserEmail) } throws expectedException
 
         // When
-        val flux = budgetController.streamEntries(budgetId, authentication)
+        val flux = budgetController.streamEntries(budgetId, authentication, MockHttpServletResponse())
 
         // Then - Flux should be an error Flux containing the exception
         assertNotNull(flux)

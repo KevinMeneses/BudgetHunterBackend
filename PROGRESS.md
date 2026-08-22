@@ -133,6 +133,8 @@ This document tracks the implementation progress of API endpoints and features a
 - ✅ Budget-scoped events (only subscribers to that budget receive notifications)
 - ✅ Hybrid Spring MVC + WebFlux setup for SSE endpoints
 - ✅ DTOs: BudgetEntryEvent, BudgetEntryEventData, UserEventInfo
+- ✅ `X-Accel-Buffering: no` response header so nginx does not buffer the stream
+- ✅ First keep-alive comment emitted immediately on subscribe, then every 15s
 - ✅ Integrated with create/update entry endpoints for automatic broadcasting
 - ✅ Properly tested with ReactiveSseIntegrationTest (6 comprehensive tests):
   - Subscriber management and cleanup
@@ -218,26 +220,26 @@ All endpoints from the system architecture diagram have been successfully implem
 ### Testing
 - [x] Add unit tests for all service layers ✅
   - ✅ UserService: 9 tests (signUp, signIn, refreshToken)
-  - ✅ BudgetService: 19 tests (create, get, collaborators, entries, access control)
-  - ✅ SseService: 11 tests (emitter creation, broadcasting, cleanup)
-  - ✅ Service Total: 39 tests, all passing with MockK
+  - ✅ BudgetService: 22 tests (create, get, collaborators, entries, access control)
+  - ✅ Service Total: 31 tests, all passing with MockK
 - [x] Add unit tests for all controllers ✅
   - ✅ UserController: 8 tests (signUp, signIn, refreshToken endpoints)
-  - ✅ BudgetController: 18 tests (create, get, collaborators, entries, SSE endpoints)
-  - ✅ Controller Total: 26 tests, all passing with MockK
+  - ✅ BudgetController: 37 tests (create, get, collaborators, entries, SSE endpoints incl. proxy-buffering header & immediate heartbeat)
+  - ✅ Controller Total: 45 tests, all passing with MockK
 - [x] Add integration tests ✅
   - ✅ AuthenticationIntegrationTest: 9 tests (sign up, sign in, refresh token flows)
   - ✅ BudgetManagementIntegrationTest: 20 tests (budget CRUD, collaborators, entries, DELETE operations, workflows)
-  - ✅ SseIntegrationTest: 9 tests (SSE connections, authorization, events, multi-user collaboration)
+  - ✅ SseIntegrationTest: 4 tests (SSE-triggering entry operations, multi-user collaboration)
+  - ✅ SseStreamDeliveryIntegrationTest: 6 tests (real HTTP stream delivery: immediate keep-alive, X-Accel-Buffering, auth rejection)
   - ✅ ConcurrentBudgetEntryTest: 5 tests (rapid multi-user operations, data consistency, audit trail)
   - ✅ ReactiveSseIntegrationTest: 6 tests (reactive SSE with actual event capture)
-  - ✅ Integration Total: 49 tests, all passing with MockMvc + H2
+  - ✅ Integration Total: 50 tests, all passing with MockMvc + H2 (+ a real embedded server for stream delivery)
 - [x] Add SSE connection/disconnection tests ✅
 - [x] Test concurrent budget entry updates ✅
 - [x] Add tests that capture and verify actual SSE event data ✅
-- [x] **Complete Test Summary: 132 total tests - 0 failures, 0 errors** ✅
-  - Unit Tests: 83 (Services: 39, Controllers: 44)
-  - Integration Tests: 49 (Auth: 9, Budget: 20, SSE: 9, Concurrent: 5, Reactive SSE: 6)
+- [x] **Complete Test Summary: 126 total tests - 0 failures, 0 errors** ✅
+  - Unit Tests: 76 (Services: 31, Controllers: 45)
+  - Integration Tests: 50 (Auth: 9, Budget: 20, SSE: 4, SSE stream delivery: 6, Concurrent: 5, Reactive SSE: 6)
 
 ### Security & Performance
 - [x] Implement JWT authentication ✅
@@ -402,28 +404,28 @@ All endpoints from the system architecture diagram have been successfully implem
 - `BudgetController.kt` - All budget-related endpoints
 - `UserController.kt` - Authentication endpoints
 - `BudgetService.kt` - Core business logic
-- `SseService.kt` - Real-time event management
+- `ReactiveSseService.kt` - Real-time event management (Flux/Sinks multicast)
 - `postman_requests.md` - API documentation and examples
 - `test-sse.html` - Interactive SSE test client
 
-### Test Files (132 total tests)
+### Test Files (126 total tests)
 
-**Service Tests (39 tests)**
+**Service Tests (31 tests)**
 - `UserServiceTest.kt` - Unit tests for user authentication (9 tests)
-- `BudgetServiceTest.kt` - Unit tests for budget operations (19 tests)
-- `SseServiceTest.kt` - Unit tests for SSE functionality (11 tests)
+- `BudgetServiceTest.kt` - Unit tests for budget operations (22 tests)
 
-**Controller Tests (44 tests)**
+**Controller Tests (45 tests)**
 - `UserControllerTest.kt` - Unit tests for user endpoints (8 tests)
-- `BudgetControllerTest.kt` - Unit tests for budget endpoints including DELETE operations (36 tests)
+- `BudgetControllerTest.kt` - Unit tests for budget endpoints including DELETE operations (37 tests)
 
-**Integration Tests (49 tests)**
+**Integration Tests (50 tests)**
 - `AuthenticationIntegrationTest.kt` - E2E authentication flows (9 tests)
 - `BudgetManagementIntegrationTest.kt` - E2E budget CRUD, collaborators, entries, DELETE operations (20 tests)
-- `SseIntegrationTest.kt` - E2E SSE connections, authorization & real-time events (9 tests)
+- `SseIntegrationTest.kt` - E2E entry operations that trigger SSE events (4 tests)
+- `SseStreamDeliveryIntegrationTest.kt` - Real HTTP stream delivery: immediate keep-alive, `X-Accel-Buffering: no`, auth rejection (6 tests)
 - `ConcurrentBudgetEntryTest.kt` - Rapid multi-user operations and data consistency (5 tests)
 - `ReactiveSseIntegrationTest.kt` - Reactive Flux-based SSE with actual event capture (6 tests)
 
 ---
 
-**Last Updated:** 2026-04-15 (SSL/HTTPS & Production Monitoring Complete - Deployed to DigitalOcean)
+**Last Updated:** 2026-08-22 (SSE stream delivery fix: proxy buffering + immediate heartbeat; removed dead SseEmitter service)

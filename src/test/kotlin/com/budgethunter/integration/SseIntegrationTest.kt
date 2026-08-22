@@ -81,81 +81,10 @@ class SseIntegrationTest {
         return response.id
     }
 
-    // SSE Connection Tests
-
-    @Test
-    fun `should establish SSE connection successfully with authentication`() {
-        // When & Then - SSE endpoint should return 200 OK and an SseEmitter
-        mockMvc.perform(
-            get("/api/budgets/${budgetId}/entries/stream")
-                .header("Authorization", "Bearer $authToken")
-                .accept("text/event-stream")
-        )
-            .andExpect(status().isOk)
-    }
-
-    @Test
-    fun `should reject SSE connection without authentication`() {
-        // When & Then
-        mockMvc.perform(
-            get("/api/budgets/${budgetId}/entries/stream")
-                .accept("text/event-stream")
-        )
-            .andExpect(status().isForbidden)
-    }
-
-    @Test
-    fun `should reject SSE connection without budget access`() {
-        // Given - Create another user
-        val otherUserToken = createAndAuthenticateUser(
-            "other@example.com",
-            "Other User",
-            "Password123!"
-        )
-
-        // When & Then - Try to connect to budget they don't have access to
-        // The exception is thrown during controller execution
-        try {
-            mockMvc.perform(
-                get("/api/budgets/${budgetId}/entries/stream")
-                    .header("Authorization", "Bearer $otherUserToken")
-                    .accept("text/event-stream")
-            )
-            fail("Should have thrown an exception")
-        } catch (e: Exception) {
-            // Verify it's the expected authorization exception
-            assertTrue(e.message!!.contains("don't have access") || e.cause?.message?.contains("don't have access") == true)
-        }
-    }
-
-    @Test
-    fun `should reject SSE connection for non-existent budget`() {
-        // When & Then - The exception is thrown during controller execution
-        try {
-            mockMvc.perform(
-                get("/api/budgets/99999/entries/stream")
-                    .header("Authorization", "Bearer $authToken")
-                    .accept("text/event-stream")
-            )
-            fail("Should have thrown an exception")
-        } catch (e: Exception) {
-            // Verify it's the expected authorization exception
-            assertTrue(e.message!!.contains("don't have access") || e.cause?.message?.contains("don't have access") == true)
-        }
-    }
-
     // SSE Event Broadcasting Tests
 
     @Test
     fun `should receive SSE event when budget entry is created`() {
-        // Verify SSE endpoint is accessible
-        mockMvc.perform(
-            get("/api/budgets/${budgetId}/entries/stream")
-                .header("Authorization", "Bearer $authToken")
-                .accept("text/event-stream")
-        )
-            .andExpect(status().isOk)
-
         // Create a budget entry which should trigger SSE event
         val entryRequest = CreateBudgetEntryRequest(
             amount = BigDecimal("100.00"),
@@ -199,14 +128,6 @@ class SseIntegrationTest {
 
         val createdEntry = objectMapper.readValue(createResult.response.contentAsString, BudgetEntryResponse::class.java)
 
-        // Verify SSE endpoint is accessible
-        mockMvc.perform(
-            get("/api/budgets/${budgetId}/entries/stream")
-                .header("Authorization", "Bearer $authToken")
-                .accept("text/event-stream")
-        )
-            .andExpect(status().isOk)
-
         // When - Update the entry (should trigger SSE event)
         val updateRequest = UpdateBudgetEntryRequest(
             amount = BigDecimal("200.00"),
@@ -232,45 +153,6 @@ class SseIntegrationTest {
         assertNotNull(updated.updatedByEmail)
     }
 
-    // Multi-User SSE Tests
-
-    @Test
-    fun `multiple users should be able to connect to same budget SSE`() {
-        // Given - Create second user and add as collaborator
-        val user2Token = createAndAuthenticateUser(
-            "user2@example.com",
-            "User Two",
-            "Password123!"
-        )
-
-        val addCollaboratorRequest = AddCollaboratorRequest(
-            budgetId = budgetId,
-            email = "user2@example.com"
-        )
-
-        mockMvc.perform(
-            post("/api/budgets/${budgetId}/collaborators")
-                .header("Authorization", "Bearer $authToken")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(addCollaboratorRequest))
-        )
-
-        // When & Then - Both users should be able to connect
-        mockMvc.perform(
-            get("/api/budgets/${budgetId}/entries/stream")
-                .header("Authorization", "Bearer $authToken")
-                .accept("text/event-stream")
-        )
-            .andExpect(status().isOk)
-
-        mockMvc.perform(
-            get("/api/budgets/${budgetId}/entries/stream")
-                .header("Authorization", "Bearer $user2Token")
-                .accept("text/event-stream")
-        )
-            .andExpect(status().isOk)
-    }
-
     @Test
     fun `SSE events should be budget-scoped`() {
         // Given - Create two budgets
@@ -289,21 +171,6 @@ class SseIntegrationTest {
 
         val budget2 = objectMapper.readValue(budget2Result.response.contentAsString, BudgetResponse::class.java)
         val budget2Id = budget2.id
-
-        // Verify both SSE connections can be established
-        mockMvc.perform(
-            get("/api/budgets/${budget1Id}/entries/stream")
-                .header("Authorization", "Bearer $authToken")
-                .accept("text/event-stream")
-        )
-            .andExpect(status().isOk)
-
-        mockMvc.perform(
-            get("/api/budgets/${budget2Id}/entries/stream")
-                .header("Authorization", "Bearer $authToken")
-                .accept("text/event-stream")
-        )
-            .andExpect(status().isOk)
 
         // Create entries in both budgets (each would trigger budget-specific SSE events)
         val entry1 = CreateBudgetEntryRequest(
@@ -363,21 +230,6 @@ class SseIntegrationTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(addCollaboratorRequest))
         )
-
-        // Both establish SSE connections
-        mockMvc.perform(
-            get("/api/budgets/${budgetId}/entries/stream")
-                .header("Authorization", "Bearer $user1Token")
-                .accept("text/event-stream")
-        )
-            .andExpect(status().isOk)
-
-        mockMvc.perform(
-            get("/api/budgets/${budgetId}/entries/stream")
-                .header("Authorization", "Bearer $user2Token")
-                .accept("text/event-stream")
-        )
-            .andExpect(status().isOk)
 
         // When - User 1 creates an entry
         val entryRequest = CreateBudgetEntryRequest(

@@ -22,7 +22,7 @@ class BudgetServiceTest {
     private lateinit var userBudgetRepository: UserBudgetRepository
     private lateinit var userRepository: UserRepository
     private lateinit var budgetEntryRepository: BudgetEntryRepository
-    private lateinit var sseService: SseService
+    private lateinit var reactiveSseService: ReactiveSseService
     private lateinit var budgetService: BudgetService
 
     private val testUserEmail = "test@example.com"
@@ -43,14 +43,12 @@ class BudgetServiceTest {
         userBudgetRepository = mockk()
         userRepository = mockk()
         budgetEntryRepository = mockk()
-        sseService = mockk(relaxed = true)
-        val reactiveSseService = mockk<ReactiveSseService>(relaxed = true)
+        reactiveSseService = mockk(relaxed = true)
         budgetService = BudgetService(
             budgetRepository,
             userBudgetRepository,
             userRepository,
             budgetEntryRepository,
-            sseService,
             reactiveSseService
         )
     }
@@ -508,7 +506,7 @@ class BudgetServiceTest {
         every { budgetRepository.findById(1L) } returns Optional.of(testBudget)
         every { userRepository.findById(testUserEmail) } returns Optional.of(testUser)
         every { budgetEntryRepository.save(any()) } returns savedEntry
-        every { sseService.broadcastBudgetEntryEvent(any(), any()) } just Runs
+        every { reactiveSseService.broadcastEvent(any(), any()) } just Runs
 
         // When
         val result = budgetService.putEntry(request, testUserEmail)
@@ -521,7 +519,7 @@ class BudgetServiceTest {
         assertEquals(request.type, result.type)
 
         verify(exactly = 1) { budgetEntryRepository.save(any()) }
-        verify(exactly = 1) { sseService.broadcastBudgetEntryEvent(1L, any()) }
+        verify(exactly = 1) { reactiveSseService.broadcastEvent(1L, any()) }
     }
 
     @Test
@@ -561,7 +559,7 @@ class BudgetServiceTest {
         every { userRepository.findById(testUserEmail) } returns Optional.of(testUser)
         every { budgetEntryRepository.findById(1L) } returns Optional.of(existingEntry)
         every { budgetEntryRepository.save(any()) } returns updatedEntry
-        every { sseService.broadcastBudgetEntryEvent(any(), any()) } just Runs
+        every { reactiveSseService.broadcastEvent(any(), any()) } just Runs
 
         // When
         val result = budgetService.putEntry(request, testUserEmail)
@@ -573,7 +571,7 @@ class BudgetServiceTest {
 
         verify(exactly = 1) { budgetEntryRepository.findById(1L) }
         verify(exactly = 1) { budgetEntryRepository.save(any()) }
-        verify(exactly = 1) { sseService.broadcastBudgetEntryEvent(1L, any()) }
+        verify(exactly = 1) { reactiveSseService.broadcastEvent(1L, any()) }
     }
 
     @Test

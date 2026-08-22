@@ -165,7 +165,7 @@ class JwtUtil {
 
 #### `@Service`
 **Package:** `org.springframework.stereotype`
-**Location:** `BudgetService.kt`, `UserService.kt`, `SseService.kt`
+**Location:** `BudgetService.kt`, `UserService.kt`, `ReactiveSseService.kt`
 
 Specialized `@Component` for service layer classes. Contains business logic.
 
@@ -661,7 +661,7 @@ val name: String
 - **Spring MVC:** `@RestController`, `@RequestMapping`, `@GetMapping`, `@PostMapping`, `@PutMapping`, `@RequestBody`, `@RequestParam`
 - **Validation:** `@Valid`
 
-### Services (`BudgetService.kt`, `UserService.kt`, `SseService.kt`)
+### Services (`BudgetService.kt`, `UserService.kt`, `ReactiveSseService.kt`)
 - **Spring:** `@Service`
 - **Transaction:** `@Transactional`
 

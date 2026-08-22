@@ -13,21 +13,40 @@ cp .env.server.example .env.server
 ```bash
 SERVER_IP=YOUR_DROPLET_IP
 SERVER_USER=root
+DOMAIN=budgethunter.duckdns.org   # opcional
 ```
+
+`DOMAIN` es opcional: si está puesto, `deploy.sh` además comprueba desde fuera que
+`https://$DOMAIN/actuator/health` responde (es decir, que Nginx + SSL siguen bien) y
+muestra las URLs públicas al terminar.
 
 ⚠️ **IMPORTANTE**: `.env.server` está en `.gitignore` y NO se debe commitear.
 
 ## Para Actualizar la Aplicación en Producción
 
 ```bash
+./gradlew test    # deploy.sh compila con -x test, los tests no corren solos
 ./deploy.sh
 ```
 
-Eso es todo! El script:
+El script:
 1. Compila localmente (2-3 minutos)
 2. Sube el JAR al servidor
 3. Reinicia los contenedores
-4. Verifica que todo esté funcionando
+4. Espera a que la app esté healthy — comprobado **por SSH contra `localhost:8080`**,
+   porque el puerto 8080 está cerrado en ufw desde que se configuró SSL
+5. Si hay `DOMAIN`, verifica también el endpoint HTTPS público
+
+**El script falla (exit 1) en dos casos**, y en ambos te dice qué mirar:
+
+- **La app no arranca** → vuelca los últimos 50 logs del contenedor.
+- **La app está sana pero `https://$DOMAIN` no responde** (tras 5 intentos) → banner
+  `⚠️ DEPLOYED, BUT NOT REACHABLE PUBLICLY` con los comandos de diagnóstico de Nginx,
+  certbot y DNS.
+
+El segundo caso falla a propósito aunque el JAR esté correctamente desplegado: si los
+clientes no pueden llegar a la API, el deploy no ha terminado bien. Es exactamente la
+forma que tenía el bug del stream SSE — app sana, clientes sin recibir nada.
 
 También puedes especificar la IP manualmente:
 ```bash

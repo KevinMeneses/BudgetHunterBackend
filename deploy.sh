@@ -62,7 +62,7 @@ mkdir -p deploy-package
 mkdir -p deploy-package/database
 mkdir -p deploy-package/logs
 cp build/libs/budgethunter-backend-0.0.1-SNAPSHOT.jar deploy-package/app.jar
-cp docker-compose-simple.yml deploy-package/docker-compose.yml
+cp docker-compose.yml deploy-package/docker-compose.yml
 cp .env deploy-package/.env
 cp database/schema.sql deploy-package/database/schema.sql
 echo -e "${GREEN}✅ Package ready${NC}"
@@ -112,29 +112,91 @@ ENDSSH
 
 echo ""
 echo "🏥 Checking application health..."
-sleep 10
+# Checked from inside the server: once SSL is configured, setup-ssl.sh closes port 8080
+# in ufw, so probing http://$SERVER_IP:8080 from here would always fail.
+APP_HEALTHY=false
 for i in {1..30}; do
-    if curl -s http://$SERVER_IP:8080/actuator/health | grep -q "UP"; then
-        echo -e "${GREEN}✅ Application is healthy!${NC}"
+    if ssh $SERVER_USER@$SERVER_IP "curl -sf http://localhost:8080/actuator/health || wget -qO- http://localhost:8080/actuator/health" 2>/dev/null | grep -q '"status":"UP"'; then
+        echo -e "${GREEN}✅ Application is healthy${NC}"
+        APP_HEALTHY=true
         break
     fi
     echo "Waiting for application... ($i/30)"
     sleep 2
 done
+
+if [ "$APP_HEALTHY" = false ]; then
+    echo -e "${RED}❌ Application did not become healthy${NC}"
+    echo ""
+    echo "Last 50 log lines:"
+    ssh $SERVER_USER@$SERVER_IP "cd /opt/budgethunter && docker compose logs backend --tail=50" || true
+    rm -rf deploy-package
+    exit 1
+fi
 echo ""
+
+# Verify the public HTTPS entrypoint too (nginx + Let's Encrypt), when a domain is known.
+# A healthy app behind a broken proxy is still a broken deployment - that is exactly how
+# the SSE stream outage looked: the app was fine and clients received nothing.
+#
+# Retried a few times on purpose: a single failed curl is more often a blip (DuckDNS, the
+# laptop's network, a slow certificate check) than a real outage, and a deploy script that
+# cries wolf gets ignored. Several failures in a row is a real signal.
+PUBLIC_OK=false
+if [ -n "$DOMAIN" ]; then
+    echo "🔒 Checking public HTTPS endpoint..."
+    for i in {1..5}; do
+        if curl -sf --max-time 10 "https://$DOMAIN/actuator/health" | grep -q '"status":"UP"'; then
+            echo -e "${GREEN}✅ https://$DOMAIN is responding${NC}"
+            PUBLIC_OK=true
+            break
+        fi
+        [ $i -lt 5 ] && echo "Retrying public endpoint... ($i/5)" && sleep 3
+    done
+    echo ""
+fi
 
 # Cleanup
 rm -rf deploy-package
+
+if [ -n "$DOMAIN" ] && [ "$PUBLIC_OK" = false ]; then
+    echo "================================================"
+    echo -e "${RED}⚠️  DEPLOYED, BUT NOT REACHABLE PUBLICLY${NC}"
+    echo "================================================"
+    echo ""
+    echo "The new JAR is running and healthy inside the server, but"
+    echo -e "${RED}https://$DOMAIN${NC} did not answer after 5 attempts."
+    echo "Clients cannot reach the API right now."
+    echo ""
+    echo "Most likely Nginx or the certificate, not the app. Check, in order:"
+    echo "  1. ssh $SERVER_USER@$SERVER_IP 'nginx -t && systemctl status nginx'"
+    echo "  2. ssh $SERVER_USER@$SERVER_IP 'certbot certificates'"
+    echo "  3. ssh $SERVER_USER@$SERVER_IP 'tail -50 /var/log/nginx/error.log'"
+    echo "  4. Confirm $DOMAIN still resolves to $SERVER_IP"
+    echo ""
+    echo "The app itself is fine:"
+    echo "  ssh $SERVER_USER@$SERVER_IP 'curl -s http://localhost:8080/actuator/health'"
+    echo ""
+    exit 1
+fi
 
 echo "================================================"
 echo -e "${GREEN}🎉 Deployment Complete!${NC}"
 echo "================================================"
 echo ""
-echo "Your BudgetHunter API is now running at:"
-echo -e "${GREEN}http://$SERVER_IP:8080${NC}"
-echo ""
-echo "API Endpoints:"
-echo "  - Health Check: http://$SERVER_IP:8080/actuator/health"
-echo "  - Swagger UI:   http://$SERVER_IP:8080/swagger-ui/index.html"
-echo "  - API Base:     http://$SERVER_IP:8080/api"
+
+if [ "$PUBLIC_OK" = true ]; then
+    echo "Your BudgetHunter API is now running at:"
+    echo -e "${GREEN}https://$DOMAIN${NC}"
+    echo ""
+    echo "API Endpoints:"
+    echo "  - Health Check: https://$DOMAIN/actuator/health"
+    echo "  - Swagger UI:   https://$DOMAIN/swagger-ui/index.html"
+    echo "  - API Base:     https://$DOMAIN/api"
+    echo "  - SSE Stream:   https://$DOMAIN/api/budgets/{id}/entries/stream"
+else
+    echo "The app is up inside the server (port 8080 is firewalled from outside)."
+    echo "Set DOMAIN in .env.server to have this script verify the public HTTPS endpoint."
+    echo "  - Internal health: ssh $SERVER_USER@$SERVER_IP 'curl -s http://localhost:8080/actuator/health'"
+fi
 echo ""

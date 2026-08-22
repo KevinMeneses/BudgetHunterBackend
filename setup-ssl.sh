@@ -104,6 +104,27 @@ server {
     listen 80;
     server_name $DOMAIN;
 
+    # Server-Sent Events stream: MUST NOT be buffered.
+    # With the default proxy_buffering on, Nginx holds back the status line and every
+    # small chunk until its buffer fills or the upstream closes, so an SSE client
+    # receives nothing at all. The backend also sends 'X-Accel-Buffering: no', this
+    # block is the belt-and-braces version.
+    location ~ ^/api/budgets/[0-9]+/entries/stream\$ {
+        proxy_pass http://localhost:8080;
+        proxy_buffering off;
+        proxy_cache off;
+        proxy_http_version 1.1;
+        proxy_set_header Connection \"\";
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+
+        # Long-lived connection: the backend heartbeats every 15s
+        proxy_read_timeout 3600s;
+        proxy_send_timeout 3600s;
+    }
+
     location / {
         proxy_pass http://localhost:8080;
         proxy_http_version 1.1;
