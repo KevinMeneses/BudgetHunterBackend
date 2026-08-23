@@ -160,7 +160,7 @@ docker-compose up -d
 - Complete RESTful API (11 endpoints)
 - JWT authentication with refresh tokens
 - Budget management and collaboration
-- Real-time updates via Server-Sent Events (SSE, proxy-buffering safe)
+- Real-time updates via Server-Sent Events (SSE, proxy-buffering safe, no self-echo)
 - Rate limiting (Token Bucket algorithm)
 - OpenAPI/Swagger documentation
 - Pagination support
@@ -172,6 +172,6 @@ docker-compose up -d
 - Health check endpoints (Actuator with liveness/readiness probes)
 - Request/response logging with file rotation
 - **Automated deployment scripts** (deploy.sh, setup-ssl.sh)
-- Comprehensive test coverage (126 tests)
+- Comprehensive test coverage (132 tests)
 
 See **PROGRESS.md** for detailed implementation status and roadmap.

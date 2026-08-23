@@ -402,7 +402,7 @@ class BudgetController(
     @GetMapping("/{budgetId}/entries/stream", produces = [MediaType.TEXT_EVENT_STREAM_VALUE])
     @Operation(
         summary = "Subscribe to real-time budget entry updates",
-        description = "Opens a Server-Sent Events (SSE) stream that pushes real-time notifications when budget entries are created, updated, or deleted. Connection stays open and events are sent as they occur. Event type is 'budget-entry'."
+        description = "Opens a Server-Sent Events (SSE) stream that pushes real-time notifications when budget entries are created, updated, or deleted by OTHER collaborators. Your own changes are never echoed back, so there is no need to de-duplicate them client-side. Connection stays open and events are sent as they occur; a ':keep-alive' comment is sent on subscribe and every 15 seconds. Event type is 'budget-entry'."
     )
     @ApiResponses(
         value = [
@@ -451,8 +451,25 @@ class BudgetController(
         // for the entire lifetime of the stream.
         response.setHeader(X_ACCEL_BUFFERING_HEADER, "no")
 
-        // Create event stream
+        // Create event stream, excluding the subscriber's own changes.
+        //
+        // Echoing a change back to its author makes the client re-download the whole entry
+        // list it just synced, and pop a "X added an entry" notification naming the user
+        // themselves. Covers CREATED, UPDATED and DELETED alike.
+        //
+        // The filter belongs here, per subscription, and NOT in
+        // ReactiveSseService.broadcastEvent: the sink is a multicast shared by every
+        // subscriber of the budget and does not know who each one is, so a single
+        // subscriber cannot be excluded from there.
+        //
+        // TRADE-OFF: this filters by USER, not by connection. With the same account open on
+        // two devices, the second one will not receive in real time what is created on the
+        // first - it catches up when the screen is reopened. If that ever matters, the
+        // precise fix is for the client to send a connection identifier (e.g. an
+        // X-Client-Id header on both the stream and the write requests) so the server can
+        // exclude just that connection instead of the whole user.
         val eventStream = reactiveSseService.subscribeToEvents(budgetId)
+            .filter { it.userInfo.email != userEmail }
             .map { event ->
                 ServerSentEvent.builder(event)
                     .event("budget-entry")

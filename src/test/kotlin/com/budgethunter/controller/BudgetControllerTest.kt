@@ -27,6 +27,9 @@ class BudgetControllerTest {
 
     private val testUserEmail = "test@example.com"
 
+    /** Window used to collect what a stream emits before the 15s heartbeat repeats. */
+    private val COLLECT_WINDOW: Duration = Duration.ofMillis(500)
+
     @BeforeEach
     fun setup() {
         budgetService = mockk()
@@ -623,6 +626,79 @@ class BudgetControllerTest {
             .thenCancel()
             .verify(Duration.ofSeconds(2))
     }
+
+    @Test
+    fun `streamEntries should not echo a user's own events back to them`() {
+        // Given - the sink carries one event per action, all authored by the subscriber
+        val budgetId = 1L
+        val ownEvents = BudgetEntryAction.entries.map { action -> event(action, testUserEmail) }
+
+        every { budgetService.verifyUserHasAccessToBudget(budgetId, testUserEmail) } just Runs
+        every { reactiveSseService.subscribeToEvents(budgetId) } returns Flux.fromIterable(ownEvents)
+
+        // When
+        val flux = budgetController.streamEntries(budgetId, authentication, MockHttpServletResponse())
+        val emitted = flux.take(COLLECT_WINDOW).collectList().block()!!
+
+        // Then - only keep-alives get through; re-sending these would make the author
+        // re-sync the list they just wrote and notify them about themselves
+        assertTrue(
+            emitted.all { it.data() == null },
+            "Author received their own events: ${emitted.mapNotNull { it.data() }}"
+        )
+    }
+
+    @Test
+    fun `streamEntries should deliver events authored by other collaborators`() {
+        // Given - same three actions, authored by somebody else
+        val budgetId = 1L
+        val otherEmail = "collaborator@example.com"
+        val otherEvents = BudgetEntryAction.entries.map { action -> event(action, otherEmail) }
+
+        every { budgetService.verifyUserHasAccessToBudget(budgetId, testUserEmail) } just Runs
+        every { reactiveSseService.subscribeToEvents(budgetId) } returns Flux.fromIterable(otherEvents)
+
+        // When
+        val flux = budgetController.streamEntries(budgetId, authentication, MockHttpServletResponse())
+        val emitted = flux.take(COLLECT_WINDOW).collectList().block()!!
+
+        // Then - all three actions arrive, tagged as budget-entry events
+        val delivered = emitted.mapNotNull { it.data() }
+        assertEquals(BudgetEntryAction.entries.toList(), delivered.map { it.action })
+        assertTrue(delivered.all { it.userInfo.email == otherEmail })
+        assertTrue(emitted.filter { it.data() != null }.all { it.event() == "budget-entry" })
+    }
+
+    @Test
+    fun `streamEntries should filter per subscriber, not per budget`() {
+        // Given - a mixed stream: the subscriber's own event between two from other users
+        val budgetId = 1L
+        val mixed = listOf(
+            event(BudgetEntryAction.CREATED, "first@example.com"),
+            event(BudgetEntryAction.CREATED, testUserEmail),
+            event(BudgetEntryAction.CREATED, "second@example.com")
+        )
+
+        every { budgetService.verifyUserHasAccessToBudget(budgetId, testUserEmail) } just Runs
+        every { reactiveSseService.subscribeToEvents(budgetId) } returns Flux.fromIterable(mixed)
+
+        // When
+        val flux = budgetController.streamEntries(budgetId, authentication, MockHttpServletResponse())
+        val emitted = flux.take(COLLECT_WINDOW).collectList().block()!!
+
+        // Then - only the subscriber's own event is dropped
+        assertEquals(
+            listOf("first@example.com", "second@example.com"),
+            emitted.mapNotNull { it.data() }.map { it.userInfo.email }
+        )
+    }
+
+    private fun event(action: BudgetEntryAction, authorEmail: String) = BudgetEntryEvent(
+        budgetId = 1L,
+        entryId = 99L,
+        action = action,
+        userInfo = UserEventInfo(email = authorEmail, name = "Author")
+    )
 
     @Test
     fun `streamEntries should not set X-Accel-Buffering header when access is denied`() {

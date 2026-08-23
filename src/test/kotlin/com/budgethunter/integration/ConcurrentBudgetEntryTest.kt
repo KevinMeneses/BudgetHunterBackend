@@ -345,6 +345,12 @@ class ConcurrentBudgetEntryTest {
         // stream emits a keep-alive as soon as it is subscribed, and MockHttpServletResponse
         // is not thread-safe, so a MockMvc-held stream races the test's own requests. The
         // sink is what we actually want to assert on anyway.
+        //
+        // Note this bypasses the controller's "don't echo my own events back to me" filter,
+        // and that is the point: the sink is a shared multicast that fans every event out to
+        // every subscriber, and the controller narrows it per subscription. This test pins
+        // the sink-level invariant the filter relies on; the filtering itself is covered by
+        // BudgetControllerTest and SseStreamDeliveryIntegrationTest.
         val users = listOf(user1AuthToken, user2AuthToken, user3AuthToken)
         val received = users.map { mutableListOf<BudgetEntryEvent>() }
         val subscriptions = received.map { events ->

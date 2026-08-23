@@ -1,13 +1,13 @@
 package com.budgethunter.integration
 
 import com.budgethunter.controller.BudgetController
-import com.budgethunter.dto.BudgetResponse
-import com.budgethunter.dto.CreateBudgetRequest
-import com.budgethunter.dto.SignInRequest
-import com.budgethunter.dto.SignInResponse
-import com.budgethunter.dto.SignUpRequest
+import com.budgethunter.dto.*
+import com.budgethunter.model.EntryType
+import com.fasterxml.jackson.databind.ObjectMapper
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertTrue
+import org.junit.jupiter.api.Assertions.fail
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
@@ -16,6 +16,7 @@ import org.springframework.boot.test.web.client.TestRestTemplate
 import org.springframework.boot.test.web.server.LocalServerPort
 import org.springframework.http.HttpEntity
 import org.springframework.http.HttpHeaders
+import org.springframework.http.HttpMethod
 import org.springframework.http.MediaType
 import java.math.BigDecimal
 import java.net.URI
@@ -24,6 +25,7 @@ import java.net.http.HttpRequest
 import java.net.http.HttpResponse
 import java.time.Duration
 import java.util.concurrent.CompletableFuture
+import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.TimeUnit
 
 /**
@@ -49,6 +51,9 @@ class SseStreamDeliveryIntegrationTest {
 
     @Autowired
     private lateinit var restTemplate: TestRestTemplate
+
+    @Autowired
+    private lateinit var objectMapper: ObjectMapper
 
     private val userEmail = "sse-stream-delivery@example.com"
     private val userPassword = "Password123!"
@@ -137,6 +142,180 @@ class SseStreamDeliveryIntegrationTest {
         assertEquals(EXPECTED_ACCESS_DENIED_STATUS, response.statusCode())
     }
 
+    @Test
+    fun `subscriber receives create update and delete events from another collaborator`() {
+        val collaboratorToken = addCollaborator("sse-stream-collaborator@example.com", "Collaborator")
+
+        openStreamReader().use { stream ->
+            // The immediate keep-alive proves the sink has a subscriber before we write
+            stream.awaitKeepAlive()
+
+            val entry = createEntry(collaboratorToken, "From the collaborator")
+            assertEventReceived(stream, BudgetEntryAction.CREATED, "sse-stream-collaborator@example.com")
+
+            updateEntry(collaboratorToken, entry.id, "Updated by the collaborator")
+            assertEventReceived(stream, BudgetEntryAction.UPDATED, "sse-stream-collaborator@example.com")
+
+            deleteEntry(collaboratorToken, entry.id)
+            assertEventReceived(stream, BudgetEntryAction.DELETED, "sse-stream-collaborator@example.com")
+        }
+    }
+
+    @Test
+    fun `subscriber receives none of its own create update and delete events`() {
+        openStreamReader().use { stream ->
+            stream.awaitKeepAlive()
+
+            val entry = createEntry(authToken, "From myself")
+            updateEntry(authToken, entry.id, "Updated by myself")
+            deleteEntry(authToken, entry.id)
+
+            // Echoing these back would make the author re-sync the list they just wrote
+            // and show a notification naming themselves.
+            val echoed = stream.nextEvent(SELF_ECHO_WINDOW)
+            assertNull(echoed, "The author must not receive their own events, but got: $echoed")
+        }
+    }
+
+    @Test
+    fun `own events are filtered per subscriber, so a collaborator still receives them`() {
+        val collaboratorToken = addCollaborator("sse-stream-watcher@example.com", "Watcher")
+
+        // Two streams on the same budget: the author's and the collaborator's
+        openStreamReader().use { authorStream ->
+            openStreamReader(token = collaboratorToken).use { collaboratorStream ->
+                authorStream.awaitKeepAlive()
+                collaboratorStream.awaitKeepAlive()
+
+                createEntry(authToken, "Written by the author")
+
+                // The collaborator sees it...
+                assertEventReceived(collaboratorStream, BudgetEntryAction.CREATED, userEmail)
+                // ...while the author does not get their own change echoed back
+                assertNull(
+                    authorStream.nextEvent(SELF_ECHO_WINDOW),
+                    "The author must not receive their own event"
+                )
+            }
+        }
+    }
+
+    private fun assertEventReceived(stream: StreamReader, action: BudgetEntryAction, authorEmail: String) {
+        val event = stream.nextEvent(EVENT_TIMEOUT)
+            ?: fail("No $action event arrived within $EVENT_TIMEOUT")
+
+        assertEquals(action, event.action)
+        assertEquals(authorEmail, event.userInfo.email)
+        assertEquals(budgetId, event.budgetId)
+    }
+
+    /**
+     * Reads an SSE stream off a background thread so a test can interleave writes with
+     * reads. Comment frames (`:keep-alive`) and data frames are kept apart, because the
+     * point of most of these tests is which data frames do *not* arrive.
+     */
+    private inner class StreamReader(
+        private val response: HttpResponse<java.io.InputStream>
+    ) : AutoCloseable {
+        private val lines = LinkedBlockingQueue<String>()
+
+        init {
+            Thread {
+                runCatching { response.body().bufferedReader().forEachLine { lines.put(it) } }
+            }.apply { isDaemon = true }.start()
+        }
+
+        /** Waits for the keep-alive emitted on subscribe; proves the stream is live. */
+        fun awaitKeepAlive() {
+            val deadline = System.nanoTime() + RESPONSE_TIMEOUT.toNanos()
+            while (System.nanoTime() < deadline) {
+                val line = lines.poll(deadline - System.nanoTime(), TimeUnit.NANOSECONDS) ?: break
+                if (line.startsWith(":")) return
+            }
+            fail<Unit>("Stream never emitted a keep-alive")
+        }
+
+        /** Next `data:` frame, or null if none arrives within [timeout]. */
+        fun nextEvent(timeout: Duration): BudgetEntryEvent? {
+            val deadline = System.nanoTime() + timeout.toNanos()
+            while (System.nanoTime() < deadline) {
+                val line = lines.poll(deadline - System.nanoTime(), TimeUnit.NANOSECONDS) ?: return null
+                if (line.startsWith("data:")) {
+                    return objectMapper.readValue(
+                        line.removePrefix("data:").trim(),
+                        BudgetEntryEvent::class.java
+                    )
+                }
+            }
+            return null
+        }
+
+        override fun close() = response.body().close()
+    }
+
+    private fun openStreamReader(token: String = authToken) = StreamReader(openStream(token = token))
+
+    private fun addCollaborator(email: String, name: String): String {
+        val collaboratorToken = createAndAuthenticateUser(email = email, name = name)
+
+        val headers = jsonHeaders()
+        headers.setBearerAuth(authToken)
+        restTemplate.postForEntity(
+            "/api/budgets/$budgetId/collaborators",
+            HttpEntity(AddCollaboratorRequest(budgetId, email), headers),
+            String::class.java
+        )
+
+        return collaboratorToken
+    }
+
+    private fun createEntry(token: String, description: String): BudgetEntryResponse {
+        val headers = jsonHeaders()
+        headers.setBearerAuth(token)
+        val request = CreateBudgetEntryRequest(
+            amount = BigDecimal("42.00"),
+            description = description,
+            category = "SSE",
+            type = EntryType.OUTCOME
+        )
+
+        val response = restTemplate.postForEntity(
+            "/api/budgets/$budgetId/entries",
+            HttpEntity(request, headers),
+            BudgetEntryResponse::class.java
+        )
+
+        return requireNotNull(response.body) { "Entry creation failed: ${response.statusCode}" }
+    }
+
+    private fun updateEntry(token: String, entryId: Long, description: String) {
+        val headers = jsonHeaders()
+        headers.setBearerAuth(token)
+        val request = UpdateBudgetEntryRequest(
+            amount = BigDecimal("84.00"),
+            description = description,
+            category = "SSE",
+            type = EntryType.OUTCOME
+        )
+
+        restTemplate.exchange(
+            "/api/budgets/$budgetId/entries/$entryId",
+            HttpMethod.PUT,
+            HttpEntity(request, headers),
+            String::class.java
+        )
+    }
+
+    private fun deleteEntry(token: String, entryId: Long) {
+        val headers = HttpHeaders().apply { setBearerAuth(token) }
+        restTemplate.exchange(
+            "/api/budgets/$budgetId/entries/$entryId",
+            HttpMethod.DELETE,
+            HttpEntity<Void>(headers),
+            String::class.java
+        )
+    }
+
     /**
      * Opens the stream with a plain JDK HTTP client. Returns as soon as the response
      * headers are available - which, for a streaming response, only happens once the
@@ -204,6 +383,15 @@ class SseStreamDeliveryIntegrationTest {
 
     companion object {
         private val RESPONSE_TIMEOUT: Duration = Duration.ofSeconds(10)
+
+        /** How long to wait for an event that should arrive. */
+        private val EVENT_TIMEOUT: Duration = Duration.ofSeconds(5)
+
+        /**
+         * How long to wait to be convinced an event will NOT arrive. Deliberately shorter
+         * than the 15s heartbeat, so a keep-alive never gets mistaken for a data frame.
+         */
+        private val SELF_ECHO_WINDOW: Duration = Duration.ofSeconds(3)
 
         /**
          * Documents current behaviour, which is arguably wrong: a valid token without
