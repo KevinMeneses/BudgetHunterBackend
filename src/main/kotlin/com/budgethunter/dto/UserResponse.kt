@@ -1,14 +1,12 @@
 package com.budgethunter.dto
 
-import com.budgethunter.model.AuthProvider
-
+/**
+ * A user as seen by *other* users - the collaborators list, for instance.
+ *
+ * Deliberately carries nothing about how the account authenticates; that belongs to
+ * [CurrentUserResponse], which only ever describes the caller themselves.
+ */
 data class UserResponse(
     val email: String,
-    val name: String,
-    /**
-     * Whether the account can also be signed into with a password. The settings screen uses it to
-     * decide between offering to set a first password and offering to change an existing one.
-     */
-    val hasPassword: Boolean = false,
-    val authProvider: AuthProvider = AuthProvider.PASSWORD
+    val name: String
 )

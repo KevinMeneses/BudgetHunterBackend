@@ -1,5 +1,6 @@
 package com.budgethunter.controller
 
+import com.budgethunter.dto.CurrentUserResponse
 import com.budgethunter.dto.GoogleSignInRequest
 import com.budgethunter.dto.RefreshTokenRequest
 import com.budgethunter.dto.SetPasswordRequest
@@ -7,6 +8,7 @@ import com.budgethunter.dto.SignInRequest
 import com.budgethunter.dto.SignInResponse
 import com.budgethunter.dto.SignUpRequest
 import com.budgethunter.dto.UserResponse
+import com.budgethunter.model.AuthProvider
 import com.budgethunter.service.UserService
 import io.mockk.*
 import org.junit.jupiter.api.AfterEach
@@ -280,7 +282,12 @@ class UserControllerTest {
     @Test
     fun `getCurrentUser should return the authenticated user`() {
         // Given
-        val expectedResponse = UserResponse(email = "test@example.com", name = "Test User", hasPassword = false)
+        val expectedResponse = CurrentUserResponse(
+            email = "test@example.com",
+            name = "Test User",
+            hasPassword = false,
+            authProvider = AuthProvider.GOOGLE
+        )
 
         every { userService.getCurrentUser("test@example.com") } returns expectedResponse
 

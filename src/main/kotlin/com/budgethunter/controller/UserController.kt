@@ -1,5 +1,6 @@
 package com.budgethunter.controller
 
+import com.budgethunter.dto.CurrentUserResponse
 import com.budgethunter.dto.GoogleSignInRequest
 import com.budgethunter.dto.RefreshTokenRequest
 import com.budgethunter.dto.SetPasswordRequest
@@ -160,12 +161,12 @@ class UserController(
             ApiResponse(
                 responseCode = "200",
                 description = "The authenticated user",
-                content = [Content(schema = Schema(implementation = UserResponse::class))]
+                content = [Content(schema = Schema(implementation = CurrentUserResponse::class))]
             ),
             ApiResponse(responseCode = "401", description = "Missing or invalid access token", content = [Content()])
         ]
     )
-    fun getCurrentUser(authentication: Authentication): ResponseEntity<UserResponse> {
+    fun getCurrentUser(authentication: Authentication): ResponseEntity<CurrentUserResponse> {
         val userEmail = authentication.principal as String
         return ResponseEntity.ok(userService.getCurrentUser(userEmail))
     }

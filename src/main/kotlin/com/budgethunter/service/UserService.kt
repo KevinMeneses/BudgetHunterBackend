@@ -1,6 +1,7 @@
 package com.budgethunter.service
 
 import com.budgethunter.dto.GoogleSignInRequest
+import com.budgethunter.dto.CurrentUserResponse
 import com.budgethunter.dto.RefreshTokenRequest
 import com.budgethunter.dto.SetPasswordRequest
 import com.budgethunter.dto.SignInRequest
@@ -44,7 +45,10 @@ class UserService(
 
         val savedUser = userRepository.save(user)
 
-        return savedUser.toResponse()
+        return UserResponse(
+            email = savedUser.email,
+            name = savedUser.name
+        )
     }
 
     @Transactional
@@ -127,10 +131,17 @@ class UserService(
         return issueSession(user)
     }
 
-    fun getCurrentUser(email: String): UserResponse =
+    fun getCurrentUser(email: String): CurrentUserResponse =
         userRepository.findById(email)
             .orElseThrow { BadCredentialsException("User not found") }
-            .toResponse()
+            .let {
+                CurrentUserResponse(
+                    email = it.email,
+                    name = it.name,
+                    hasPassword = it.password != null,
+                    authProvider = it.authProvider
+                )
+            }
 
     /**
      * Sets or replaces the account password.
@@ -181,11 +192,4 @@ class UserService(
             name = savedUser.name
         )
     }
-
-    private fun User.toResponse() = UserResponse(
-        email = email,
-        name = name,
-        hasPassword = password != null,
-        authProvider = authProvider
-    )
 }
