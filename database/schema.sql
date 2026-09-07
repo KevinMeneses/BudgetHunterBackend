@@ -21,7 +21,10 @@
 CREATE TABLE IF NOT EXISTS users (
     email VARCHAR(255) PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
-    password VARCHAR(255) NOT NULL,
+    -- Nullable: an account created through Google sign-in never chose a password.
+    password VARCHAR(255),
+    google_subject VARCHAR(255) UNIQUE,
+    auth_provider VARCHAR(32) NOT NULL DEFAULT 'PASSWORD',
     refresh_token VARCHAR(500) UNIQUE,
     refresh_token_expiry TIMESTAMP
 );
@@ -66,6 +69,9 @@ CREATE TABLE IF NOT EXISTS budget_entries (
 -- Index on users for refresh token lookup
 CREATE INDEX IF NOT EXISTS idx_users_refresh_token ON users(refresh_token) WHERE refresh_token IS NOT NULL;
 
+-- Index on users for Google sign-in lookup
+CREATE INDEX IF NOT EXISTS idx_users_google_subject ON users(google_subject) WHERE google_subject IS NOT NULL;
+
 -- Index on user_budgets for faster user lookup
 CREATE INDEX IF NOT EXISTS idx_user_budgets_user_email ON user_budgets(user_email);
 CREATE INDEX IF NOT EXISTS idx_user_budgets_budget_id ON user_budgets(budget_id);
@@ -89,6 +95,9 @@ COMMENT ON TABLE budgets IS 'Budgets that can be shared among multiple users';
 COMMENT ON TABLE user_budgets IS 'Junction table for many-to-many relationship between users and budgets';
 COMMENT ON TABLE budget_entries IS 'Income and outcome entries within budgets with audit trail';
 
+COMMENT ON COLUMN users.password IS 'BCrypt hash; NULL for accounts that only sign in with Google';
+COMMENT ON COLUMN users.google_subject IS 'Google "sub" claim - immutable account id, unlike the email';
+COMMENT ON COLUMN users.auth_provider IS 'How the account can authenticate: PASSWORD, GOOGLE or PASSWORD_AND_GOOGLE';
 COMMENT ON COLUMN users.refresh_token IS 'JWT refresh token for authentication renewal';
 COMMENT ON COLUMN users.refresh_token_expiry IS 'Expiration timestamp for the refresh token';
 COMMENT ON COLUMN budget_entries.type IS 'Entry type: INCOME or OUTCOME';

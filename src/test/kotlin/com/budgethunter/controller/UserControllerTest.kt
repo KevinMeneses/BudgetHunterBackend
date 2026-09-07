@@ -1,6 +1,8 @@
 package com.budgethunter.controller
 
+import com.budgethunter.dto.GoogleSignInRequest
 import com.budgethunter.dto.RefreshTokenRequest
+import com.budgethunter.dto.SetPasswordRequest
 import com.budgethunter.dto.SignInRequest
 import com.budgethunter.dto.SignInResponse
 import com.budgethunter.dto.SignUpRequest
@@ -12,7 +14,9 @@ import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.springframework.http.HttpStatus
+import org.junit.jupiter.api.assertThrows
 import org.springframework.security.authentication.BadCredentialsException
+import org.springframework.security.core.Authentication
 
 class UserControllerTest {
 
@@ -230,5 +234,93 @@ class UserControllerTest {
 
         verify(exactly = 1) { userService.signUp(signUpRequest) }
         verify(exactly = 1) { userService.signIn(signInRequest) }
+    }
+
+    // Google Sign-In Tests
+
+    private fun authenticationFor(email: String): Authentication =
+        mockk<Authentication>().also { every { it.principal } returns email }
+
+    @Test
+    fun `signInWithGoogle should return ok with the session`() {
+        // Given
+        val request = GoogleSignInRequest(idToken = "google-id-token")
+        val expectedResponse = SignInResponse(
+            authToken = "authToken",
+            refreshToken = "refreshToken",
+            email = "test@example.com",
+            name = "Test User"
+        )
+
+        every { userService.signInWithGoogle(request) } returns expectedResponse
+
+        // When
+        val response = userController.signInWithGoogle(request)
+
+        // Then
+        assertEquals(HttpStatus.OK, response.statusCode)
+        assertEquals(expectedResponse, response.body)
+        verify(exactly = 1) { userService.signInWithGoogle(request) }
+    }
+
+    @Test
+    fun `signInWithGoogle should propagate exception from service`() {
+        // Given
+        val request = GoogleSignInRequest(idToken = "invalid-token")
+
+        every { userService.signInWithGoogle(request) } throws BadCredentialsException("Invalid Google ID token")
+
+        // When & Then
+        assertThrows<BadCredentialsException> { userController.signInWithGoogle(request) }
+        verify(exactly = 1) { userService.signInWithGoogle(request) }
+    }
+
+    // Current User Tests
+
+    @Test
+    fun `getCurrentUser should return the authenticated user`() {
+        // Given
+        val expectedResponse = UserResponse(email = "test@example.com", name = "Test User", hasPassword = false)
+
+        every { userService.getCurrentUser("test@example.com") } returns expectedResponse
+
+        // When
+        val response = userController.getCurrentUser(authenticationFor("test@example.com"))
+
+        // Then
+        assertEquals(HttpStatus.OK, response.statusCode)
+        assertEquals(expectedResponse, response.body)
+    }
+
+    // Set Password Tests
+
+    @Test
+    fun `setPassword should return no content`() {
+        // Given
+        val request = SetPasswordRequest(newPassword = "newPassword")
+
+        every { userService.setPassword("test@example.com", request) } just Runs
+
+        // When
+        val response = userController.setPassword(request, authenticationFor("test@example.com"))
+
+        // Then
+        assertEquals(HttpStatus.NO_CONTENT, response.statusCode)
+        verify(exactly = 1) { userService.setPassword("test@example.com", request) }
+    }
+
+    @Test
+    fun `setPassword should propagate exception from service`() {
+        // Given
+        val request = SetPasswordRequest(currentPassword = "wrong", newPassword = "newPassword")
+
+        every {
+            userService.setPassword("test@example.com", request)
+        } throws BadCredentialsException("Current password is incorrect")
+
+        // When & Then
+        assertThrows<BadCredentialsException> {
+            userController.setPassword(request, authenticationFor("test@example.com"))
+        }
     }
 }

@@ -34,6 +34,7 @@ class SecurityConfig(
                         "/api/users/sign_up",
                         "/api/users/sign_in",
                         "/api/users/refresh_token",
+                        "/api/users/sign_in_with_google",
                         "/h2-console/**",
                         "/swagger-ui/**",
                         "/v3/api-docs/**",

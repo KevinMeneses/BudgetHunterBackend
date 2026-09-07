@@ -18,9 +18,19 @@ data class User(
     @field:Column(nullable = false)
     val name: String,
 
-    @field:NotBlank
-    @field:Column(nullable = false)
-    val password: String,
+    // Nullable since a Google-only account has never set one. Every read has to guard against
+    // that: see UserService.signIn, where a null here means "cannot authenticate by password".
+    @field:Column
+    var password: String? = null,
+
+    // Google's "sub" claim. Unlike the email it never changes, so it is the primary key we match
+    // a returning Google user on; the email is only a fallback used the first time we link.
+    @field:Column(name = "google_subject", unique = true)
+    var googleSubject: String? = null,
+
+    @field:Enumerated(EnumType.STRING)
+    @field:Column(name = "auth_provider", nullable = false)
+    var authProvider: AuthProvider = AuthProvider.PASSWORD,
 
     @field:Column(unique = true)
     var refreshToken: String? = null,
