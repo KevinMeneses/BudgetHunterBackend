@@ -82,6 +82,10 @@ echo ""
 echo "📤 Uploading to server..."
 ssh $SERVER_USER@$SERVER_IP "mkdir -p /opt/budgethunter"
 scp -r deploy-package/* $SERVER_USER@$SERVER_IP:/opt/budgethunter/
+# .env needs its own line: the glob above does not match dotfiles, so for a long time this
+# script prepared an .env it never actually shipped, and the server kept whatever had last
+# been placed there by hand. A new variable added locally would simply never arrive.
+scp deploy-package/.env $SERVER_USER@$SERVER_IP:/opt/budgethunter/.env
 echo -e "${GREEN}✅ Files uploaded${NC}"
 echo ""
 
