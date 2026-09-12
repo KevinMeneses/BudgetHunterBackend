@@ -32,6 +32,7 @@ services:
       DATABASE_USERNAME: budgethunter_user
       DATABASE_PASSWORD: ${DATABASE_PASSWORD}
       JWT_SECRET: ${JWT_SECRET}
+      GOOGLE_OAUTH_CLIENT_IDS: ${GOOGLE_OAUTH_CLIENT_IDS:-}
     ports:
       - "8080:8080"
     volumes:
