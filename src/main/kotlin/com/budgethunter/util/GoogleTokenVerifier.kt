@@ -44,7 +44,9 @@ class GoogleIdTokenVerifierAdapter(
 
     private val logger = LoggerFactory.getLogger(GoogleIdTokenVerifierAdapter::class.java)
 
-    private val audiences: List<String> get() = clientIds.map(String::trim).filter(String::isNotEmpty)
+    // internal so a test can assert what Spring actually bound: the value arrives as one
+    // comma-separated string from the environment, and every entry must survive the trip.
+    internal val audiences: List<String> get() = clientIds.map(String::trim).filter(String::isNotEmpty)
 
     private val verifier: GoogleIdTokenVerifier by lazy {
         GoogleIdTokenVerifier.Builder(NetHttpTransport(), GsonFactory.getDefaultInstance())
