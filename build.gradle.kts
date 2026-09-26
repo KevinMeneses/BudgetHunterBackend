@@ -1,3 +1,4 @@
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
 plugins {
@@ -85,10 +86,13 @@ dependencies {
     testImplementation("io.projectreactor:reactor-test") // For StepVerifier
 }
 
-tasks.withType<KotlinCompile> {
-    kotlinOptions {
-        freeCompilerArgs += "-Xjsr305=strict"
-        jvmTarget = "17"
+// compilerOptions, not kotlinOptions: the latter is gone from Kotlin 2.1's Gradle plugin, which
+// is why bumping any one Kotlin plugin on its own stopped the build script from compiling. This
+// DSL has existed since 1.8, so it works on the current version too.
+tasks.withType<KotlinCompile>().configureEach {
+    compilerOptions {
+        freeCompilerArgs.add("-Xjsr305=strict")
+        jvmTarget.set(JvmTarget.JVM_17)
     }
 }
 
