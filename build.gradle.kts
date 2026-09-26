@@ -7,7 +7,7 @@ plugins {
     kotlin("plugin.spring") version "2.0.20"
     kotlin("plugin.jpa") version "2.0.20"
     id("org.jlleitschuh.gradle.ktlint") version "14.2.0"
-    id("io.gitlab.arturbosch.detekt") version "1.23.7"
+    id("io.gitlab.arturbosch.detekt") version "1.23.8"
     id("org.jetbrains.kotlinx.kover") version "0.8.3"
 }
 
@@ -110,11 +110,13 @@ detekt {
     baseline = file("config/detekt/baseline.xml")
 }
 
-// detekt 1.23.7 is compiled against Kotlin 2.0.10 and refuses to run on anything else, but the
-// Spring dependency-management plugin bumps every configuration to the project's Kotlin version.
+// detekt refuses to run on any Kotlin but the one it was compiled against, while the Spring
+// dependency-management plugin bumps every configuration to the project's Kotlin version - hence
+// the pin. It has to move with detekt: 1.23.7 wanted 2.0.10, 1.23.8 wants 2.0.21. When a detekt
+// bump fails with "compiled with Kotlin X but is currently running with Y", this is the line.
 configurations.matching { it.name == "detekt" }.configureEach {
     resolutionStrategy.eachDependency {
-        if (requested.group == "org.jetbrains.kotlin") useVersion("2.0.10")
+        if (requested.group == "org.jetbrains.kotlin") useVersion("2.0.21")
     }
 }
 
