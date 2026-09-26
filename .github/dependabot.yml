@@ -6,16 +6,55 @@ updates:
       interval: weekly
     open-pull-requests-limit: 5
     groups:
-      spring-and-kotlin:
+      # The three Kotlin compiler plugins have to move together. Dependabot names them after the
+      # short string in the `kotlin("...")` DSL, not their maven coordinates, so a pattern like
+      # "org.jetbrains.kotlin*" never matched them and each arrived on its own. That is how PR #6
+      # came to propose plugin.spring 2.4.20 alongside jvm 2.0.20, which stopped the build script
+      # from compiling at all.
+      kotlin-plugins:
+        patterns:
+          - "jvm"
+          - "plugin.spring"
+          - "plugin.jpa"
+          - "org.jetbrains.kotlin"
+          - "org.jetbrains.kotlin.*"
+      spring:
         patterns:
           - "org.springframework*"
           - "io.spring*"
-          - "org.jetbrains.kotlin*"
-          - "org.jetbrains.kotlinx*"
+      # Kover used to fall into the Spring group through "org.jetbrains.kotlinx*", so a coverage
+      # bump could ride along with a framework upgrade. The build's quality tooling is its own
+      # concern and reviewing it together makes the diff readable.
+      quality-tools:
+        patterns:
+          - "org.jlleitschuh.gradle.ktlint"
+          - "io.gitlab.arturbosch.detekt"
+          - "org.jetbrains.kotlinx.kover"
       test:
         patterns:
           - "io.mockk*"
           - "io.projectreactor*"
+          - "org.jetbrains.kotlinx.coroutines-test"
+    ignore:
+      # Majors of these are migrations, not updates, and a weekly PR is the wrong way to meet one.
+      # Spring Boot 4.1.1 turned up grouped with a Kover bump and needed Gradle 8.14+, Spring
+      # Framework 7 and Security 7. A Kotlin major drags the three compiler plugins, detekt's
+      # Kotlin pin and the removed kotlinOptions DSL along with it. Both are worth doing
+      # deliberately, in a PR of their own, from the release notes.
+      - dependency-name: "org.springframework.boot"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "io.spring.dependency-management"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "org.springframework*"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "jvm"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "plugin.spring"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "plugin.jpa"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "org.jetbrains.kotlin*"
+        update-types: ["version-update:semver-major"]
 
   - package-ecosystem: github-actions
     directory: /
