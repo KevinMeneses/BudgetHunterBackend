@@ -24,6 +24,11 @@ java {
 // but this is a patch-line bump, far cheaper than carrying an exception in the dependency review.
 extra["netty.version"] = "4.1.138.Final"
 
+// Boot 3.5.16 pins tomcat 10.1.55, affected by three critical advisories fixed in 10.1.58:
+// GHSA-9xv2-5v5q-p794 (DIGEST auth capture-replay), GHSA-gcx9-497g-6cp6 (improper access
+// control) and GHSA-h3x4-894j-xpx5 (FORM auth incorrect authorization).
+extra["tomcat.version"] = "10.1.60"
+
 repositories {
     mavenCentral()
 }
