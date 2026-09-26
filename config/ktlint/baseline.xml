@@ -1,13 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <baseline version="1.0">
-    <file name="build.gradle.kts">
-        <error line="31" column="76" source="standard:no-multi-spaces" />
-        <error line="35" column="77" source="standard:no-multi-spaces" />
-        <error line="42" column="72" source="standard:no-multi-spaces" />
-        <error line="66" column="80" source="standard:no-multi-spaces" />
-        <error line="67" column="73" source="standard:no-multi-spaces" />
-        <error line="68" column="58" source="standard:no-multi-spaces" />
-    </file>
     <file name="src/main/kotlin/com/budgethunter/config/CustomAuthenticationEntryPoint.kt">
         <error line="17" column="43" source="standard:trailing-comma-on-declaration-site" />
         <error line="19" column="1" source="standard:no-empty-first-line-in-class-body" />
