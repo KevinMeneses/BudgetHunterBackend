@@ -79,7 +79,7 @@ dependencies {
     // Testing
     testImplementation("org.springframework.boot:spring-boot-starter-test")
     testImplementation("org.springframework.security:spring-security-test")
-    testImplementation("io.mockk:mockk:1.13.12")
+    testImplementation("io.mockk:mockk:1.14.11")
     testImplementation("org.springframework.boot:spring-boot-starter-webflux") // For WebTestClient
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test") // For runTest
     testImplementation("io.projectreactor:reactor-test") // For StepVerifier
