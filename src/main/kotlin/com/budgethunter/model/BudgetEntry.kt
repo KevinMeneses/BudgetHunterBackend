@@ -14,6 +14,7 @@ import jakarta.persistence.Table
 import jakarta.validation.constraints.NotBlank
 import jakarta.validation.constraints.NotNull
 import java.math.BigDecimal
+import java.time.LocalDate
 import java.time.LocalDateTime
 
 @Entity
@@ -57,7 +58,13 @@ data class BudgetEntry(
     val creationDate: LocalDateTime = LocalDateTime.now(),
 
     @field:Column(nullable = false)
-    val modificationDate: LocalDateTime = LocalDateTime.now()
+    val modificationDate: LocalDateTime = LocalDateTime.now(),
+
+    // Nullable on purpose: the user-facing calendar date the app shows for this entry.
+    // Existing rows stay NULL rather than being backfilled from creationDate - see
+    // database/migrations/002_add_entity_dates.sql for why.
+    @field:Column(name = "date")
+    val date: LocalDate? = null
 )
 
 enum class EntryType {

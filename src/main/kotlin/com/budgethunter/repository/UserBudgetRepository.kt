@@ -14,7 +14,13 @@ import org.springframework.stereotype.Repository
 @Repository
 interface UserBudgetRepository : JpaRepository<UserBudget, UserBudgetId> {
 
-    @Query("SELECT ub.budget FROM UserBudget ub WHERE ub.id.userEmail = :userEmail")
+    // Newest-first: by the user-facing date descending, with budgets that have no date yet
+    // (never edited since the date column was added) sorted last, then by id descending as a
+    // tiebreaker (covers same-day entries and the pre-migration rows that are all NULL here).
+    @Query(
+        "SELECT ub.budget FROM UserBudget ub WHERE ub.id.userEmail = :userEmail " +
+            "ORDER BY ub.budget.date DESC NULLS LAST, ub.budget.id DESC"
+    )
     fun findBudgetsByUserEmail(@Param("userEmail") userEmail: String): List<Budget>
 
     @Query("SELECT ub.budget FROM UserBudget ub WHERE ub.id.userEmail = :userEmail")

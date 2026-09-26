@@ -2,6 +2,7 @@ package com.budgethunter.dto
 
 import com.budgethunter.model.EntryType
 import java.math.BigDecimal
+import java.time.LocalDate
 import java.time.LocalDateTime
 
 data class BudgetEntryResponse(
@@ -14,5 +15,6 @@ data class BudgetEntryResponse(
     val createdByEmail: String?,
     val updatedByEmail: String?,
     val creationDate: LocalDateTime,
-    val modificationDate: LocalDateTime
+    val modificationDate: LocalDateTime,
+    val date: LocalDate? = null
 )
