@@ -1,23 +1,36 @@
 package com.budgethunter.service
 
-import com.budgethunter.dto.*
-import com.budgethunter.model.*
+import com.budgethunter.dto.AddCollaboratorRequest
+import com.budgethunter.dto.CreateBudgetRequest
+import com.budgethunter.dto.PutEntryRequest
+import com.budgethunter.dto.UpdateBudgetRequest
+import com.budgethunter.model.Budget
+import com.budgethunter.model.BudgetEntry
+import com.budgethunter.model.EntryType
+import com.budgethunter.model.User
+import com.budgethunter.model.UserBudgetId
 import com.budgethunter.repository.BudgetEntryRepository
 import com.budgethunter.repository.BudgetRepository
 import com.budgethunter.repository.UserBudgetRepository
 import com.budgethunter.repository.UserRepository
-import io.mockk.*
+import io.mockk.Runs
+import io.mockk.clearAllMocks
+import io.mockk.every
+import io.mockk.just
+import io.mockk.mockk
+import io.mockk.verify
 import org.junit.jupiter.api.AfterEach
-import org.junit.jupiter.api.Assertions.*
+import org.junit.jupiter.api.Assertions.assertDoesNotThrow
+import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
 import java.math.BigDecimal
 import java.time.LocalDateTime
-import java.util.*
+import java.util.Optional
 
 class BudgetServiceTest {
-
     private lateinit var budgetRepository: BudgetRepository
     private lateinit var userBudgetRepository: UserBudgetRepository
     private lateinit var userRepository: UserRepository
@@ -26,16 +39,18 @@ class BudgetServiceTest {
     private lateinit var budgetService: BudgetService
 
     private val testUserEmail = "test@example.com"
-    private val testUser = User(
-        email = testUserEmail,
-        name = "Test User",
-        password = "encodedPassword"
-    )
-    private val testBudget = Budget(
-        id = 1L,
-        name = "Test Budget",
-        amount = BigDecimal("1000.00")
-    )
+    private val testUser =
+        User(
+            email = testUserEmail,
+            name = "Test User",
+            password = "encodedPassword",
+        )
+    private val testBudget =
+        Budget(
+            id = 1L,
+            name = "Test Budget",
+            amount = BigDecimal("1000.00"),
+        )
 
     @BeforeEach
     fun setup() {
@@ -44,13 +59,14 @@ class BudgetServiceTest {
         userRepository = mockk()
         budgetEntryRepository = mockk()
         reactiveSseService = mockk(relaxed = true)
-        budgetService = BudgetService(
-            budgetRepository,
-            userBudgetRepository,
-            userRepository,
-            budgetEntryRepository,
-            reactiveSseService
-        )
+        budgetService =
+            BudgetService(
+                budgetRepository,
+                userBudgetRepository,
+                userRepository,
+                budgetEntryRepository,
+                reactiveSseService,
+            )
     }
 
     @AfterEach
@@ -63,15 +79,17 @@ class BudgetServiceTest {
     @Test
     fun `createBudget should create new budget successfully`() {
         // Given
-        val request = CreateBudgetRequest(
-            name = "Monthly Budget",
-            amount = BigDecimal("2500.00")
-        )
-        val savedBudget = Budget(
-            id = 1L,
-            name = request.name,
-            amount = request.amount
-        )
+        val request =
+            CreateBudgetRequest(
+                name = "Monthly Budget",
+                amount = BigDecimal("2500.00"),
+            )
+        val savedBudget =
+            Budget(
+                id = 1L,
+                name = request.name,
+                amount = request.amount,
+            )
 
         every { userRepository.findById(testUserEmail) } returns Optional.of(testUser)
         every { budgetRepository.save(any()) } returns savedBudget
@@ -93,17 +111,19 @@ class BudgetServiceTest {
     @Test
     fun `createBudget should throw exception when user not found`() {
         // Given
-        val request = CreateBudgetRequest(
-            name = "Monthly Budget",
-            amount = BigDecimal("2500.00")
-        )
+        val request =
+            CreateBudgetRequest(
+                name = "Monthly Budget",
+                amount = BigDecimal("2500.00"),
+            )
 
         every { userRepository.findById(testUserEmail) } returns Optional.empty()
 
         // When & Then
-        val exception = assertThrows<IllegalArgumentException> {
-            budgetService.createBudget(request, testUserEmail)
-        }
+        val exception =
+            assertThrows<IllegalArgumentException> {
+                budgetService.createBudget(request, testUserEmail)
+            }
 
         assertEquals("User not found", exception.message)
         verify(exactly = 1) { userRepository.findById(testUserEmail) }
@@ -115,10 +135,11 @@ class BudgetServiceTest {
     @Test
     fun `getBudgetsByUserEmail should return list of budgets`() {
         // Given
-        val budgets = listOf(
-            Budget(id = 1L, name = "Budget 1", amount = BigDecimal("1000.00")),
-            Budget(id = 2L, name = "Budget 2", amount = BigDecimal("2000.00"))
-        )
+        val budgets =
+            listOf(
+                Budget(id = 1L, name = "Budget 1", amount = BigDecimal("1000.00")),
+                Budget(id = 2L, name = "Budget 2", amount = BigDecimal("2000.00")),
+            )
 
         every { userBudgetRepository.findBudgetsByUserEmail(testUserEmail) } returns budgets
 
@@ -154,19 +175,22 @@ class BudgetServiceTest {
     fun `updateBudget should update budget successfully`() {
         // Given
         val budgetId = 1L
-        val request = UpdateBudgetRequest(
-            name = "Updated Budget Name",
-            amount = BigDecimal("3500.00")
-        )
-        val existingBudget = Budget(
-            id = budgetId,
-            name = "Old Budget Name",
-            amount = BigDecimal("2000.00")
-        )
-        val updatedBudget = existingBudget.copy(
-            name = request.name,
-            amount = request.amount
-        )
+        val request =
+            UpdateBudgetRequest(
+                name = "Updated Budget Name",
+                amount = BigDecimal("3500.00"),
+            )
+        val existingBudget =
+            Budget(
+                id = budgetId,
+                name = "Old Budget Name",
+                amount = BigDecimal("2000.00"),
+            )
+        val updatedBudget =
+            existingBudget.copy(
+                name = request.name,
+                amount = request.amount,
+            )
         val userBudgetId = UserBudgetId(budgetId = budgetId, userEmail = testUserEmail)
 
         every { userBudgetRepository.existsById(userBudgetId) } returns true
@@ -190,19 +214,21 @@ class BudgetServiceTest {
     fun `updateBudget should throw exception when budget not found`() {
         // Given
         val budgetId = 999L
-        val request = UpdateBudgetRequest(
-            name = "Updated Budget",
-            amount = BigDecimal("2000.00")
-        )
+        val request =
+            UpdateBudgetRequest(
+                name = "Updated Budget",
+                amount = BigDecimal("2000.00"),
+            )
         val userBudgetId = UserBudgetId(budgetId = budgetId, userEmail = testUserEmail)
 
         every { userBudgetRepository.existsById(userBudgetId) } returns true
         every { budgetRepository.findById(budgetId) } returns Optional.empty()
 
         // When & Then
-        val exception = assertThrows<IllegalArgumentException> {
-            budgetService.updateBudget(budgetId, request, testUserEmail)
-        }
+        val exception =
+            assertThrows<IllegalArgumentException> {
+                budgetService.updateBudget(budgetId, request, testUserEmail)
+            }
 
         assertEquals("Budget not found with id: $budgetId", exception.message)
         verify(exactly = 1) { userBudgetRepository.existsById(userBudgetId) }
@@ -214,18 +240,20 @@ class BudgetServiceTest {
     fun `updateBudget should throw exception when user has no access to budget`() {
         // Given
         val budgetId = 1L
-        val request = UpdateBudgetRequest(
-            name = "Updated Budget",
-            amount = BigDecimal("2000.00")
-        )
+        val request =
+            UpdateBudgetRequest(
+                name = "Updated Budget",
+                amount = BigDecimal("2000.00"),
+            )
         val userBudgetId = UserBudgetId(budgetId = budgetId, userEmail = testUserEmail)
 
         every { userBudgetRepository.existsById(userBudgetId) } returns false
 
         // When & Then
-        val exception = assertThrows<com.budgethunter.exception.ForbiddenAccessException> {
-            budgetService.updateBudget(budgetId, request, testUserEmail)
-        }
+        val exception =
+            assertThrows<com.budgethunter.exception.ForbiddenAccessException> {
+                budgetService.updateBudget(budgetId, request, testUserEmail)
+            }
 
         assertTrue(exception.message!!.contains("don't have access to budget with id: $budgetId"))
         verify(exactly = 1) { userBudgetRepository.existsById(userBudgetId) }
@@ -239,15 +267,17 @@ class BudgetServiceTest {
     fun `addCollaborator should add collaborator successfully`() {
         // Given
         val collaboratorEmail = "collaborator@example.com"
-        val collaborator = User(
-            email = collaboratorEmail,
-            name = "Collaborator User",
-            password = "encodedPassword"
-        )
-        val request = AddCollaboratorRequest(
-            budgetId = 1L,
-            email = collaboratorEmail
-        )
+        val collaborator =
+            User(
+                email = collaboratorEmail,
+                name = "Collaborator User",
+                password = "encodedPassword",
+            )
+        val request =
+            AddCollaboratorRequest(
+                budgetId = 1L,
+                email = collaboratorEmail,
+            )
         val userBudgetId = UserBudgetId(budgetId = 1L, userEmail = testUserEmail)
 
         every { userBudgetRepository.existsById(userBudgetId) } returns true
@@ -274,18 +304,20 @@ class BudgetServiceTest {
     @Test
     fun `addCollaborator should throw exception when user has no access to budget`() {
         // Given
-        val request = AddCollaboratorRequest(
-            budgetId = 1L,
-            email = "collaborator@example.com"
-        )
+        val request =
+            AddCollaboratorRequest(
+                budgetId = 1L,
+                email = "collaborator@example.com",
+            )
         val userBudgetId = UserBudgetId(budgetId = 1L, userEmail = testUserEmail)
 
         every { userBudgetRepository.existsById(userBudgetId) } returns false
 
         // When & Then
-        val exception = assertThrows<com.budgethunter.exception.ForbiddenAccessException> {
-            budgetService.addCollaborator(request.budgetId, request, testUserEmail)
-        }
+        val exception =
+            assertThrows<com.budgethunter.exception.ForbiddenAccessException> {
+                budgetService.addCollaborator(request.budgetId, request, testUserEmail)
+            }
 
         assertTrue(exception.message!!.contains("don't have access to budget with id: 1"))
         verify(exactly = 1) { userBudgetRepository.existsById(userBudgetId) }
@@ -295,19 +327,21 @@ class BudgetServiceTest {
     @Test
     fun `addCollaborator should throw exception when budget not found`() {
         // Given
-        val request = AddCollaboratorRequest(
-            budgetId = 999L,
-            email = "collaborator@example.com"
-        )
+        val request =
+            AddCollaboratorRequest(
+                budgetId = 999L,
+                email = "collaborator@example.com",
+            )
         val userBudgetId = UserBudgetId(budgetId = 999L, userEmail = testUserEmail)
 
         every { userBudgetRepository.existsById(userBudgetId) } returns true
         every { budgetRepository.findById(999L) } returns Optional.empty()
 
         // When & Then
-        val exception = assertThrows<IllegalArgumentException> {
-            budgetService.addCollaborator(request.budgetId, request, testUserEmail)
-        }
+        val exception =
+            assertThrows<IllegalArgumentException> {
+                budgetService.addCollaborator(request.budgetId, request, testUserEmail)
+            }
 
         assertEquals("Budget not found with id: 999", exception.message)
         verify(exactly = 1) { budgetRepository.findById(999L) }
@@ -317,10 +351,11 @@ class BudgetServiceTest {
     fun `addCollaborator should throw exception when collaborator email not found`() {
         // Given
         val nonExistentEmail = "nonexistent@example.com"
-        val request = AddCollaboratorRequest(
-            budgetId = 1L,
-            email = nonExistentEmail
-        )
+        val request =
+            AddCollaboratorRequest(
+                budgetId = 1L,
+                email = nonExistentEmail,
+            )
         val userBudgetId = UserBudgetId(budgetId = 1L, userEmail = testUserEmail)
 
         every { userBudgetRepository.existsById(userBudgetId) } returns true
@@ -328,9 +363,10 @@ class BudgetServiceTest {
         every { userRepository.findById(nonExistentEmail) } returns Optional.empty()
 
         // When & Then
-        val exception = assertThrows<IllegalArgumentException> {
-            budgetService.addCollaborator(request.budgetId, request, testUserEmail)
-        }
+        val exception =
+            assertThrows<IllegalArgumentException> {
+                budgetService.addCollaborator(request.budgetId, request, testUserEmail)
+            }
 
         assertEquals("User not found with email: $nonExistentEmail", exception.message)
         verify(exactly = 1) { userRepository.findById(nonExistentEmail) }
@@ -340,15 +376,17 @@ class BudgetServiceTest {
     fun `addCollaborator should throw exception when user is already a collaborator`() {
         // Given
         val collaboratorEmail = "existing@example.com"
-        val collaborator = User(
-            email = collaboratorEmail,
-            name = "Existing Collaborator",
-            password = "encodedPassword"
-        )
-        val request = AddCollaboratorRequest(
-            budgetId = 1L,
-            email = collaboratorEmail
-        )
+        val collaborator =
+            User(
+                email = collaboratorEmail,
+                name = "Existing Collaborator",
+                password = "encodedPassword",
+            )
+        val request =
+            AddCollaboratorRequest(
+                budgetId = 1L,
+                email = collaboratorEmail,
+            )
         val userBudgetId = UserBudgetId(budgetId = 1L, userEmail = testUserEmail)
         val collaboratorBudgetId = UserBudgetId(budgetId = 1L, userEmail = collaboratorEmail)
 
@@ -358,9 +396,10 @@ class BudgetServiceTest {
         every { userBudgetRepository.existsById(collaboratorBudgetId) } returns true
 
         // When & Then
-        val exception = assertThrows<IllegalStateException> {
-            budgetService.addCollaborator(request.budgetId, request, testUserEmail)
-        }
+        val exception =
+            assertThrows<IllegalStateException> {
+                budgetService.addCollaborator(request.budgetId, request, testUserEmail)
+            }
 
         assertTrue(exception.message!!.contains("is already a collaborator"))
         verify(exactly = 1) { userBudgetRepository.existsById(collaboratorBudgetId) }
@@ -374,10 +413,11 @@ class BudgetServiceTest {
         // Given
         val budgetId = 1L
         val userBudgetId = UserBudgetId(budgetId = budgetId, userEmail = testUserEmail)
-        val collaborators = listOf(
-            testUser,
-            User(email = "user2@example.com", name = "User 2", password = "pass")
-        )
+        val collaborators =
+            listOf(
+                testUser,
+                User(email = "user2@example.com", name = "User 2", password = "pass"),
+            )
 
         every { userBudgetRepository.existsById(userBudgetId) } returns true
         every { budgetRepository.existsById(budgetId) } returns true
@@ -403,9 +443,10 @@ class BudgetServiceTest {
         every { userBudgetRepository.existsById(userBudgetId) } returns false
 
         // When & Then
-        val exception = assertThrows<com.budgethunter.exception.ForbiddenAccessException> {
-            budgetService.getCollaboratorsByBudgetId(budgetId, testUserEmail)
-        }
+        val exception =
+            assertThrows<com.budgethunter.exception.ForbiddenAccessException> {
+                budgetService.getCollaboratorsByBudgetId(budgetId, testUserEmail)
+            }
 
         assertTrue(exception.message!!.contains("don't have access to budget with id: $budgetId"))
     }
@@ -420,9 +461,10 @@ class BudgetServiceTest {
         every { budgetRepository.existsById(budgetId) } returns false
 
         // When & Then
-        val exception = assertThrows<IllegalArgumentException> {
-            budgetService.getCollaboratorsByBudgetId(budgetId, testUserEmail)
-        }
+        val exception =
+            assertThrows<IllegalArgumentException> {
+                budgetService.getCollaboratorsByBudgetId(budgetId, testUserEmail)
+            }
 
         assertEquals("Budget not found with id: $budgetId", exception.message)
     }
@@ -435,30 +477,31 @@ class BudgetServiceTest {
         val budgetId = 1L
         val userBudgetId = UserBudgetId(budgetId = budgetId, userEmail = testUserEmail)
         val now = LocalDateTime.now()
-        val entries = listOf(
-            BudgetEntry(
-                id = 1L,
-                budget = testBudget,
-                amount = BigDecimal("100.00"),
-                description = "Entry 1",
-                category = "Food",
-                type = EntryType.OUTCOME,
-                createdBy = testUser,
-                creationDate = now,
-                modificationDate = now
-            ),
-            BudgetEntry(
-                id = 2L,
-                budget = testBudget,
-                amount = BigDecimal("200.00"),
-                description = "Entry 2",
-                category = "Transport",
-                type = EntryType.OUTCOME,
-                createdBy = testUser,
-                creationDate = now,
-                modificationDate = now
+        val entries =
+            listOf(
+                BudgetEntry(
+                    id = 1L,
+                    budget = testBudget,
+                    amount = BigDecimal("100.00"),
+                    description = "Entry 1",
+                    category = "Food",
+                    type = EntryType.OUTCOME,
+                    createdBy = testUser,
+                    creationDate = now,
+                    modificationDate = now,
+                ),
+                BudgetEntry(
+                    id = 2L,
+                    budget = testBudget,
+                    amount = BigDecimal("200.00"),
+                    description = "Entry 2",
+                    category = "Transport",
+                    type = EntryType.OUTCOME,
+                    createdBy = testUser,
+                    creationDate = now,
+                    modificationDate = now,
+                ),
             )
-        )
 
         every { userBudgetRepository.existsById(userBudgetId) } returns true
         every { budgetRepository.existsById(budgetId) } returns true
@@ -481,26 +524,28 @@ class BudgetServiceTest {
     @Test
     fun `putEntry should create new entry successfully`() {
         // Given
-        val request = PutEntryRequest(
-            id = null,
-            budgetId = 1L,
-            amount = BigDecimal("150.00"),
-            description = "Groceries",
-            category = "Food",
-            type = EntryType.OUTCOME
-        )
+        val request =
+            PutEntryRequest(
+                id = null,
+                budgetId = 1L,
+                amount = BigDecimal("150.00"),
+                description = "Groceries",
+                category = "Food",
+                type = EntryType.OUTCOME,
+            )
         val userBudgetId = UserBudgetId(budgetId = 1L, userEmail = testUserEmail)
-        val savedEntry = BudgetEntry(
-            id = 1L,
-            budget = testBudget,
-            amount = request.amount,
-            description = request.description,
-            category = request.category,
-            type = request.type,
-            createdBy = testUser,
-            creationDate = LocalDateTime.now(),
-            modificationDate = LocalDateTime.now()
-        )
+        val savedEntry =
+            BudgetEntry(
+                id = 1L,
+                budget = testBudget,
+                amount = request.amount,
+                description = request.description,
+                category = request.category,
+                type = request.type,
+                createdBy = testUser,
+                creationDate = LocalDateTime.now(),
+                modificationDate = LocalDateTime.now(),
+            )
 
         every { userBudgetRepository.existsById(userBudgetId) } returns true
         every { budgetRepository.findById(1L) } returns Optional.of(testBudget)
@@ -525,34 +570,37 @@ class BudgetServiceTest {
     @Test
     fun `putEntry should update existing entry successfully`() {
         // Given
-        val existingEntry = BudgetEntry(
-            id = 1L,
-            budget = testBudget,
-            amount = BigDecimal("100.00"),
-            description = "Old Description",
-            category = "Old Category",
-            type = EntryType.OUTCOME,
-            createdBy = testUser,
-            creationDate = LocalDateTime.now().minusDays(1),
-            modificationDate = LocalDateTime.now().minusDays(1)
-        )
-        val request = PutEntryRequest(
-            id = 1L,
-            budgetId = 1L,
-            amount = BigDecimal("200.00"),
-            description = "Updated Description",
-            category = "Updated Category",
-            type = EntryType.INCOME
-        )
+        val existingEntry =
+            BudgetEntry(
+                id = 1L,
+                budget = testBudget,
+                amount = BigDecimal("100.00"),
+                description = "Old Description",
+                category = "Old Category",
+                type = EntryType.OUTCOME,
+                createdBy = testUser,
+                creationDate = LocalDateTime.now().minusDays(1),
+                modificationDate = LocalDateTime.now().minusDays(1),
+            )
+        val request =
+            PutEntryRequest(
+                id = 1L,
+                budgetId = 1L,
+                amount = BigDecimal("200.00"),
+                description = "Updated Description",
+                category = "Updated Category",
+                type = EntryType.INCOME,
+            )
         val userBudgetId = UserBudgetId(budgetId = 1L, userEmail = testUserEmail)
-        val updatedEntry = existingEntry.copy(
-            amount = request.amount,
-            description = request.description,
-            category = request.category,
-            type = request.type,
-            updatedBy = testUser,
-            modificationDate = LocalDateTime.now()
-        )
+        val updatedEntry =
+            existingEntry.copy(
+                amount = request.amount,
+                description = request.description,
+                category = request.category,
+                type = request.type,
+                updatedBy = testUser,
+                modificationDate = LocalDateTime.now(),
+            )
 
         every { userBudgetRepository.existsById(userBudgetId) } returns true
         every { budgetRepository.findById(1L) } returns Optional.of(testBudget)
@@ -577,22 +625,24 @@ class BudgetServiceTest {
     @Test
     fun `putEntry should throw exception when user has no access to budget`() {
         // Given
-        val request = PutEntryRequest(
-            id = null,
-            budgetId = 1L,
-            amount = BigDecimal("150.00"),
-            description = "Test",
-            category = "Test",
-            type = EntryType.OUTCOME
-        )
+        val request =
+            PutEntryRequest(
+                id = null,
+                budgetId = 1L,
+                amount = BigDecimal("150.00"),
+                description = "Test",
+                category = "Test",
+                type = EntryType.OUTCOME,
+            )
         val userBudgetId = UserBudgetId(budgetId = 1L, userEmail = testUserEmail)
 
         every { userBudgetRepository.existsById(userBudgetId) } returns false
 
         // When & Then
-        val exception = assertThrows<com.budgethunter.exception.ForbiddenAccessException> {
-            budgetService.putEntry(request, testUserEmail)
-        }
+        val exception =
+            assertThrows<com.budgethunter.exception.ForbiddenAccessException> {
+                budgetService.putEntry(request, testUserEmail)
+            }
 
         assertTrue(exception.message!!.contains("don't have access to budget with id: 1"))
     }
@@ -601,25 +651,27 @@ class BudgetServiceTest {
     fun `putEntry should throw exception when entry does not belong to budget`() {
         // Given
         val differentBudget = Budget(id = 2L, name = "Different Budget", amount = BigDecimal("1000.00"))
-        val existingEntry = BudgetEntry(
-            id = 1L,
-            budget = differentBudget,
-            amount = BigDecimal("100.00"),
-            description = "Entry",
-            category = "Category",
-            type = EntryType.OUTCOME,
-            createdBy = testUser,
-            creationDate = LocalDateTime.now(),
-            modificationDate = LocalDateTime.now()
-        )
-        val request = PutEntryRequest(
-            id = 1L,
-            budgetId = 1L,
-            amount = BigDecimal("200.00"),
-            description = "Updated",
-            category = "Updated",
-            type = EntryType.INCOME
-        )
+        val existingEntry =
+            BudgetEntry(
+                id = 1L,
+                budget = differentBudget,
+                amount = BigDecimal("100.00"),
+                description = "Entry",
+                category = "Category",
+                type = EntryType.OUTCOME,
+                createdBy = testUser,
+                creationDate = LocalDateTime.now(),
+                modificationDate = LocalDateTime.now(),
+            )
+        val request =
+            PutEntryRequest(
+                id = 1L,
+                budgetId = 1L,
+                amount = BigDecimal("200.00"),
+                description = "Updated",
+                category = "Updated",
+                type = EntryType.INCOME,
+            )
         val userBudgetId = UserBudgetId(budgetId = 1L, userEmail = testUserEmail)
 
         every { userBudgetRepository.existsById(userBudgetId) } returns true
@@ -628,9 +680,10 @@ class BudgetServiceTest {
         every { budgetEntryRepository.findById(1L) } returns Optional.of(existingEntry)
 
         // When & Then
-        val exception = assertThrows<IllegalArgumentException> {
-            budgetService.putEntry(request, testUserEmail)
-        }
+        val exception =
+            assertThrows<IllegalArgumentException> {
+                budgetService.putEntry(request, testUserEmail)
+            }
 
         assertTrue(exception.message!!.contains("does not belong to budget"))
     }
@@ -662,9 +715,10 @@ class BudgetServiceTest {
         every { userBudgetRepository.existsById(userBudgetId) } returns false
 
         // When & Then
-        val exception = assertThrows<com.budgethunter.exception.ForbiddenAccessException> {
-            budgetService.verifyUserHasAccessToBudget(budgetId, testUserEmail)
-        }
+        val exception =
+            assertThrows<com.budgethunter.exception.ForbiddenAccessException> {
+                budgetService.verifyUserHasAccessToBudget(budgetId, testUserEmail)
+            }
 
         assertTrue(exception.message!!.contains("don't have access to budget with id: $budgetId"))
     }

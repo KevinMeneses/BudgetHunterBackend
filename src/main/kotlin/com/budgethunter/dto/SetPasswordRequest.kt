@@ -10,8 +10,7 @@ data class SetPasswordRequest(
      * the request already proves who they are.
      */
     val currentPassword: String? = null,
-
     @field:NotBlank(message = "Password is required")
     @field:Size(min = 6, message = "Password must be at least 6 characters")
-    val newPassword: String
+    val newPassword: String,
 )

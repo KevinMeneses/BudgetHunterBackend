@@ -15,13 +15,10 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 @EnableWebSecurity
 class SecurityConfig(
     private val jwtAuthenticationFilter: JwtAuthenticationFilter,
-    private val customAuthenticationEntryPoint: CustomAuthenticationEntryPoint
+    private val customAuthenticationEntryPoint: CustomAuthenticationEntryPoint,
 ) {
-
     @Bean
-    fun passwordEncoder(): PasswordEncoder {
-        return BCryptPasswordEncoder()
-    }
+    fun passwordEncoder(): PasswordEncoder = BCryptPasswordEncoder()
 
     @Bean
     fun securityFilterChain(http: HttpSecurity): SecurityFilterChain {
@@ -40,17 +37,15 @@ class SecurityConfig(
                         "/v3/api-docs/**",
                         "/swagger-ui.html",
                         "/actuator/health/**",
-                        "/actuator/health"
+                        "/actuator/health",
                     ).permitAll()
-                    .anyRequest().authenticated()
-            }
-            .exceptionHandling { exceptionHandling ->
+                    .anyRequest()
+                    .authenticated()
+            }.exceptionHandling { exceptionHandling ->
                 exceptionHandling.authenticationEntryPoint(customAuthenticationEntryPoint)
-            }
-            .headers { headers ->
+            }.headers { headers ->
                 headers.frameOptions { it.sameOrigin() } // For H2 console
-            }
-            .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter::class.java)
+            }.addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter::class.java)
 
         return http.build()
     }

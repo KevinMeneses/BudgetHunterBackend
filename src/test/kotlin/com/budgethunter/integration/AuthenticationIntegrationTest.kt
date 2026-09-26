@@ -6,7 +6,10 @@ import com.budgethunter.dto.SignInResponse
 import com.budgethunter.dto.SignUpRequest
 import com.budgethunter.dto.UserResponse
 import com.fasterxml.jackson.databind.ObjectMapper
-import org.junit.jupiter.api.Assertions.*
+import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertNotEquals
+import org.junit.jupiter.api.Assertions.assertNotNull
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
@@ -14,15 +17,15 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.http.MediaType
 import org.springframework.test.web.servlet.MockMvc
-import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*
-import org.springframework.test.web.servlet.result.MockMvcResultMatchers.*
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
+import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath
+import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
 import org.springframework.transaction.annotation.Transactional
 
 @SpringBootTest
 @AutoConfigureMockMvc
 @Transactional
 class AuthenticationIntegrationTest {
-
     @Autowired
     private lateinit var mockMvc: MockMvc
 
@@ -43,22 +46,24 @@ class AuthenticationIntegrationTest {
     @Test
     fun `should successfully sign up a new user`() {
         // Given
-        val request = SignUpRequest(
-            email = testEmail,
-            name = testName,
-            password = testPassword
-        )
+        val request =
+            SignUpRequest(
+                email = testEmail,
+                name = testName,
+                password = testPassword,
+            )
 
         // When & Then
-        val result = mockMvc.perform(
-            post("/api/users/sign_up")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(request))
-        )
-            .andExpect(status().isCreated)
-            .andExpect(jsonPath("$.email").value(testEmail))
-            .andExpect(jsonPath("$.name").value(testName))
-            .andReturn()
+        val result =
+            mockMvc
+                .perform(
+                    post("/api/users/sign_up")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)),
+                ).andExpect(status().isCreated)
+                .andExpect(jsonPath("$.email").value(testEmail))
+                .andExpect(jsonPath("$.name").value(testName))
+                .andReturn()
 
         val response = objectMapper.readValue(result.response.contentAsString, UserResponse::class.java)
         assertEquals(testEmail, response.email)
@@ -68,44 +73,46 @@ class AuthenticationIntegrationTest {
     @Test
     fun `should return 400 when signing up with invalid email`() {
         // Given
-        val request = SignUpRequest(
-            email = "invalid-email",
-            name = testName,
-            password = testPassword
-        )
+        val request =
+            SignUpRequest(
+                email = "invalid-email",
+                name = testName,
+                password = testPassword,
+            )
 
         // When & Then
-        mockMvc.perform(
-            post("/api/users/sign_up")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(request))
-        )
-            .andExpect(status().isBadRequest)
+        mockMvc
+            .perform(
+                post("/api/users/sign_up")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(request)),
+            ).andExpect(status().isBadRequest)
     }
 
     @Test
     fun `should return 400 when signing up with duplicate email`() {
         // Given - First sign up
-        val request = SignUpRequest(
-            email = testEmail,
-            name = testName,
-            password = testPassword
-        )
+        val request =
+            SignUpRequest(
+                email = testEmail,
+                name = testName,
+                password = testPassword,
+            )
 
-        mockMvc.perform(
-            post("/api/users/sign_up")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(request))
-        )
-            .andExpect(status().isCreated)
+        mockMvc
+            .perform(
+                post("/api/users/sign_up")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(request)),
+            ).andExpect(status().isCreated)
 
         // When & Then - Try to sign up again with same email
-        mockMvc.perform(
-            post("/api/users/sign_up")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(request))
-        )
-            .andExpect(status().isBadRequest)
+        mockMvc
+            .perform(
+                post("/api/users/sign_up")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(request)),
+            ).andExpect(status().isBadRequest)
     }
 
     // Sign In Tests
@@ -113,36 +120,39 @@ class AuthenticationIntegrationTest {
     @Test
     fun `should successfully sign in with valid credentials`() {
         // Given - Sign up first
-        val signUpRequest = SignUpRequest(
-            email = testEmail,
-            name = testName,
-            password = testPassword
-        )
+        val signUpRequest =
+            SignUpRequest(
+                email = testEmail,
+                name = testName,
+                password = testPassword,
+            )
 
-        mockMvc.perform(
-            post("/api/users/sign_up")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(signUpRequest))
-        )
-            .andExpect(status().isCreated)
+        mockMvc
+            .perform(
+                post("/api/users/sign_up")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(signUpRequest)),
+            ).andExpect(status().isCreated)
 
         // When - Sign in
-        val signInRequest = SignInRequest(
-            email = testEmail,
-            password = testPassword
-        )
+        val signInRequest =
+            SignInRequest(
+                email = testEmail,
+                password = testPassword,
+            )
 
-        val result = mockMvc.perform(
-            post("/api/users/sign_in")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(signInRequest))
-        )
-            .andExpect(status().isOk)
-            .andExpect(jsonPath("$.authToken").exists())
-            .andExpect(jsonPath("$.refreshToken").exists())
-            .andExpect(jsonPath("$.email").value(testEmail))
-            .andExpect(jsonPath("$.name").value(testName))
-            .andReturn()
+        val result =
+            mockMvc
+                .perform(
+                    post("/api/users/sign_in")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(signInRequest)),
+                ).andExpect(status().isOk)
+                .andExpect(jsonPath("$.authToken").exists())
+                .andExpect(jsonPath("$.refreshToken").exists())
+                .andExpect(jsonPath("$.email").value(testEmail))
+                .andExpect(jsonPath("$.name").value(testName))
+                .andReturn()
 
         val response = objectMapper.readValue(result.response.contentAsString, SignInResponse::class.java)
         assertNotNull(response.authToken)
@@ -154,48 +164,51 @@ class AuthenticationIntegrationTest {
     @Test
     fun `should return 401 when signing in with non-existent email`() {
         // Given
-        val signInRequest = SignInRequest(
-            email = "nonexistent@example.com",
-            password = testPassword
-        )
+        val signInRequest =
+            SignInRequest(
+                email = "nonexistent@example.com",
+                password = testPassword,
+            )
 
         // When & Then
-        mockMvc.perform(
-            post("/api/users/sign_in")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(signInRequest))
-        )
-            .andExpect(status().isUnauthorized)
+        mockMvc
+            .perform(
+                post("/api/users/sign_in")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(signInRequest)),
+            ).andExpect(status().isUnauthorized)
     }
 
     @Test
     fun `should return 401 when signing in with wrong password`() {
         // Given - Sign up first
-        val signUpRequest = SignUpRequest(
-            email = testEmail,
-            name = testName,
-            password = testPassword
-        )
+        val signUpRequest =
+            SignUpRequest(
+                email = testEmail,
+                name = testName,
+                password = testPassword,
+            )
 
-        mockMvc.perform(
-            post("/api/users/sign_up")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(signUpRequest))
-        )
-            .andExpect(status().isCreated)
+        mockMvc
+            .perform(
+                post("/api/users/sign_up")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(signUpRequest)),
+            ).andExpect(status().isCreated)
 
         // When - Try to sign in with wrong password
-        val signInRequest = SignInRequest(
-            email = testEmail,
-            password = "WrongPassword123!"
-        )
+        val signInRequest =
+            SignInRequest(
+                email = testEmail,
+                password = "WrongPassword123!",
+            )
 
-        mockMvc.perform(
-            post("/api/users/sign_in")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(signInRequest))
-        )
-            .andExpect(status().isUnauthorized)
+        mockMvc
+            .perform(
+                post("/api/users/sign_in")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(signInRequest)),
+            ).andExpect(status().isUnauthorized)
     }
 
     // Refresh Token Tests
@@ -203,31 +216,34 @@ class AuthenticationIntegrationTest {
     @Test
     fun `should successfully refresh token with valid refresh token`() {
         // Given - Sign up and sign in
-        val signUpRequest = SignUpRequest(
-            email = testEmail,
-            name = testName,
-            password = testPassword
-        )
+        val signUpRequest =
+            SignUpRequest(
+                email = testEmail,
+                name = testName,
+                password = testPassword,
+            )
 
-        mockMvc.perform(
-            post("/api/users/sign_up")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(signUpRequest))
-        )
-            .andExpect(status().isCreated)
+        mockMvc
+            .perform(
+                post("/api/users/sign_up")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(signUpRequest)),
+            ).andExpect(status().isCreated)
 
-        val signInRequest = SignInRequest(
-            email = testEmail,
-            password = testPassword
-        )
+        val signInRequest =
+            SignInRequest(
+                email = testEmail,
+                password = testPassword,
+            )
 
-        val signInResult = mockMvc.perform(
-            post("/api/users/sign_in")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(signInRequest))
-        )
-            .andExpect(status().isOk)
-            .andReturn()
+        val signInResult =
+            mockMvc
+                .perform(
+                    post("/api/users/sign_in")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(signInRequest)),
+                ).andExpect(status().isOk)
+                .andReturn()
 
         val signInResponse = objectMapper.readValue(signInResult.response.contentAsString, SignInResponse::class.java)
         val refreshToken = signInResponse.refreshToken
@@ -235,16 +251,17 @@ class AuthenticationIntegrationTest {
         // When - Refresh token
         val refreshRequest = RefreshTokenRequest(refreshToken = refreshToken)
 
-        val result = mockMvc.perform(
-            post("/api/users/refresh_token")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(refreshRequest))
-        )
-            .andExpect(status().isOk)
-            .andExpect(jsonPath("$.authToken").exists())
-            .andExpect(jsonPath("$.refreshToken").exists())
-            .andExpect(jsonPath("$.email").value(testEmail))
-            .andReturn()
+        val result =
+            mockMvc
+                .perform(
+                    post("/api/users/refresh_token")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(refreshRequest)),
+                ).andExpect(status().isOk)
+                .andExpect(jsonPath("$.authToken").exists())
+                .andExpect(jsonPath("$.refreshToken").exists())
+                .andExpect(jsonPath("$.email").value(testEmail))
+                .andReturn()
 
         val response = objectMapper.readValue(result.response.contentAsString, SignInResponse::class.java)
         assertNotNull(response.authToken)
@@ -258,12 +275,12 @@ class AuthenticationIntegrationTest {
         val refreshRequest = RefreshTokenRequest(refreshToken = "invalid-refresh-token")
 
         // When & Then
-        mockMvc.perform(
-            post("/api/users/refresh_token")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(refreshRequest))
-        )
-            .andExpect(status().isUnauthorized)
+        mockMvc
+            .perform(
+                post("/api/users/refresh_token")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(refreshRequest)),
+            ).andExpect(status().isUnauthorized)
     }
 
     // End-to-End Authentication Flow Test
@@ -271,33 +288,36 @@ class AuthenticationIntegrationTest {
     @Test
     fun `complete authentication flow should work correctly`() {
         // Step 1: Sign up
-        val signUpRequest = SignUpRequest(
-            email = testEmail,
-            name = testName,
-            password = testPassword
-        )
+        val signUpRequest =
+            SignUpRequest(
+                email = testEmail,
+                name = testName,
+                password = testPassword,
+            )
 
-        mockMvc.perform(
-            post("/api/users/sign_up")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(signUpRequest))
-        )
-            .andExpect(status().isCreated)
+        mockMvc
+            .perform(
+                post("/api/users/sign_up")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(signUpRequest)),
+            ).andExpect(status().isCreated)
             .andExpect(jsonPath("$.email").value(testEmail))
 
         // Step 2: Sign in
-        val signInRequest = SignInRequest(
-            email = testEmail,
-            password = testPassword
-        )
+        val signInRequest =
+            SignInRequest(
+                email = testEmail,
+                password = testPassword,
+            )
 
-        val signInResult = mockMvc.perform(
-            post("/api/users/sign_in")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(signInRequest))
-        )
-            .andExpect(status().isOk)
-            .andReturn()
+        val signInResult =
+            mockMvc
+                .perform(
+                    post("/api/users/sign_in")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(signInRequest)),
+                ).andExpect(status().isOk)
+                .andReturn()
 
         val signInResponse = objectMapper.readValue(signInResult.response.contentAsString, SignInResponse::class.java)
         val originalRefreshToken = signInResponse.refreshToken
@@ -305,13 +325,14 @@ class AuthenticationIntegrationTest {
         // Step 3: Refresh token
         val refreshRequest = RefreshTokenRequest(refreshToken = originalRefreshToken)
 
-        val refreshResult = mockMvc.perform(
-            post("/api/users/refresh_token")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(refreshRequest))
-        )
-            .andExpect(status().isOk)
-            .andReturn()
+        val refreshResult =
+            mockMvc
+                .perform(
+                    post("/api/users/refresh_token")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(refreshRequest)),
+                ).andExpect(status().isOk)
+                .andReturn()
 
         val refreshResponse = objectMapper.readValue(refreshResult.response.contentAsString, SignInResponse::class.java)
 
@@ -321,11 +342,11 @@ class AuthenticationIntegrationTest {
         assertNotNull(refreshResponse.authToken)
 
         // Step 4: Try to use old refresh token (should fail)
-        mockMvc.perform(
-            post("/api/users/refresh_token")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(refreshRequest))
-        )
-            .andExpect(status().isUnauthorized)
+        mockMvc
+            .perform(
+                post("/api/users/refresh_token")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(refreshRequest)),
+            ).andExpect(status().isUnauthorized)
     }
 }

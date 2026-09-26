@@ -20,22 +20,22 @@ class ReactiveSseService {
      * Multiple subscribers to the same budget will all receive the same events.
      */
     fun subscribeToEvents(budgetId: Long): Flux<BudgetEntryEvent> {
-        val sink = budgetSinks.computeIfAbsent(budgetId) {
-            // Create a multicast sink that can have multiple subscribers
-            Sinks.many().multicast().onBackpressureBuffer()
-        }
+        val sink =
+            budgetSinks.computeIfAbsent(budgetId) {
+                // Create a multicast sink that can have multiple subscribers
+                Sinks.many().multicast().onBackpressureBuffer()
+            }
 
         logger.info("New subscriber for budget: {}. Sink: {}", budgetId, sink)
 
-        return sink.asFlux()
+        return sink
+            .asFlux()
             .doOnSubscribe {
                 logger.info("Subscription started for budget: {}", budgetId)
-            }
-            .doOnCancel {
+            }.doOnCancel {
                 logger.info("Subscription cancelled for budget: {}", budgetId)
                 cleanupSinkIfNoSubscribers(budgetId)
-            }
-            .doOnTerminate {
+            }.doOnTerminate {
                 logger.info("Subscription terminated for budget: {}", budgetId)
                 cleanupSinkIfNoSubscribers(budgetId)
             }
@@ -45,7 +45,10 @@ class ReactiveSseService {
      * Broadcasts an event to all subscribers of the specified budget.
      * This method is thread-safe and can be called from any thread.
      */
-    fun broadcastEvent(budgetId: Long, event: BudgetEntryEvent) {
+    fun broadcastEvent(
+        budgetId: Long,
+        event: BudgetEntryEvent,
+    ) {
         val sink = budgetSinks[budgetId]
 
         if (sink == null) {
@@ -79,7 +82,5 @@ class ReactiveSseService {
     /**
      * Gets the count of active subscribers for a budget (useful for testing/monitoring)
      */
-    fun getSubscriberCount(budgetId: Long): Int {
-        return budgetSinks[budgetId]?.currentSubscriberCount() ?: 0
-    }
+    fun getSubscriberCount(budgetId: Long): Int = budgetSinks[budgetId]?.currentSubscriberCount() ?: 0
 }

@@ -11,19 +11,24 @@ import com.budgethunter.repository.UserRepository
 import com.budgethunter.util.GoogleTokenVerifier
 import com.budgethunter.util.GoogleUserInfo
 import com.budgethunter.util.JwtUtil
-import io.mockk.*
+import io.mockk.clearAllMocks
+import io.mockk.every
+import io.mockk.mockk
+import io.mockk.slot
+import io.mockk.verify
 import org.junit.jupiter.api.AfterEach
-import org.junit.jupiter.api.Assertions.*
+import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertFalse
+import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
 import org.springframework.security.authentication.BadCredentialsException
 import org.springframework.security.crypto.password.PasswordEncoder
 import java.time.Instant
-import java.util.*
+import java.util.Optional
 
 class UserServiceTest {
-
     private lateinit var userRepository: UserRepository
     private lateinit var passwordEncoder: PasswordEncoder
     private lateinit var jwtUtil: JwtUtil
@@ -49,17 +54,19 @@ class UserServiceTest {
     @Test
     fun `signUp should create new user successfully`() {
         // Given
-        val request = SignUpRequest(
-            email = "test@example.com",
-            name = "Test User",
-            password = "password123"
-        )
+        val request =
+            SignUpRequest(
+                email = "test@example.com",
+                name = "Test User",
+                password = "password123",
+            )
         val encodedPassword = "encodedPassword123"
-        val savedUser = User(
-            email = request.email,
-            name = request.name,
-            password = encodedPassword
-        )
+        val savedUser =
+            User(
+                email = request.email,
+                name = request.name,
+                password = encodedPassword,
+            )
 
         every { userRepository.existsByEmail(request.email) } returns false
         every { passwordEncoder.encode(request.password) } returns encodedPassword
@@ -80,18 +87,20 @@ class UserServiceTest {
     @Test
     fun `signUp should throw exception when email already exists`() {
         // Given
-        val request = SignUpRequest(
-            email = "existing@example.com",
-            name = "Test User",
-            password = "password123"
-        )
+        val request =
+            SignUpRequest(
+                email = "existing@example.com",
+                name = "Test User",
+                password = "password123",
+            )
 
         every { userRepository.existsByEmail(request.email) } returns true
 
         // When & Then
-        val exception = assertThrows<IllegalArgumentException> {
-            userService.signUp(request)
-        }
+        val exception =
+            assertThrows<IllegalArgumentException> {
+                userService.signUp(request)
+            }
 
         assertEquals("Email already exists", exception.message)
         verify(exactly = 1) { userRepository.existsByEmail(request.email) }
@@ -104,15 +113,17 @@ class UserServiceTest {
     @Test
     fun `signIn should authenticate user successfully`() {
         // Given
-        val request = SignInRequest(
-            email = "test@example.com",
-            password = "password123"
-        )
-        val user = User(
-            email = request.email,
-            name = "Test User",
-            password = "encodedPassword"
-        )
+        val request =
+            SignInRequest(
+                email = "test@example.com",
+                password = "password123",
+            )
+        val user =
+            User(
+                email = request.email,
+                name = "Test User",
+                password = "encodedPassword",
+            )
         val authToken = "jwt-auth-token"
         val refreshToken = "refresh-token-uuid"
         val refreshTokenExpiry = Instant.now().plusSeconds(604800)
@@ -144,17 +155,19 @@ class UserServiceTest {
     @Test
     fun `signIn should throw exception when user not found`() {
         // Given
-        val request = SignInRequest(
-            email = "nonexistent@example.com",
-            password = "password123"
-        )
+        val request =
+            SignInRequest(
+                email = "nonexistent@example.com",
+                password = "password123",
+            )
 
         every { userRepository.findById(request.email) } returns Optional.empty()
 
         // When & Then
-        val exception = assertThrows<BadCredentialsException> {
-            userService.signIn(request)
-        }
+        val exception =
+            assertThrows<BadCredentialsException> {
+                userService.signIn(request)
+            }
 
         assertEquals("Invalid email or password", exception.message)
         verify(exactly = 1) { userRepository.findById(request.email) }
@@ -164,23 +177,26 @@ class UserServiceTest {
     @Test
     fun `signIn should throw exception when password is incorrect`() {
         // Given
-        val request = SignInRequest(
-            email = "test@example.com",
-            password = "wrongpassword"
-        )
-        val user = User(
-            email = request.email,
-            name = "Test User",
-            password = "encodedPassword"
-        )
+        val request =
+            SignInRequest(
+                email = "test@example.com",
+                password = "wrongpassword",
+            )
+        val user =
+            User(
+                email = request.email,
+                name = "Test User",
+                password = "encodedPassword",
+            )
 
         every { userRepository.findById(request.email) } returns Optional.of(user)
         every { passwordEncoder.matches(request.password, user.password) } returns false
 
         // When & Then
-        val exception = assertThrows<BadCredentialsException> {
-            userService.signIn(request)
-        }
+        val exception =
+            assertThrows<BadCredentialsException> {
+                userService.signIn(request)
+            }
 
         assertEquals("Invalid email or password", exception.message)
         verify(exactly = 1) { userRepository.findById(request.email) }
@@ -195,13 +211,14 @@ class UserServiceTest {
         // Given
         val refreshToken = "valid-refresh-token"
         val request = RefreshTokenRequest(refreshToken = refreshToken)
-        val user = User(
-            email = "test@example.com",
-            name = "Test User",
-            password = "encodedPassword",
-            refreshToken = refreshToken,
-            refreshTokenExpiry = Instant.now().plusSeconds(3600)
-        )
+        val user =
+            User(
+                email = "test@example.com",
+                name = "Test User",
+                password = "encodedPassword",
+                refreshToken = refreshToken,
+                refreshTokenExpiry = Instant.now().plusSeconds(3600),
+            )
         val newAuthToken = "new-jwt-auth-token"
         val newRefreshToken = "new-refresh-token-uuid"
         val newRefreshTokenExpiry = Instant.now().plusSeconds(604800)
@@ -237,9 +254,10 @@ class UserServiceTest {
         every { userRepository.findByRefreshToken(refreshToken) } returns Optional.empty()
 
         // When & Then
-        val exception = assertThrows<BadCredentialsException> {
-            userService.refreshToken(request)
-        }
+        val exception =
+            assertThrows<BadCredentialsException> {
+                userService.refreshToken(request)
+            }
 
         assertEquals("Invalid refresh token", exception.message)
         verify(exactly = 1) { userRepository.findByRefreshToken(refreshToken) }
@@ -251,20 +269,22 @@ class UserServiceTest {
         // Given
         val refreshToken = "expired-refresh-token"
         val request = RefreshTokenRequest(refreshToken = refreshToken)
-        val user = User(
-            email = "test@example.com",
-            name = "Test User",
-            password = "encodedPassword",
-            refreshToken = refreshToken,
-            refreshTokenExpiry = Instant.now().minusSeconds(3600) // Expired 1 hour ago
-        )
+        val user =
+            User(
+                email = "test@example.com",
+                name = "Test User",
+                password = "encodedPassword",
+                refreshToken = refreshToken,
+                refreshTokenExpiry = Instant.now().minusSeconds(3600), // Expired 1 hour ago
+            )
 
         every { userRepository.findByRefreshToken(refreshToken) } returns Optional.of(user)
 
         // When & Then
-        val exception = assertThrows<BadCredentialsException> {
-            userService.refreshToken(request)
-        }
+        val exception =
+            assertThrows<BadCredentialsException> {
+                userService.refreshToken(request)
+            }
 
         assertEquals("Refresh token has expired", exception.message)
         verify(exactly = 1) { userRepository.findByRefreshToken(refreshToken) }
@@ -276,20 +296,22 @@ class UserServiceTest {
         // Given
         val refreshToken = "refresh-token-no-expiry"
         val request = RefreshTokenRequest(refreshToken = refreshToken)
-        val user = User(
-            email = "test@example.com",
-            name = "Test User",
-            password = "encodedPassword",
-            refreshToken = refreshToken,
-            refreshTokenExpiry = null
-        )
+        val user =
+            User(
+                email = "test@example.com",
+                name = "Test User",
+                password = "encodedPassword",
+                refreshToken = refreshToken,
+                refreshTokenExpiry = null,
+            )
 
         every { userRepository.findByRefreshToken(refreshToken) } returns Optional.of(user)
 
         // When & Then
-        val exception = assertThrows<BadCredentialsException> {
-            userService.refreshToken(request)
-        }
+        val exception =
+            assertThrows<BadCredentialsException> {
+                userService.refreshToken(request)
+            }
 
         assertEquals("Refresh token has expired", exception.message)
         verify(exactly = 1) { userRepository.findByRefreshToken(refreshToken) }
@@ -302,7 +324,7 @@ class UserServiceTest {
         subject: String = "google-sub-123",
         email: String = "test@example.com",
         emailVerified: Boolean = true,
-        name: String? = "Test User"
+        name: String? = "Test User",
     ) = GoogleUserInfo(subject, email, emailVerified, name)
 
     private fun stubSessionIssuing() {
@@ -340,12 +362,13 @@ class UserServiceTest {
     fun `signInWithGoogle should link an existing password account and keep its password`() {
         // Given
         val request = GoogleSignInRequest("id-token")
-        val existing = User(
-            email = "test@example.com",
-            name = "Existing User",
-            password = "encodedPassword",
-            authProvider = AuthProvider.PASSWORD
-        )
+        val existing =
+            User(
+                email = "test@example.com",
+                name = "Existing User",
+                password = "encodedPassword",
+                authProvider = AuthProvider.PASSWORD,
+            )
         every { googleTokenVerifier.verify(request.idToken) } returns googleInfo()
         every { userRepository.findByGoogleSubject("google-sub-123") } returns Optional.empty()
         every { userRepository.findById("test@example.com") } returns Optional.of(existing)
@@ -366,13 +389,14 @@ class UserServiceTest {
     fun `signInWithGoogle should match on the Google subject without rewriting a changed email`() {
         // Given - the account was created under an address the user has since changed
         val request = GoogleSignInRequest("id-token")
-        val existing = User(
-            email = "old@example.com",
-            name = "Test User",
-            password = null,
-            googleSubject = "google-sub-123",
-            authProvider = AuthProvider.GOOGLE
-        )
+        val existing =
+            User(
+                email = "old@example.com",
+                name = "Test User",
+                password = null,
+                googleSubject = "google-sub-123",
+                authProvider = AuthProvider.GOOGLE,
+            )
         every { googleTokenVerifier.verify(request.idToken) } returns googleInfo(email = "new@example.com")
         every { userRepository.findByGoogleSubject("google-sub-123") } returns Optional.of(existing)
         stubSessionIssuing()
@@ -445,13 +469,14 @@ class UserServiceTest {
     fun `signIn should reject a Google-only account instead of failing on a null password`() {
         // Given
         val request = SignInRequest(email = "test@example.com", password = "password123")
-        val googleOnlyUser = User(
-            email = request.email,
-            name = "Test User",
-            password = null,
-            googleSubject = "google-sub-123",
-            authProvider = AuthProvider.GOOGLE
-        )
+        val googleOnlyUser =
+            User(
+                email = request.email,
+                name = "Test User",
+                password = null,
+                googleSubject = "google-sub-123",
+                authProvider = AuthProvider.GOOGLE,
+            )
         every { userRepository.findById(request.email) } returns Optional.of(googleOnlyUser)
 
         // When / Then
@@ -464,13 +489,14 @@ class UserServiceTest {
     @Test
     fun `setPassword should not require a current password when the account has none`() {
         // Given - this is how an account created through Google gains a password
-        val user = User(
-            email = "test@example.com",
-            name = "Test User",
-            password = null,
-            googleSubject = "google-sub-123",
-            authProvider = AuthProvider.GOOGLE
-        )
+        val user =
+            User(
+                email = "test@example.com",
+                name = "Test User",
+                password = null,
+                googleSubject = "google-sub-123",
+                authProvider = AuthProvider.GOOGLE,
+            )
         every { userRepository.findById("test@example.com") } returns Optional.of(user)
         every { passwordEncoder.encode("newPassword") } returns "encodedNewPassword"
         every { userRepository.save(any()) } answers { firstArg() }
@@ -508,7 +534,7 @@ class UserServiceTest {
         assertThrows<BadCredentialsException> {
             userService.setPassword(
                 "test@example.com",
-                SetPasswordRequest(currentPassword = "wrongPassword", newPassword = "newPassword")
+                SetPasswordRequest(currentPassword = "wrongPassword", newPassword = "newPassword"),
             )
         }
         assertEquals("encodedPassword", user.password)
@@ -526,7 +552,7 @@ class UserServiceTest {
         // When
         userService.setPassword(
             "test@example.com",
-            SetPasswordRequest(currentPassword = "oldPassword", newPassword = "newPassword")
+            SetPasswordRequest(currentPassword = "oldPassword", newPassword = "newPassword"),
         )
 
         // Then
@@ -539,13 +565,14 @@ class UserServiceTest {
     @Test
     fun `getCurrentUser should report whether the account has a password`() {
         // Given
-        val user = User(
-            email = "test@example.com",
-            name = "Test User",
-            password = null,
-            googleSubject = "google-sub-123",
-            authProvider = AuthProvider.GOOGLE
-        )
+        val user =
+            User(
+                email = "test@example.com",
+                name = "Test User",
+                password = null,
+                googleSubject = "google-sub-123",
+                authProvider = AuthProvider.GOOGLE,
+            )
         every { userRepository.findById("test@example.com") } returns Optional.of(user)
 
         // When

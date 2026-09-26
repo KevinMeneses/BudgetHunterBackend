@@ -28,7 +28,6 @@ import java.util.concurrent.ConcurrentHashMap
  */
 @Configuration
 class RateLimitConfig {
-
     /**
      * Cache of buckets, one per client IP address
      * - Key: IP address (e.g., "192.168.1.1")
@@ -74,12 +73,13 @@ class RateLimitConfig {
         // This creates a bucket with:
         // - Capacity: 100 tokens (max burst size)
         // - Refill: 100 tokens per minute (continuous/greedy refill)
-        return Bucket.builder()
+        return Bucket
+            .builder()
             .addLimit { limit ->
-                limit.capacity(100)
+                limit
+                    .capacity(100)
                     .refillGreedy(100, Duration.ofMinutes(1))
-            }
-            .build()
+            }.build()
     }
 
     /**

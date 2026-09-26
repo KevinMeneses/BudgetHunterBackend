@@ -14,5 +14,5 @@ data class BudgetEntryResponse(
     val createdByEmail: String?,
     val updatedByEmail: String?,
     val creationDate: LocalDateTime,
-    val modificationDate: LocalDateTime
+    val modificationDate: LocalDateTime,
 )

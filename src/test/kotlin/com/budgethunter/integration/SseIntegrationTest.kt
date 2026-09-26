@@ -1,9 +1,18 @@
 package com.budgethunter.integration
 
-import com.budgethunter.dto.*
+import com.budgethunter.dto.AddCollaboratorRequest
+import com.budgethunter.dto.BudgetEntryResponse
+import com.budgethunter.dto.BudgetResponse
+import com.budgethunter.dto.CreateBudgetEntryRequest
+import com.budgethunter.dto.CreateBudgetRequest
+import com.budgethunter.dto.SignInRequest
+import com.budgethunter.dto.SignInResponse
+import com.budgethunter.dto.SignUpRequest
+import com.budgethunter.dto.UpdateBudgetEntryRequest
 import com.budgethunter.model.EntryType
 import com.fasterxml.jackson.databind.ObjectMapper
-import org.junit.jupiter.api.Assertions.*
+import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
@@ -11,7 +20,9 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.http.MediaType
 import org.springframework.test.web.servlet.MockMvc
-import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
 import org.springframework.transaction.annotation.Transactional
 import java.math.BigDecimal
@@ -20,7 +31,6 @@ import java.math.BigDecimal
 @AutoConfigureMockMvc
 @Transactional
 class SseIntegrationTest {
-
     @Autowired
     private lateinit var mockMvc: MockMvc
 
@@ -43,39 +53,48 @@ class SseIntegrationTest {
         budgetId = createTestBudget()
     }
 
-    private fun createAndAuthenticateUser(email: String, name: String, password: String): String {
+    private fun createAndAuthenticateUser(
+        email: String,
+        name: String,
+        password: String,
+    ): String {
         val signUpRequest = SignUpRequest(email = email, name = name, password = password)
 
         mockMvc.perform(
             post("/api/users/sign_up")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(signUpRequest))
+                .content(objectMapper.writeValueAsString(signUpRequest)),
         )
 
         val signInRequest = SignInRequest(email = email, password = password)
 
-        val result = mockMvc.perform(
-            post("/api/users/sign_in")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(signInRequest))
-        ).andReturn()
+        val result =
+            mockMvc
+                .perform(
+                    post("/api/users/sign_in")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(signInRequest)),
+                ).andReturn()
 
         val response = objectMapper.readValue(result.response.contentAsString, SignInResponse::class.java)
         return response.authToken
     }
 
     private fun createTestBudget(): Long {
-        val request = CreateBudgetRequest(
-            name = "SSE Test Budget",
-            amount = BigDecimal("1000.00")
-        )
+        val request =
+            CreateBudgetRequest(
+                name = "SSE Test Budget",
+                amount = BigDecimal("1000.00"),
+            )
 
-        val result = mockMvc.perform(
-            post("/api/budgets")
-                .header("Authorization", "Bearer $authToken")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(request))
-        ).andReturn()
+        val result =
+            mockMvc
+                .perform(
+                    post("/api/budgets")
+                        .header("Authorization", "Bearer $authToken")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)),
+                ).andReturn()
 
         val response = objectMapper.readValue(result.response.contentAsString, BudgetResponse::class.java)
         return response.id
@@ -86,21 +105,23 @@ class SseIntegrationTest {
     @Test
     fun `should receive SSE event when budget entry is created`() {
         // Create a budget entry which should trigger SSE event
-        val entryRequest = CreateBudgetEntryRequest(
-            amount = BigDecimal("100.00"),
-            description = "Test Entry",
-            category = "Test",
-            type = EntryType.OUTCOME
-        )
+        val entryRequest =
+            CreateBudgetEntryRequest(
+                amount = BigDecimal("100.00"),
+                description = "Test Entry",
+                category = "Test",
+                type = EntryType.OUTCOME,
+            )
 
-        val result = mockMvc.perform(
-            post("/api/budgets/${budgetId}/entries")
-                .header("Authorization", "Bearer $authToken")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(entryRequest))
-        )
-            .andExpect(status().isCreated)
-            .andReturn()
+        val result =
+            mockMvc
+                .perform(
+                    post("/api/budgets/$budgetId/entries")
+                        .header("Authorization", "Bearer $authToken")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(entryRequest)),
+                ).andExpect(status().isCreated)
+                .andReturn()
 
         // Verify the entry was created (SSE event would have been broadcast)
         val response = objectMapper.readValue(result.response.contentAsString, BudgetEntryResponse::class.java)
@@ -112,38 +133,43 @@ class SseIntegrationTest {
     @Test
     fun `should receive SSE event when budget entry is updated`() {
         // Given - Create an entry first
-        val createRequest = CreateBudgetEntryRequest(
-            amount = BigDecimal("100.00"),
-            description = "Original",
-            category = "Test",
-            type = EntryType.OUTCOME
-        )
+        val createRequest =
+            CreateBudgetEntryRequest(
+                amount = BigDecimal("100.00"),
+                description = "Original",
+                category = "Test",
+                type = EntryType.OUTCOME,
+            )
 
-        val createResult = mockMvc.perform(
-            post("/api/budgets/${budgetId}/entries")
-                .header("Authorization", "Bearer $authToken")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(createRequest))
-        ).andReturn()
+        val createResult =
+            mockMvc
+                .perform(
+                    post("/api/budgets/$budgetId/entries")
+                        .header("Authorization", "Bearer $authToken")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(createRequest)),
+                ).andReturn()
 
         val createdEntry = objectMapper.readValue(createResult.response.contentAsString, BudgetEntryResponse::class.java)
 
         // When - Update the entry (should trigger SSE event)
-        val updateRequest = UpdateBudgetEntryRequest(
-            amount = BigDecimal("200.00"),
-            description = "Updated",
-            category = "Updated",
-            type = EntryType.INCOME
-        )
+        val updateRequest =
+            UpdateBudgetEntryRequest(
+                amount = BigDecimal("200.00"),
+                description = "Updated",
+                category = "Updated",
+                type = EntryType.INCOME,
+            )
 
-        val updateResult = mockMvc.perform(
-            put("/api/budgets/${budgetId}/entries/${createdEntry.id}")
-                .header("Authorization", "Bearer $authToken")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(updateRequest))
-        )
-            .andExpect(status().isOk)
-            .andReturn()
+        val updateResult =
+            mockMvc
+                .perform(
+                    put("/api/budgets/$budgetId/entries/${createdEntry.id}")
+                        .header("Authorization", "Bearer $authToken")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(updateRequest)),
+                ).andExpect(status().isOk)
+                .andReturn()
 
         // Then - Verify the entry was updated
         val updated = objectMapper.readValue(updateResult.response.contentAsString, BudgetEntryResponse::class.java)
@@ -157,50 +183,55 @@ class SseIntegrationTest {
     fun `SSE events should be budget-scoped`() {
         // Given - Create two budgets
         val budget1Id = budgetId
-        val budget2Request = CreateBudgetRequest(
-            name = "Budget 2",
-            amount = BigDecimal("2000.00")
-        )
+        val budget2Request =
+            CreateBudgetRequest(
+                name = "Budget 2",
+                amount = BigDecimal("2000.00"),
+            )
 
-        val budget2Result = mockMvc.perform(
-            post("/api/budgets")
-                .header("Authorization", "Bearer $authToken")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(budget2Request))
-        ).andReturn()
+        val budget2Result =
+            mockMvc
+                .perform(
+                    post("/api/budgets")
+                        .header("Authorization", "Bearer $authToken")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(budget2Request)),
+                ).andReturn()
 
         val budget2 = objectMapper.readValue(budget2Result.response.contentAsString, BudgetResponse::class.java)
         val budget2Id = budget2.id
 
         // Create entries in both budgets (each would trigger budget-specific SSE events)
-        val entry1 = CreateBudgetEntryRequest(
-            amount = BigDecimal("50.00"),
-            description = "Budget 1 Entry",
-            category = "Cat1",
-            type = EntryType.OUTCOME
-        )
-        val entry2 = CreateBudgetEntryRequest(
-            amount = BigDecimal("100.00"),
-            description = "Budget 2 Entry",
-            category = "Cat2",
-            type = EntryType.OUTCOME
-        )
+        val entry1 =
+            CreateBudgetEntryRequest(
+                amount = BigDecimal("50.00"),
+                description = "Budget 1 Entry",
+                category = "Cat1",
+                type = EntryType.OUTCOME,
+            )
+        val entry2 =
+            CreateBudgetEntryRequest(
+                amount = BigDecimal("100.00"),
+                description = "Budget 2 Entry",
+                category = "Cat2",
+                type = EntryType.OUTCOME,
+            )
 
-        mockMvc.perform(
-            post("/api/budgets/${budget1Id}/entries")
-                .header("Authorization", "Bearer $authToken")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(entry1))
-        )
-            .andExpect(status().isCreated)
+        mockMvc
+            .perform(
+                post("/api/budgets/$budget1Id/entries")
+                    .header("Authorization", "Bearer $authToken")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(entry1)),
+            ).andExpect(status().isCreated)
 
-        mockMvc.perform(
-            post("/api/budgets/${budget2Id}/entries")
-                .header("Authorization", "Bearer $authToken")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(entry2))
-        )
-            .andExpect(status().isCreated)
+        mockMvc
+            .perform(
+                post("/api/budgets/$budget2Id/entries")
+                    .header("Authorization", "Bearer $authToken")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(entry2)),
+            ).andExpect(status().isCreated)
     }
 
     // Collaborative SSE Test
@@ -212,72 +243,80 @@ class SseIntegrationTest {
         val user1Email = userEmail
 
         val user2Email = "collaborator@example.com"
-        val user2Token = createAndAuthenticateUser(
-            user2Email,
-            "Collaborator",
-            "Password123!"
-        )
+        val user2Token =
+            createAndAuthenticateUser(
+                user2Email,
+                "Collaborator",
+                "Password123!",
+            )
 
         // Add user2 as collaborator
-        val addCollaboratorRequest = AddCollaboratorRequest(
-            budgetId = budgetId,
-            email = user2Email
-        )
+        val addCollaboratorRequest =
+            AddCollaboratorRequest(
+                budgetId = budgetId,
+                email = user2Email,
+            )
 
         mockMvc.perform(
-            post("/api/budgets/${budgetId}/collaborators")
+            post("/api/budgets/$budgetId/collaborators")
                 .header("Authorization", "Bearer $user1Token")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(addCollaboratorRequest))
+                .content(objectMapper.writeValueAsString(addCollaboratorRequest)),
         )
 
         // When - User 1 creates an entry
-        val entryRequest = CreateBudgetEntryRequest(
-            amount = BigDecimal("75.00"),
-            description = "User 1 Entry",
-            category = "Food",
-            type = EntryType.OUTCOME
-        )
+        val entryRequest =
+            CreateBudgetEntryRequest(
+                amount = BigDecimal("75.00"),
+                description = "User 1 Entry",
+                category = "Food",
+                type = EntryType.OUTCOME,
+            )
 
-        val result = mockMvc.perform(
-            post("/api/budgets/${budgetId}/entries")
-                .header("Authorization", "Bearer $user1Token")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(entryRequest))
-        )
-            .andExpect(status().isCreated)
-            .andReturn()
+        val result =
+            mockMvc
+                .perform(
+                    post("/api/budgets/$budgetId/entries")
+                        .header("Authorization", "Bearer $user1Token")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(entryRequest)),
+                ).andExpect(status().isCreated)
+                .andReturn()
 
         // Then - Verify entry was created (both users would receive SSE event)
         val response = objectMapper.readValue(result.response.contentAsString, BudgetEntryResponse::class.java)
         assertEquals(user1Email, response.createdByEmail)
 
         // When - User 2 creates an entry
-        val entry2Request = CreateBudgetEntryRequest(
-            amount = BigDecimal("125.00"),
-            description = "User 2 Entry",
-            category = "Transport",
-            type = EntryType.OUTCOME
-        )
+        val entry2Request =
+            CreateBudgetEntryRequest(
+                amount = BigDecimal("125.00"),
+                description = "User 2 Entry",
+                category = "Transport",
+                type = EntryType.OUTCOME,
+            )
 
-        val result2 = mockMvc.perform(
-            post("/api/budgets/${budgetId}/entries")
-                .header("Authorization", "Bearer $user2Token")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(entry2Request))
-        )
-            .andExpect(status().isCreated)
-            .andReturn()
+        val result2 =
+            mockMvc
+                .perform(
+                    post("/api/budgets/$budgetId/entries")
+                        .header("Authorization", "Bearer $user2Token")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(entry2Request)),
+                ).andExpect(status().isCreated)
+                .andReturn()
 
         // Then - Verify entry was created (both users would receive SSE event)
         val response2 = objectMapper.readValue(result2.response.contentAsString, BudgetEntryResponse::class.java)
         assertEquals(user2Email, response2.createdByEmail)
 
         // Verify both entries exist
-        val entriesResult = mockMvc.perform(
-            get("/api/budgets/${budgetId}/entries")
-                .header("Authorization", "Bearer $user1Token")
-        ).andReturn()
+        val entriesResult =
+            mockMvc
+                .perform(
+                    get("/api/budgets/$budgetId/entries")
+                        .header("Authorization", "Bearer $user1Token"),
+                ).andReturn()
 
         val entries = objectMapper.readValue(entriesResult.response.contentAsString, Array<BudgetEntryResponse>::class.java)
         assertEquals(2, entries.size)

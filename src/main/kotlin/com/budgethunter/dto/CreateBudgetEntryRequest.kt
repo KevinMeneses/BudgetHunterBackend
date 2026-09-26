@@ -8,13 +8,10 @@ import java.math.BigDecimal
 data class CreateBudgetEntryRequest(
     @field:NotNull(message = "Amount is required")
     val amount: BigDecimal,
-
     @field:NotBlank(message = "Description is required")
     val description: String,
-
     @field:NotBlank(message = "Category is required")
     val category: String,
-
     @field:NotNull(message = "Entry type is required")
-    val type: EntryType
+    val type: EntryType,
 )

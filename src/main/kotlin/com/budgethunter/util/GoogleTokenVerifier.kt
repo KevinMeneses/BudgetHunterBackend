@@ -16,7 +16,7 @@ data class GoogleUserInfo(
     val subject: String,
     val email: String,
     val emailVerified: Boolean,
-    val name: String?
+    val name: String?,
 )
 
 /**
@@ -39,9 +39,8 @@ class GoogleIdTokenVerifierAdapter(
      * *web* client id into `aud` (we pass it as `serverClientId`), while the iOS SDK stamps the
      * *iOS* client id, so this has to accept more than one value.
      */
-    @Value("\${google.auth.client-ids:}") private val clientIds: List<String>
+    @Value("\${google.auth.client-ids:}") private val clientIds: List<String>,
 ) : GoogleTokenVerifier {
-
     private val logger = LoggerFactory.getLogger(GoogleIdTokenVerifierAdapter::class.java)
 
     // internal so a test can assert what Spring actually bound: the value arrives as one
@@ -49,7 +48,8 @@ class GoogleIdTokenVerifierAdapter(
     internal val audiences: List<String> get() = clientIds.map(String::trim).filter(String::isNotEmpty)
 
     private val verifier: GoogleIdTokenVerifier by lazy {
-        GoogleIdTokenVerifier.Builder(NetHttpTransport(), GsonFactory.getDefaultInstance())
+        GoogleIdTokenVerifier
+            .Builder(NetHttpTransport(), GsonFactory.getDefaultInstance())
             .setAudience(audiences)
             .build()
     }
@@ -64,18 +64,19 @@ class GoogleIdTokenVerifierAdapter(
 
         // verify() returns null for a token we reject and throws for one we cannot even parse.
         // Both mean the same thing to the caller, so collapse them into one 401.
-        val payload = try {
-            verifier.verify(idToken)?.payload
-        } catch (e: Exception) {
-            logger.warn("Could not verify the Google ID token: ${e.message}")
-            throw BadCredentialsException("Invalid Google ID token")
-        } ?: throw BadCredentialsException("Invalid Google ID token")
+        val payload =
+            try {
+                verifier.verify(idToken)?.payload
+            } catch (e: Exception) {
+                logger.warn("Could not verify the Google ID token: ${e.message}")
+                throw BadCredentialsException("Invalid Google ID token")
+            } ?: throw BadCredentialsException("Invalid Google ID token")
 
         return GoogleUserInfo(
             subject = payload.subject,
             email = payload.email,
             emailVerified = payload.emailVerified == true,
-            name = payload["name"] as? String
+            name = payload["name"] as? String,
         )
     }
 }

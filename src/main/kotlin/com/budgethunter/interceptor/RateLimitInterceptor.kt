@@ -33,9 +33,8 @@ import org.springframework.web.servlet.HandlerInterceptor
  */
 @Component
 class RateLimitInterceptor(
-    private val rateLimitConfig: RateLimitConfig
+    private val rateLimitConfig: RateLimitConfig,
 ) : HandlerInterceptor {
-
     private val logger = LoggerFactory.getLogger(RateLimitInterceptor::class.java)
 
     /**
@@ -49,7 +48,7 @@ class RateLimitInterceptor(
     override fun preHandle(
         request: HttpServletRequest,
         response: HttpServletResponse,
-        handler: Any
+        handler: Any,
     ): Boolean {
         // STEP 1: Identify the client by IP address
         val clientIp = getClientIp(request)
@@ -76,7 +75,7 @@ class RateLimitInterceptor(
             // nanosToWait / 1_000_000_000 converts nanoseconds to seconds
             response.addHeader(
                 "X-Rate-Limit-Retry-After-Seconds",
-                (probe.nanosToWaitForRefill / 1_000_000_000).toString()
+                (probe.nanosToWaitForRefill / 1_000_000_000).toString(),
             )
 
             logger.debug("Rate limit check passed for IP: $clientIp (${probe.remainingTokens} tokens remaining)")
@@ -93,13 +92,15 @@ class RateLimitInterceptor(
 
             // Set response body with helpful error message
             response.contentType = "application/json"
-            response.writer.write("""
+            response.writer.write(
+                """
                 {
                     "error": "Too Many Requests",
                     "message": "You have exceeded the rate limit. Please try again in ${probe.nanosToWaitForRefill / 1_000_000_000} seconds.",
                     "status": 429
                 }
-            """.trimIndent())
+                """.trimIndent(),
+            )
 
             logger.warn("Rate limit exceeded for IP: $clientIp (retry after ${probe.nanosToWaitForRefill / 1_000_000_000}s)")
 

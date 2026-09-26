@@ -4,16 +4,16 @@ data class BudgetEntryEvent(
     val budgetId: Long,
     val entryId: Long,
     val action: BudgetEntryAction,
-    val userInfo: UserEventInfo
+    val userInfo: UserEventInfo,
 )
 
 enum class BudgetEntryAction {
     CREATED,
     UPDATED,
-    DELETED
+    DELETED,
 }
 
 data class UserEventInfo(
     val email: String,
-    val name: String
+    val name: String,
 )

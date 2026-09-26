@@ -10,5 +10,5 @@ package com.budgethunter.model
 enum class AuthProvider {
     PASSWORD,
     GOOGLE,
-    PASSWORD_AND_GOOGLE
+    PASSWORD_AND_GOOGLE,
 }

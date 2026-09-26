@@ -10,18 +10,23 @@ import com.budgethunter.dto.SignUpRequest
 import com.budgethunter.dto.UserResponse
 import com.budgethunter.model.AuthProvider
 import com.budgethunter.service.UserService
-import io.mockk.*
+import io.mockk.Runs
+import io.mockk.clearAllMocks
+import io.mockk.every
+import io.mockk.just
+import io.mockk.mockk
+import io.mockk.verify
 import org.junit.jupiter.api.AfterEach
-import org.junit.jupiter.api.Assertions.*
+import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
-import org.springframework.http.HttpStatus
 import org.junit.jupiter.api.assertThrows
+import org.springframework.http.HttpStatus
 import org.springframework.security.authentication.BadCredentialsException
 import org.springframework.security.core.Authentication
 
 class UserControllerTest {
-
     private lateinit var userService: UserService
     private lateinit var userController: UserController
 
@@ -41,15 +46,17 @@ class UserControllerTest {
     @Test
     fun `signUp should return created status with user response`() {
         // Given
-        val request = SignUpRequest(
-            email = "test@example.com",
-            name = "Test User",
-            password = "password123"
-        )
-        val expectedResponse = UserResponse(
-            email = request.email,
-            name = request.name
-        )
+        val request =
+            SignUpRequest(
+                email = "test@example.com",
+                name = "Test User",
+                password = "password123",
+            )
+        val expectedResponse =
+            UserResponse(
+                email = request.email,
+                name = request.name,
+            )
 
         every { userService.signUp(request) } returns expectedResponse
 
@@ -65,18 +72,20 @@ class UserControllerTest {
     @Test
     fun `signUp should propagate exception from service`() {
         // Given
-        val request = SignUpRequest(
-            email = "existing@example.com",
-            name = "Test User",
-            password = "password123"
-        )
+        val request =
+            SignUpRequest(
+                email = "existing@example.com",
+                name = "Test User",
+                password = "password123",
+            )
 
         every { userService.signUp(request) } throws IllegalArgumentException("Email already exists")
 
         // When & Then
-        val exception = org.junit.jupiter.api.assertThrows<IllegalArgumentException> {
-            userController.signUp(request)
-        }
+        val exception =
+            org.junit.jupiter.api.assertThrows<IllegalArgumentException> {
+                userController.signUp(request)
+            }
 
         assertEquals("Email already exists", exception.message)
         verify(exactly = 1) { userService.signUp(request) }
@@ -87,16 +96,18 @@ class UserControllerTest {
     @Test
     fun `signIn should return ok status with sign in response`() {
         // Given
-        val request = SignInRequest(
-            email = "test@example.com",
-            password = "password123"
-        )
-        val expectedResponse = SignInResponse(
-            authToken = "jwt-token",
-            refreshToken = "refresh-token",
-            email = request.email,
-            name = "Test User"
-        )
+        val request =
+            SignInRequest(
+                email = "test@example.com",
+                password = "password123",
+            )
+        val expectedResponse =
+            SignInResponse(
+                authToken = "jwt-token",
+                refreshToken = "refresh-token",
+                email = request.email,
+                name = "Test User",
+            )
 
         every { userService.signIn(request) } returns expectedResponse
 
@@ -114,17 +125,19 @@ class UserControllerTest {
     @Test
     fun `signIn should propagate BadCredentialsException from service`() {
         // Given
-        val request = SignInRequest(
-            email = "test@example.com",
-            password = "wrongpassword"
-        )
+        val request =
+            SignInRequest(
+                email = "test@example.com",
+                password = "wrongpassword",
+            )
 
         every { userService.signIn(request) } throws BadCredentialsException("Invalid email or password")
 
         // When & Then
-        val exception = org.junit.jupiter.api.assertThrows<BadCredentialsException> {
-            userController.signIn(request)
-        }
+        val exception =
+            org.junit.jupiter.api.assertThrows<BadCredentialsException> {
+                userController.signIn(request)
+            }
 
         assertEquals("Invalid email or password", exception.message)
         verify(exactly = 1) { userService.signIn(request) }
@@ -136,12 +149,13 @@ class UserControllerTest {
     fun `refreshToken should return ok status with new tokens`() {
         // Given
         val request = RefreshTokenRequest(refreshToken = "valid-refresh-token")
-        val expectedResponse = SignInResponse(
-            authToken = "new-jwt-token",
-            refreshToken = "new-refresh-token",
-            email = "test@example.com",
-            name = "Test User"
-        )
+        val expectedResponse =
+            SignInResponse(
+                authToken = "new-jwt-token",
+                refreshToken = "new-refresh-token",
+                email = "test@example.com",
+                name = "Test User",
+            )
 
         every { userService.refreshToken(request) } returns expectedResponse
 
@@ -164,9 +178,10 @@ class UserControllerTest {
         every { userService.refreshToken(request) } throws BadCredentialsException("Invalid refresh token")
 
         // When & Then
-        val exception = org.junit.jupiter.api.assertThrows<BadCredentialsException> {
-            userController.refreshToken(request)
-        }
+        val exception =
+            org.junit.jupiter.api.assertThrows<BadCredentialsException> {
+                userController.refreshToken(request)
+            }
 
         assertEquals("Invalid refresh token", exception.message)
         verify(exactly = 1) { userService.refreshToken(request) }
@@ -180,9 +195,10 @@ class UserControllerTest {
         every { userService.refreshToken(request) } throws BadCredentialsException("Refresh token has expired")
 
         // When & Then
-        val exception = org.junit.jupiter.api.assertThrows<BadCredentialsException> {
-            userController.refreshToken(request)
-        }
+        val exception =
+            org.junit.jupiter.api.assertThrows<BadCredentialsException> {
+                userController.refreshToken(request)
+            }
 
         assertEquals("Refresh token has expired", exception.message)
         verify(exactly = 1) { userService.refreshToken(request) }
@@ -193,15 +209,17 @@ class UserControllerTest {
     @Test
     fun `signUp and signIn flow should work correctly`() {
         // Given - Sign up a new user
-        val signUpRequest = SignUpRequest(
-            email = "newuser@example.com",
-            name = "New User",
-            password = "password123"
-        )
-        val userResponse = UserResponse(
-            email = signUpRequest.email,
-            name = signUpRequest.name
-        )
+        val signUpRequest =
+            SignUpRequest(
+                email = "newuser@example.com",
+                name = "New User",
+                password = "password123",
+            )
+        val userResponse =
+            UserResponse(
+                email = signUpRequest.email,
+                name = signUpRequest.name,
+            )
 
         every { userService.signUp(signUpRequest) } returns userResponse
 
@@ -213,16 +231,18 @@ class UserControllerTest {
         assertEquals(signUpRequest.email, signUpResponse.body?.email)
 
         // Given - Sign in with the new user
-        val signInRequest = SignInRequest(
-            email = signUpRequest.email,
-            password = signUpRequest.password
-        )
-        val signInResponse = SignInResponse(
-            authToken = "jwt-token",
-            refreshToken = "refresh-token",
-            email = signUpRequest.email,
-            name = signUpRequest.name
-        )
+        val signInRequest =
+            SignInRequest(
+                email = signUpRequest.email,
+                password = signUpRequest.password,
+            )
+        val signInResponse =
+            SignInResponse(
+                authToken = "jwt-token",
+                refreshToken = "refresh-token",
+                email = signUpRequest.email,
+                name = signUpRequest.name,
+            )
 
         every { userService.signIn(signInRequest) } returns signInResponse
 
@@ -240,19 +260,19 @@ class UserControllerTest {
 
     // Google Sign-In Tests
 
-    private fun authenticationFor(email: String): Authentication =
-        mockk<Authentication>().also { every { it.principal } returns email }
+    private fun authenticationFor(email: String): Authentication = mockk<Authentication>().also { every { it.principal } returns email }
 
     @Test
     fun `signInWithGoogle should return ok with the session`() {
         // Given
         val request = GoogleSignInRequest(idToken = "google-id-token")
-        val expectedResponse = SignInResponse(
-            authToken = "authToken",
-            refreshToken = "refreshToken",
-            email = "test@example.com",
-            name = "Test User"
-        )
+        val expectedResponse =
+            SignInResponse(
+                authToken = "authToken",
+                refreshToken = "refreshToken",
+                email = "test@example.com",
+                name = "Test User",
+            )
 
         every { userService.signInWithGoogle(request) } returns expectedResponse
 
@@ -282,12 +302,13 @@ class UserControllerTest {
     @Test
     fun `getCurrentUser should return the authenticated user`() {
         // Given
-        val expectedResponse = CurrentUserResponse(
-            email = "test@example.com",
-            name = "Test User",
-            hasPassword = false,
-            authProvider = AuthProvider.GOOGLE
-        )
+        val expectedResponse =
+            CurrentUserResponse(
+                email = "test@example.com",
+                name = "Test User",
+                hasPassword = false,
+                authProvider = AuthProvider.GOOGLE,
+            )
 
         every { userService.getCurrentUser("test@example.com") } returns expectedResponse
 

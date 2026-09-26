@@ -7,7 +7,6 @@ import java.math.BigDecimal
 data class UpdateBudgetRequest(
     @field:NotBlank(message = "Budget name is required")
     val name: String,
-
     @field:PositiveOrZero(message = "Budget amount must be zero or positive")
-    val amount: BigDecimal
+    val amount: BigDecimal,
 )

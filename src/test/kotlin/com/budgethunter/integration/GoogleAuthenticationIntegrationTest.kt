@@ -10,7 +10,11 @@ import com.budgethunter.repository.UserRepository
 import com.budgethunter.util.GoogleTokenVerifier
 import com.budgethunter.util.GoogleUserInfo
 import com.fasterxml.jackson.databind.ObjectMapper
-import org.junit.jupiter.api.Assertions.*
+import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertFalse
+import org.junit.jupiter.api.Assertions.assertNotNull
+import org.junit.jupiter.api.Assertions.assertNull
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
@@ -23,8 +27,10 @@ import org.springframework.context.annotation.Primary
 import org.springframework.http.MediaType
 import org.springframework.security.authentication.BadCredentialsException
 import org.springframework.test.web.servlet.MockMvc
-import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*
-import org.springframework.test.web.servlet.result.MockMvcResultMatchers.*
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
+import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath
+import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
 import org.springframework.transaction.annotation.Transactional
 
 /**
@@ -37,8 +43,7 @@ import org.springframework.transaction.annotation.Transactional
 class StubGoogleTokenVerifier : GoogleTokenVerifier {
     var next: GoogleUserInfo? = null
 
-    override fun verify(idToken: String): GoogleUserInfo =
-        next ?: throw BadCredentialsException("Invalid Google ID token")
+    override fun verify(idToken: String): GoogleUserInfo = next ?: throw BadCredentialsException("Invalid Google ID token")
 }
 
 @TestConfiguration
@@ -53,7 +58,6 @@ class StubGoogleTokenVerifierConfig {
 @Import(StubGoogleTokenVerifierConfig::class)
 @Transactional
 class GoogleAuthenticationIntegrationTest {
-
     @Autowired
     private lateinit var mockMvc: MockMvc
 
@@ -72,28 +76,30 @@ class GoogleAuthenticationIntegrationTest {
 
     @BeforeEach
     fun setup() {
-        googleTokenVerifier.next = GoogleUserInfo(
-            subject = "google-subject-integration",
-            email = testEmail,
-            emailVerified = true,
-            name = testName
-        )
+        googleTokenVerifier.next =
+            GoogleUserInfo(
+                subject = "google-subject-integration",
+                email = testEmail,
+                emailVerified = true,
+                name = testName,
+            )
     }
 
     private fun signInWithGoogle(idToken: String = "stub-id-token") =
         mockMvc.perform(
             post("/api/users/sign_in_with_google")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(GoogleSignInRequest(idToken)))
+                .content(objectMapper.writeValueAsString(GoogleSignInRequest(idToken))),
         )
 
     @Test
     fun `should create an account and return a usable session on first Google sign in`() {
-        val result = signInWithGoogle()
-            .andExpect(status().isOk)
-            .andExpect(jsonPath("$.email").value(testEmail))
-            .andExpect(jsonPath("$.name").value(testName))
-            .andReturn()
+        val result =
+            signInWithGoogle()
+                .andExpect(status().isOk)
+                .andExpect(jsonPath("$.email").value(testEmail))
+                .andExpect(jsonPath("$.name").value(testName))
+                .andReturn()
 
         val response = objectMapper.readValue(result.response.contentAsString, SignInResponse::class.java)
         assertTrue(response.authToken.isNotBlank())
@@ -110,18 +116,20 @@ class GoogleAuthenticationIntegrationTest {
         val result = signInWithGoogle().andExpect(status().isOk).andReturn()
         val response = objectMapper.readValue(result.response.contentAsString, SignInResponse::class.java)
 
-        mockMvc.perform(
-            get("/api/budgets").header("Authorization", "Bearer ${response.authToken}")
-        ).andExpect(status().isOk)
+        mockMvc
+            .perform(
+                get("/api/budgets").header("Authorization", "Bearer ${response.authToken}"),
+            ).andExpect(status().isOk)
     }
 
     @Test
     fun `should link a Google sign in to an existing password account with the same email`() {
-        mockMvc.perform(
-            post("/api/users/sign_up")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(SignUpRequest(testEmail, testName, testPassword)))
-        ).andExpect(status().isCreated)
+        mockMvc
+            .perform(
+                post("/api/users/sign_up")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(SignUpRequest(testEmail, testName, testPassword))),
+            ).andExpect(status().isCreated)
 
         signInWithGoogle().andExpect(status().isOk).andExpect(jsonPath("$.email").value(testEmail))
 
@@ -130,11 +138,12 @@ class GoogleAuthenticationIntegrationTest {
         assertNotNull(user.password, "linking must not wipe the existing password")
 
         // The password still works, so the user has not been locked out of either route.
-        mockMvc.perform(
-            post("/api/users/sign_in")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(SignInRequest(testEmail, testPassword)))
-        ).andExpect(status().isOk)
+        mockMvc
+            .perform(
+                post("/api/users/sign_in")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(SignInRequest(testEmail, testPassword))),
+            ).andExpect(status().isOk)
     }
 
     @Test
@@ -143,18 +152,20 @@ class GoogleAuthenticationIntegrationTest {
         val response = objectMapper.readValue(result.response.contentAsString, SignInResponse::class.java)
 
         // No current password is required: the account never had one.
-        mockMvc.perform(
-            post("/api/users/password")
-                .header("Authorization", "Bearer ${response.authToken}")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(SetPasswordRequest(newPassword = testPassword)))
-        ).andExpect(status().isNoContent)
+        mockMvc
+            .perform(
+                post("/api/users/password")
+                    .header("Authorization", "Bearer ${response.authToken}")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(SetPasswordRequest(newPassword = testPassword))),
+            ).andExpect(status().isNoContent)
 
-        mockMvc.perform(
-            post("/api/users/sign_in")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(SignInRequest(testEmail, testPassword)))
-        ).andExpect(status().isOk)
+        mockMvc
+            .perform(
+                post("/api/users/sign_in")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(SignInRequest(testEmail, testPassword))),
+            ).andExpect(status().isOk)
 
         val user = userRepository.findById(testEmail).orElseThrow()
         assertEquals(AuthProvider.PASSWORD_AND_GOOGLE, user.authProvider)
@@ -165,7 +176,8 @@ class GoogleAuthenticationIntegrationTest {
         val result = signInWithGoogle().andExpect(status().isOk).andReturn()
         val response = objectMapper.readValue(result.response.contentAsString, SignInResponse::class.java)
 
-        mockMvc.perform(get("/api/users/me").header("Authorization", "Bearer ${response.authToken}"))
+        mockMvc
+            .perform(get("/api/users/me").header("Authorization", "Bearer ${response.authToken}"))
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.email").value(testEmail))
             .andExpect(jsonPath("$.hasPassword").value(false))
@@ -174,12 +186,13 @@ class GoogleAuthenticationIntegrationTest {
 
     @Test
     fun `should reject a Google sign in when the email is not verified`() {
-        googleTokenVerifier.next = GoogleUserInfo(
-            subject = "google-subject-integration",
-            email = testEmail,
-            emailVerified = false,
-            name = testName
-        )
+        googleTokenVerifier.next =
+            GoogleUserInfo(
+                subject = "google-subject-integration",
+                email = testEmail,
+                emailVerified = false,
+                name = testName,
+            )
 
         signInWithGoogle().andExpect(status().isUnauthorized)
         assertFalse(userRepository.existsByEmail(testEmail))
@@ -201,10 +214,11 @@ class GoogleAuthenticationIntegrationTest {
     fun `should require authentication to read the current user or set a password`() {
         mockMvc.perform(get("/api/users/me")).andExpect(status().isUnauthorized)
 
-        mockMvc.perform(
-            post("/api/users/password")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(SetPasswordRequest(newPassword = testPassword)))
-        ).andExpect(status().isUnauthorized)
+        mockMvc
+            .perform(
+                post("/api/users/password")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(SetPasswordRequest(newPassword = testPassword))),
+            ).andExpect(status().isUnauthorized)
     }
 }

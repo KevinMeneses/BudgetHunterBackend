@@ -20,26 +20,26 @@ import org.springframework.web.servlet.ModelAndView
  */
 @Component
 class RequestLoggingInterceptor : HandlerInterceptor {
-
     private val logger = LoggerFactory.getLogger(RequestLoggingInterceptor::class.java)
 
     companion object {
         private const val START_TIME_ATTR = "startTime"
 
         // Endpoints to skip logging (noisy endpoints)
-        private val SKIP_LOGGING = setOf(
-            "/actuator/health",
-            "/actuator/health/liveness",
-            "/actuator/health/readiness",
-            "/swagger-ui",
-            "/v3/api-docs"
-        )
+        private val SKIP_LOGGING =
+            setOf(
+                "/actuator/health",
+                "/actuator/health/liveness",
+                "/actuator/health/readiness",
+                "/swagger-ui",
+                "/v3/api-docs",
+            )
     }
 
     override fun preHandle(
         request: HttpServletRequest,
         response: HttpServletResponse,
-        handler: Any
+        handler: Any,
     ): Boolean {
         // Skip logging for health checks and documentation endpoints
         if (shouldSkipLogging(request.requestURI)) {
@@ -64,7 +64,7 @@ class RequestLoggingInterceptor : HandlerInterceptor {
         request: HttpServletRequest,
         response: HttpServletResponse,
         handler: Any,
-        modelAndView: ModelAndView?
+        modelAndView: ModelAndView?,
     ) {
         // Not used - we log in afterCompletion to include exception handling
     }
@@ -73,7 +73,7 @@ class RequestLoggingInterceptor : HandlerInterceptor {
         request: HttpServletRequest,
         response: HttpServletResponse,
         handler: Any,
-        ex: Exception?
+        ex: Exception?,
     ) {
         // Skip logging for health checks and documentation endpoints
         if (shouldSkipLogging(request.requestURI)) {
@@ -90,7 +90,10 @@ class RequestLoggingInterceptor : HandlerInterceptor {
 
         // Log response with duration
         if (ex != null) {
-            logger.error("← Response: $method $uri | Status: $status | Duration: ${duration}ms | User: $userEmail | Error: ${ex.message}", ex)
+            logger.error(
+                "← Response: $method $uri | Status: $status | Duration: ${duration}ms | User: $userEmail | Error: ${ex.message}",
+                ex,
+            )
         } else if (status >= 400) {
             logger.warn("← Response: $method $uri | Status: $status | Duration: ${duration}ms | User: $userEmail")
         } else {
@@ -98,7 +101,5 @@ class RequestLoggingInterceptor : HandlerInterceptor {
         }
     }
 
-    private fun shouldSkipLogging(uri: String): Boolean {
-        return SKIP_LOGGING.any { uri.startsWith(it) }
-    }
+    private fun shouldSkipLogging(uri: String): Boolean = SKIP_LOGGING.any { uri.startsWith(it) }
 }

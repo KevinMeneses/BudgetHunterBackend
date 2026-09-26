@@ -8,6 +8,8 @@ import java.util.Optional
 @Repository
 interface UserRepository : JpaRepository<User, String> {
     fun existsByEmail(email: String): Boolean
+
     fun findByRefreshToken(refreshToken: String): Optional<User>
+
     fun findByGoogleSubject(googleSubject: String): Optional<User>
 }

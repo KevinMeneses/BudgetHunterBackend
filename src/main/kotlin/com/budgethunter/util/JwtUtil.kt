@@ -6,12 +6,12 @@ import io.jsonwebtoken.security.Keys
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.stereotype.Component
 import java.time.Instant
-import java.util.*
+import java.util.Date
+import java.util.UUID
 import javax.crypto.SecretKey
 
 @Component
 class JwtUtil {
-
     @Value("\${jwt.secret:budgethunter-secret-key-for-jwt-token-generation-minimum-256-bits}")
     private lateinit var secret: String
 
@@ -21,15 +21,14 @@ class JwtUtil {
     @Value("\${jwt.refresh.expiration:604800000}") // 7 days in milliseconds
     private var refreshExpiration: Long = 604800000
 
-    private fun getSigningKey(): SecretKey {
-        return Keys.hmacShaKeyFor(secret.toByteArray())
-    }
+    private fun getSigningKey(): SecretKey = Keys.hmacShaKeyFor(secret.toByteArray())
 
     fun generateToken(email: String): String {
         val now = Date()
         val expiryDate = Date(now.time + expiration)
 
-        return Jwts.builder()
+        return Jwts
+            .builder()
             .subject(email)
             .issuedAt(now)
             .expiration(expiryDate)
@@ -37,32 +36,27 @@ class JwtUtil {
             .compact()
     }
 
-    fun generateRefreshToken(): String {
-        return UUID.randomUUID().toString()
-    }
+    fun generateRefreshToken(): String = UUID.randomUUID().toString()
 
-    fun getRefreshTokenExpiry(): Instant {
-        return Instant.now().plusMillis(refreshExpiration)
-    }
+    fun getRefreshTokenExpiry(): Instant = Instant.now().plusMillis(refreshExpiration)
 
-    fun extractEmail(token: String): String {
-        return extractClaims(token).subject
-    }
+    fun extractEmail(token: String): String = extractClaims(token).subject
 
-    fun isTokenValid(token: String, email: String): Boolean {
+    fun isTokenValid(
+        token: String,
+        email: String,
+    ): Boolean {
         val extractedEmail = extractEmail(token)
         return extractedEmail == email && !isTokenExpired(token)
     }
 
-    private fun extractClaims(token: String): Claims {
-        return Jwts.parser()
+    private fun extractClaims(token: String): Claims =
+        Jwts
+            .parser()
             .verifyWith(getSigningKey())
             .build()
             .parseSignedClaims(token)
             .payload
-    }
 
-    private fun isTokenExpired(token: String): Boolean {
-        return extractClaims(token).expiration.before(Date())
-    }
+    private fun isTokenExpired(token: String): Boolean = extractClaims(token).expiration.before(Date())
 }

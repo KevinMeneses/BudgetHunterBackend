@@ -32,9 +32,8 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer
 class WebMvcConfig(
     private val rateLimitInterceptor: RateLimitInterceptor,
     private val requestLoggingInterceptor: RequestLoggingInterceptor,
-    private val environment: org.springframework.core.env.Environment
+    private val environment: org.springframework.core.env.Environment,
 ) : WebMvcConfigurer {
-
     /**
      * Register interceptors to be called for incoming requests
      *
@@ -43,7 +42,8 @@ class WebMvcConfig(
     override fun addInterceptors(registry: InterceptorRegistry) {
         // REQUEST LOGGING: Log all incoming requests and responses
         // This runs BEFORE rate limiting so we can see rate-limited requests in logs
-        registry.addInterceptor(requestLoggingInterceptor)
+        registry
+            .addInterceptor(requestLoggingInterceptor)
             .addPathPatterns("/**")
 
         // RATE LIMITING: Enabled ONLY in production
@@ -56,7 +56,8 @@ class WebMvcConfig(
         val isProductionProfile = environment.activeProfiles.contains("production")
 
         if (isProductionProfile) {
-            registry.addInterceptor(rateLimitInterceptor)
+            registry
+                .addInterceptor(rateLimitInterceptor)
                 // Apply rate limiting to ALL API endpoints
                 .addPathPatterns("/api/**")
 

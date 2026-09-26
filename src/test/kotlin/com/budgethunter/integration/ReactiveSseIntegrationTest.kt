@@ -1,10 +1,21 @@
 package com.budgethunter.integration
 
-import com.budgethunter.dto.*
+import com.budgethunter.dto.AddCollaboratorRequest
+import com.budgethunter.dto.BudgetEntryAction
+import com.budgethunter.dto.BudgetEntryEvent
+import com.budgethunter.dto.BudgetEntryResponse
+import com.budgethunter.dto.BudgetResponse
+import com.budgethunter.dto.CreateBudgetEntryRequest
+import com.budgethunter.dto.CreateBudgetRequest
+import com.budgethunter.dto.SignInRequest
+import com.budgethunter.dto.SignInResponse
+import com.budgethunter.dto.SignUpRequest
+import com.budgethunter.dto.UpdateBudgetEntryRequest
 import com.budgethunter.model.EntryType
 import com.budgethunter.service.ReactiveSseService
 import com.fasterxml.jackson.databind.ObjectMapper
-import org.junit.jupiter.api.Assertions.*
+import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
@@ -33,7 +44,6 @@ import java.math.BigDecimal
 @AutoConfigureMockMvc
 @Transactional
 class ReactiveSseIntegrationTest {
-
     @Autowired
     private lateinit var mockMvc: MockMvc
 
@@ -56,39 +66,48 @@ class ReactiveSseIntegrationTest {
         budgetId = createTestBudget()
     }
 
-    private fun createAndAuthenticateUser(email: String, name: String, password: String): String {
+    private fun createAndAuthenticateUser(
+        email: String,
+        name: String,
+        password: String,
+    ): String {
         val signUpRequest = SignUpRequest(email = email, name = name, password = password)
 
         mockMvc.perform(
             post("/api/users/sign_up")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(signUpRequest))
+                .content(objectMapper.writeValueAsString(signUpRequest)),
         )
 
         val signInRequest = SignInRequest(email = email, password = password)
 
-        val result = mockMvc.perform(
-            post("/api/users/sign_in")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(signInRequest))
-        ).andReturn()
+        val result =
+            mockMvc
+                .perform(
+                    post("/api/users/sign_in")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(signInRequest)),
+                ).andReturn()
 
         val response = objectMapper.readValue(result.response.contentAsString, SignInResponse::class.java)
         return response.authToken
     }
 
     private fun createTestBudget(): Long {
-        val request = CreateBudgetRequest(
-            name = "Reactive SSE Test Budget",
-            amount = BigDecimal("1000.00")
-        )
+        val request =
+            CreateBudgetRequest(
+                name = "Reactive SSE Test Budget",
+                amount = BigDecimal("1000.00"),
+            )
 
-        val result = mockMvc.perform(
-            post("/api/budgets")
-                .header("Authorization", "Bearer $authToken")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(request))
-        ).andReturn()
+        val result =
+            mockMvc
+                .perform(
+                    post("/api/budgets")
+                        .header("Authorization", "Bearer $authToken")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)),
+                ).andReturn()
 
         val response = objectMapper.readValue(result.response.contentAsString, BudgetResponse::class.java)
         return response.id
@@ -128,25 +147,28 @@ class ReactiveSseIntegrationTest {
     fun `should receive SSE event when budget entry is created`() {
         // Given - Subscribe to events for this budget
         val receivedEvents = mutableListOf<BudgetEntryEvent>()
-        val subscription = reactiveSseService.subscribeToEvents(budgetId)
-            .subscribe { event -> receivedEvents.add(event) }
+        val subscription =
+            reactiveSseService
+                .subscribeToEvents(budgetId)
+                .subscribe { event -> receivedEvents.add(event) }
 
         // Wait for subscription to be ready
         Thread.sleep(100)
 
         // When - Create a budget entry
-        val entryRequest = CreateBudgetEntryRequest(
-            amount = BigDecimal("150.00"),
-            description = "Test Entry",
-            category = "Food",
-            type = EntryType.OUTCOME
-        )
+        val entryRequest =
+            CreateBudgetEntryRequest(
+                amount = BigDecimal("150.00"),
+                description = "Test Entry",
+                category = "Food",
+                type = EntryType.OUTCOME,
+            )
 
         mockMvc.perform(
-            post("/api/budgets/${budgetId}/entries")
+            post("/api/budgets/$budgetId/entries")
                 .header("Authorization", "Bearer $authToken")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(entryRequest))
+                .content(objectMapper.writeValueAsString(entryRequest)),
         )
 
         // Wait for event to be broadcasted
@@ -170,42 +192,48 @@ class ReactiveSseIntegrationTest {
     @Test
     fun `should receive SSE event when budget entry is updated`() {
         // Given - Create an initial entry
-        val createRequest = CreateBudgetEntryRequest(
-            amount = BigDecimal("100.00"),
-            description = "Initial Entry",
-            category = "Transport",
-            type = EntryType.OUTCOME
-        )
+        val createRequest =
+            CreateBudgetEntryRequest(
+                amount = BigDecimal("100.00"),
+                description = "Initial Entry",
+                category = "Transport",
+                type = EntryType.OUTCOME,
+            )
 
-        val createResult = mockMvc.perform(
-            post("/api/budgets/${budgetId}/entries")
-                .header("Authorization", "Bearer $authToken")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(createRequest))
-        ).andReturn()
+        val createResult =
+            mockMvc
+                .perform(
+                    post("/api/budgets/$budgetId/entries")
+                        .header("Authorization", "Bearer $authToken")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(createRequest)),
+                ).andReturn()
 
         val createdEntry = objectMapper.readValue(createResult.response.contentAsString, BudgetEntryResponse::class.java)
 
         // And - Subscribe to events
         val receivedEvents = mutableListOf<BudgetEntryEvent>()
-        val subscription = reactiveSseService.subscribeToEvents(budgetId)
-            .subscribe { event -> receivedEvents.add(event) }
+        val subscription =
+            reactiveSseService
+                .subscribeToEvents(budgetId)
+                .subscribe { event -> receivedEvents.add(event) }
 
         Thread.sleep(100)
 
         // When - Update the entry
-        val updateRequest = UpdateBudgetEntryRequest(
-            amount = BigDecimal("250.00"),
-            description = "Updated Entry",
-            category = "Transport",
-            type = EntryType.OUTCOME
-        )
+        val updateRequest =
+            UpdateBudgetEntryRequest(
+                amount = BigDecimal("250.00"),
+                description = "Updated Entry",
+                category = "Transport",
+                type = EntryType.OUTCOME,
+            )
 
         mockMvc.perform(
-            put("/api/budgets/${budgetId}/entries/${createdEntry.id}")
+            put("/api/budgets/$budgetId/entries/${createdEntry.id}")
                 .header("Authorization", "Bearer $authToken")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(updateRequest))
+                .content(objectMapper.writeValueAsString(updateRequest)),
         )
 
         Thread.sleep(200)
@@ -228,55 +256,63 @@ class ReactiveSseIntegrationTest {
     fun `should broadcast events only to subscribers of correct budget`() {
         // Given - Two budgets
         val budget2Request = CreateBudgetRequest(name = "Budget 2", amount = BigDecimal("2000.00"))
-        val budget2Result = mockMvc.perform(
-            post("/api/budgets")
-                .header("Authorization", "Bearer $authToken")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(budget2Request))
-        ).andReturn()
+        val budget2Result =
+            mockMvc
+                .perform(
+                    post("/api/budgets")
+                        .header("Authorization", "Bearer $authToken")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(budget2Request)),
+                ).andReturn()
         val budget2 = objectMapper.readValue(budget2Result.response.contentAsString, BudgetResponse::class.java)
 
         // And - Subscribe to events for both budgets
         val budget1Events = mutableListOf<BudgetEntryEvent>()
         val budget2Events = mutableListOf<BudgetEntryEvent>()
 
-        val subscription1 = reactiveSseService.subscribeToEvents(budgetId)
-            .subscribe { event -> budget1Events.add(event) }
-        val subscription2 = reactiveSseService.subscribeToEvents(budget2.id)
-            .subscribe { event -> budget2Events.add(event) }
+        val subscription1 =
+            reactiveSseService
+                .subscribeToEvents(budgetId)
+                .subscribe { event -> budget1Events.add(event) }
+        val subscription2 =
+            reactiveSseService
+                .subscribeToEvents(budget2.id)
+                .subscribe { event -> budget2Events.add(event) }
 
         Thread.sleep(100)
 
         // When - Create entry in budget 1
-        val entry1 = CreateBudgetEntryRequest(
-            amount = BigDecimal("100.00"),
-            description = "Budget 1 Entry",
-            category = "Cat1",
-            type = EntryType.OUTCOME
-        )
+        val entry1 =
+            CreateBudgetEntryRequest(
+                amount = BigDecimal("100.00"),
+                description = "Budget 1 Entry",
+                category = "Cat1",
+                type = EntryType.OUTCOME,
+            )
 
         mockMvc.perform(
-            post("/api/budgets/${budgetId}/entries")
+            post("/api/budgets/$budgetId/entries")
                 .header("Authorization", "Bearer $authToken")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(entry1))
+                .content(objectMapper.writeValueAsString(entry1)),
         )
 
         Thread.sleep(200)
 
         // And - Create entry in budget 2
-        val entry2 = CreateBudgetEntryRequest(
-            amount = BigDecimal("200.00"),
-            description = "Budget 2 Entry",
-            category = "Cat2",
-            type = EntryType.OUTCOME
-        )
+        val entry2 =
+            CreateBudgetEntryRequest(
+                amount = BigDecimal("200.00"),
+                description = "Budget 2 Entry",
+                category = "Cat2",
+                type = EntryType.OUTCOME,
+            )
 
         mockMvc.perform(
             post("/api/budgets/${budget2.id}/entries")
                 .header("Authorization", "Bearer $authToken")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(entry2))
+                .content(objectMapper.writeValueAsString(entry2)),
         )
 
         Thread.sleep(200)
@@ -304,47 +340,51 @@ class ReactiveSseIntegrationTest {
         val user2Token = createAndAuthenticateUser(user2Email, user2Name, userPassword)
 
         mockMvc.perform(
-            post("/api/budgets/${budgetId}/collaborators")
+            post("/api/budgets/$budgetId/collaborators")
                 .header("Authorization", "Bearer $authToken")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(AddCollaboratorRequest(budgetId, user2Email)))
+                .content(objectMapper.writeValueAsString(AddCollaboratorRequest(budgetId, user2Email))),
         )
 
         // And - Subscribe to events (simulating both users listening)
         val receivedEvents = mutableListOf<BudgetEntryEvent>()
-        val subscription = reactiveSseService.subscribeToEvents(budgetId)
-            .subscribe { event -> receivedEvents.add(event) }
+        val subscription =
+            reactiveSseService
+                .subscribeToEvents(budgetId)
+                .subscribe { event -> receivedEvents.add(event) }
 
         Thread.sleep(100)
 
         // When - User 1 creates an entry
-        val entry1 = CreateBudgetEntryRequest(
-            amount = BigDecimal("50.00"),
-            description = "User 1 Entry",
-            category = "Food",
-            type = EntryType.OUTCOME
-        )
+        val entry1 =
+            CreateBudgetEntryRequest(
+                amount = BigDecimal("50.00"),
+                description = "User 1 Entry",
+                category = "Food",
+                type = EntryType.OUTCOME,
+            )
         mockMvc.perform(
-            post("/api/budgets/${budgetId}/entries")
+            post("/api/budgets/$budgetId/entries")
                 .header("Authorization", "Bearer $authToken")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(entry1))
+                .content(objectMapper.writeValueAsString(entry1)),
         )
 
         Thread.sleep(200)
 
         // And - User 2 creates an entry
-        val entry2 = CreateBudgetEntryRequest(
-            amount = BigDecimal("75.00"),
-            description = "User 2 Entry",
-            category = "Transport",
-            type = EntryType.OUTCOME
-        )
+        val entry2 =
+            CreateBudgetEntryRequest(
+                amount = BigDecimal("75.00"),
+                description = "User 2 Entry",
+                category = "Transport",
+                type = EntryType.OUTCOME,
+            )
         mockMvc.perform(
-            post("/api/budgets/${budgetId}/entries")
+            post("/api/budgets/$budgetId/entries")
                 .header("Authorization", "Bearer $user2Token")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(entry2))
+                .content(objectMapper.writeValueAsString(entry2)),
         )
 
         Thread.sleep(200)
@@ -377,12 +417,18 @@ class ReactiveSseIntegrationTest {
         val subscriber2Events = mutableListOf<BudgetEntryEvent>()
         val subscriber3Events = mutableListOf<BudgetEntryEvent>()
 
-        val subscription1 = reactiveSseService.subscribeToEvents(budgetId)
-            .subscribe { event -> subscriber1Events.add(event) }
-        val subscription2 = reactiveSseService.subscribeToEvents(budgetId)
-            .subscribe { event -> subscriber2Events.add(event) }
-        val subscription3 = reactiveSseService.subscribeToEvents(budgetId)
-            .subscribe { event -> subscriber3Events.add(event) }
+        val subscription1 =
+            reactiveSseService
+                .subscribeToEvents(budgetId)
+                .subscribe { event -> subscriber1Events.add(event) }
+        val subscription2 =
+            reactiveSseService
+                .subscribeToEvents(budgetId)
+                .subscribe { event -> subscriber2Events.add(event) }
+        val subscription3 =
+            reactiveSseService
+                .subscribeToEvents(budgetId)
+                .subscribe { event -> subscriber3Events.add(event) }
 
         Thread.sleep(100)
 
@@ -390,18 +436,19 @@ class ReactiveSseIntegrationTest {
         assertEquals(3, reactiveSseService.getSubscriberCount(budgetId))
 
         // When - A single entry is created
-        val entryRequest = CreateBudgetEntryRequest(
-            amount = BigDecimal("999.99"),
-            description = "Multicast Test",
-            category = "Test",
-            type = EntryType.INCOME
-        )
+        val entryRequest =
+            CreateBudgetEntryRequest(
+                amount = BigDecimal("999.99"),
+                description = "Multicast Test",
+                category = "Test",
+                type = EntryType.INCOME,
+            )
 
         mockMvc.perform(
-            post("/api/budgets/${budgetId}/entries")
+            post("/api/budgets/$budgetId/entries")
                 .header("Authorization", "Bearer $authToken")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(entryRequest))
+                .content(objectMapper.writeValueAsString(entryRequest)),
         )
 
         Thread.sleep(200)

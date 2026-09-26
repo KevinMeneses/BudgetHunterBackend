@@ -10,12 +10,16 @@ import org.springframework.stereotype.Repository
 
 @Repository
 interface BudgetEntryRepository : JpaRepository<BudgetEntry, Long> {
-
     @Query("SELECT be FROM BudgetEntry be WHERE be.budget.id = :budgetId ORDER BY be.modificationDate DESC")
-    fun findByBudgetId(@Param("budgetId") budgetId: Long): List<BudgetEntry>
+    fun findByBudgetId(
+        @Param("budgetId") budgetId: Long,
+    ): List<BudgetEntry>
 
     @Query("SELECT be FROM BudgetEntry be WHERE be.budget.id = :budgetId")
-    fun findByBudgetId(@Param("budgetId") budgetId: Long, pageable: Pageable): Page<BudgetEntry>
+    fun findByBudgetId(
+        @Param("budgetId") budgetId: Long,
+        pageable: Pageable,
+    ): Page<BudgetEntry>
 
     fun deleteByBudgetId(budgetId: Long)
 }
