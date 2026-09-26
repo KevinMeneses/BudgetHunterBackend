@@ -10,13 +10,19 @@ import com.budgethunter.dto.SignUpRequest
 import com.budgethunter.dto.UserResponse
 import com.budgethunter.model.AuthProvider
 import com.budgethunter.service.UserService
-import io.mockk.*
+import io.mockk.Runs
+import io.mockk.clearAllMocks
+import io.mockk.every
+import io.mockk.just
+import io.mockk.mockk
+import io.mockk.verify
 import org.junit.jupiter.api.AfterEach
-import org.junit.jupiter.api.Assertions.*
+import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
-import org.springframework.http.HttpStatus
 import org.junit.jupiter.api.assertThrows
+import org.springframework.http.HttpStatus
 import org.springframework.security.authentication.BadCredentialsException
 import org.springframework.security.core.Authentication
 
@@ -44,11 +50,11 @@ class UserControllerTest {
         val request = SignUpRequest(
             email = "test@example.com",
             name = "Test User",
-            password = "password123"
+            password = "password123",
         )
         val expectedResponse = UserResponse(
             email = request.email,
-            name = request.name
+            name = request.name,
         )
 
         every { userService.signUp(request) } returns expectedResponse
@@ -68,7 +74,7 @@ class UserControllerTest {
         val request = SignUpRequest(
             email = "existing@example.com",
             name = "Test User",
-            password = "password123"
+            password = "password123",
         )
 
         every { userService.signUp(request) } throws IllegalArgumentException("Email already exists")
@@ -89,13 +95,13 @@ class UserControllerTest {
         // Given
         val request = SignInRequest(
             email = "test@example.com",
-            password = "password123"
+            password = "password123",
         )
         val expectedResponse = SignInResponse(
             authToken = "jwt-token",
             refreshToken = "refresh-token",
             email = request.email,
-            name = "Test User"
+            name = "Test User",
         )
 
         every { userService.signIn(request) } returns expectedResponse
@@ -116,7 +122,7 @@ class UserControllerTest {
         // Given
         val request = SignInRequest(
             email = "test@example.com",
-            password = "wrongpassword"
+            password = "wrongpassword",
         )
 
         every { userService.signIn(request) } throws BadCredentialsException("Invalid email or password")
@@ -140,7 +146,7 @@ class UserControllerTest {
             authToken = "new-jwt-token",
             refreshToken = "new-refresh-token",
             email = "test@example.com",
-            name = "Test User"
+            name = "Test User",
         )
 
         every { userService.refreshToken(request) } returns expectedResponse
@@ -196,11 +202,11 @@ class UserControllerTest {
         val signUpRequest = SignUpRequest(
             email = "newuser@example.com",
             name = "New User",
-            password = "password123"
+            password = "password123",
         )
         val userResponse = UserResponse(
             email = signUpRequest.email,
-            name = signUpRequest.name
+            name = signUpRequest.name,
         )
 
         every { userService.signUp(signUpRequest) } returns userResponse
@@ -215,13 +221,13 @@ class UserControllerTest {
         // Given - Sign in with the new user
         val signInRequest = SignInRequest(
             email = signUpRequest.email,
-            password = signUpRequest.password
+            password = signUpRequest.password,
         )
         val signInResponse = SignInResponse(
             authToken = "jwt-token",
             refreshToken = "refresh-token",
             email = signUpRequest.email,
-            name = signUpRequest.name
+            name = signUpRequest.name,
         )
 
         every { userService.signIn(signInRequest) } returns signInResponse
@@ -240,8 +246,7 @@ class UserControllerTest {
 
     // Google Sign-In Tests
 
-    private fun authenticationFor(email: String): Authentication =
-        mockk<Authentication>().also { every { it.principal } returns email }
+    private fun authenticationFor(email: String): Authentication = mockk<Authentication>().also { every { it.principal } returns email }
 
     @Test
     fun `signInWithGoogle should return ok with the session`() {
@@ -251,7 +256,7 @@ class UserControllerTest {
             authToken = "authToken",
             refreshToken = "refreshToken",
             email = "test@example.com",
-            name = "Test User"
+            name = "Test User",
         )
 
         every { userService.signInWithGoogle(request) } returns expectedResponse
@@ -286,7 +291,7 @@ class UserControllerTest {
             email = "test@example.com",
             name = "Test User",
             hasPassword = false,
-            authProvider = AuthProvider.GOOGLE
+            authProvider = AuthProvider.GOOGLE,
         )
 
         every { userService.getCurrentUser("test@example.com") } returns expectedResponse

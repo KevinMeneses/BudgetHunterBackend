@@ -79,7 +79,5 @@ class ReactiveSseService {
     /**
      * Gets the count of active subscribers for a budget (useful for testing/monitoring)
      */
-    fun getSubscriberCount(budgetId: Long): Int {
-        return budgetSinks[budgetId]?.currentSubscriberCount() ?: 0
-    }
+    fun getSubscriberCount(budgetId: Long): Int = budgetSinks[budgetId]?.currentSubscriberCount() ?: 0
 }

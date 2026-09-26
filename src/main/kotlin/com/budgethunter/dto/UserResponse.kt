@@ -6,7 +6,4 @@ package com.budgethunter.dto
  * Deliberately carries nothing about how the account authenticates; that belongs to
  * [CurrentUserResponse], which only ever describes the caller themselves.
  */
-data class UserResponse(
-    val email: String,
-    val name: String
-)
+data class UserResponse(val email: String, val name: String)

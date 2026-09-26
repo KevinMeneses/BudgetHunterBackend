@@ -32,7 +32,7 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer
 class WebMvcConfig(
     private val rateLimitInterceptor: RateLimitInterceptor,
     private val requestLoggingInterceptor: RequestLoggingInterceptor,
-    private val environment: org.springframework.core.env.Environment
+    private val environment: org.springframework.core.env.Environment,
 ) : WebMvcConfigurer {
 
     /**

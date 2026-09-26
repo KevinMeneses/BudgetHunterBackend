@@ -1,12 +1,31 @@
 package com.budgethunter.controller
 
-import com.budgethunter.dto.*
+import com.budgethunter.dto.AddCollaboratorRequest
+import com.budgethunter.dto.BudgetEntryAction
+import com.budgethunter.dto.BudgetEntryEvent
+import com.budgethunter.dto.BudgetEntryResponse
+import com.budgethunter.dto.BudgetResponse
+import com.budgethunter.dto.CollaboratorResponse
+import com.budgethunter.dto.CreateBudgetEntryRequest
+import com.budgethunter.dto.CreateBudgetRequest
+import com.budgethunter.dto.UpdateBudgetEntryRequest
+import com.budgethunter.dto.UpdateBudgetRequest
+import com.budgethunter.dto.UserEventInfo
+import com.budgethunter.dto.UserResponse
 import com.budgethunter.model.EntryType
 import com.budgethunter.service.BudgetService
 import com.budgethunter.service.ReactiveSseService
-import io.mockk.*
+import io.mockk.Runs
+import io.mockk.clearAllMocks
+import io.mockk.every
+import io.mockk.just
+import io.mockk.mockk
+import io.mockk.verify
 import org.junit.jupiter.api.AfterEach
-import org.junit.jupiter.api.Assertions.*
+import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertNotNull
+import org.junit.jupiter.api.Assertions.assertNull
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.springframework.http.HttpStatus
@@ -28,7 +47,7 @@ class BudgetControllerTest {
     private val testUserEmail = "test@example.com"
 
     /** Window used to collect what a stream emits before the 15s heartbeat repeats. */
-    private val COLLECT_WINDOW: Duration = Duration.ofMillis(500)
+    private val collectWindow: Duration = Duration.ofMillis(500)
 
     @BeforeEach
     fun setup() {
@@ -53,12 +72,12 @@ class BudgetControllerTest {
         // Given
         val request = CreateBudgetRequest(
             name = "Monthly Budget",
-            amount = BigDecimal("2500.00")
+            amount = BigDecimal("2500.00"),
         )
         val expectedResponse = BudgetResponse(
             id = 1L,
             name = request.name,
-            amount = request.amount
+            amount = request.amount,
         )
 
         every { budgetService.createBudget(request, testUserEmail) } returns expectedResponse
@@ -79,7 +98,7 @@ class BudgetControllerTest {
         // Given
         val request = CreateBudgetRequest(
             name = "Test Budget",
-            amount = BigDecimal("1000.00")
+            amount = BigDecimal("1000.00"),
         )
 
         every { budgetService.createBudget(request, testUserEmail) } throws IllegalArgumentException("User not found")
@@ -100,7 +119,7 @@ class BudgetControllerTest {
         // Given
         val expectedBudgets = listOf(
             BudgetResponse(id = 1L, name = "Budget 1", amount = BigDecimal("1000.00")),
-            BudgetResponse(id = 2L, name = "Budget 2", amount = BigDecimal("2000.00"))
+            BudgetResponse(id = 2L, name = "Budget 2", amount = BigDecimal("2000.00")),
         )
 
         every { budgetService.getBudgetsByUserEmail(testUserEmail) } returns expectedBudgets
@@ -142,12 +161,12 @@ class BudgetControllerTest {
         val budgetId = 1L
         val request = UpdateBudgetRequest(
             name = "Updated Budget Name",
-            amount = BigDecimal("3500.00")
+            amount = BigDecimal("3500.00"),
         )
         val expectedResponse = BudgetResponse(
             id = budgetId,
             name = request.name,
-            amount = request.amount
+            amount = request.amount,
         )
 
         every { budgetService.updateBudget(budgetId, request, testUserEmail) } returns expectedResponse
@@ -171,7 +190,7 @@ class BudgetControllerTest {
         val budgetId = 999L
         val request = UpdateBudgetRequest(
             name = "Updated Budget",
-            amount = BigDecimal("2000.00")
+            amount = BigDecimal("2000.00"),
         )
 
         every { budgetService.updateBudget(budgetId, request, testUserEmail) } throws
@@ -192,7 +211,7 @@ class BudgetControllerTest {
         val budgetId = 1L
         val request = UpdateBudgetRequest(
             name = "Updated Budget",
-            amount = BigDecimal("2000.00")
+            amount = BigDecimal("2000.00"),
         )
 
         every { budgetService.updateBudget(budgetId, request, testUserEmail) } throws
@@ -215,13 +234,13 @@ class BudgetControllerTest {
         val budgetId = 1L
         val request = AddCollaboratorRequest(
             budgetId = budgetId,
-            email = "collaborator@example.com"
+            email = "collaborator@example.com",
         )
         val expectedResponse = CollaboratorResponse(
             budgetId = budgetId,
             budgetName = "Test Budget",
             collaboratorEmail = request.email,
-            collaboratorName = "Collaborator User"
+            collaboratorName = "Collaborator User",
         )
 
         every { budgetService.addCollaborator(budgetId, request, testUserEmail) } returns expectedResponse
@@ -241,7 +260,7 @@ class BudgetControllerTest {
         // Given
         val request = AddCollaboratorRequest(
             budgetId = 1L,
-            email = "collaborator@example.com"
+            email = "collaborator@example.com",
         )
 
         every { budgetService.addCollaborator(1L, request, testUserEmail) } throws
@@ -262,7 +281,7 @@ class BudgetControllerTest {
         val budgetId = 1L
         val request = AddCollaboratorRequest(
             budgetId = budgetId,
-            email = "existing@example.com"
+            email = "existing@example.com",
         )
 
         every { budgetService.addCollaborator(budgetId, request, testUserEmail) } throws
@@ -285,7 +304,7 @@ class BudgetControllerTest {
         val budgetId = 1L
         val expectedCollaborators = listOf(
             UserResponse(email = "user1@example.com", name = "User 1"),
-            UserResponse(email = "user2@example.com", name = "User 2")
+            UserResponse(email = "user2@example.com", name = "User 2"),
         )
 
         every { budgetService.getCollaboratorsByBudgetId(budgetId, testUserEmail) } returns expectedCollaborators
@@ -335,7 +354,7 @@ class BudgetControllerTest {
                 createdByEmail = testUserEmail,
                 updatedByEmail = null,
                 creationDate = now,
-                modificationDate = now
+                modificationDate = now,
             ),
             BudgetEntryResponse(
                 id = 2L,
@@ -347,8 +366,8 @@ class BudgetControllerTest {
                 createdByEmail = testUserEmail,
                 updatedByEmail = null,
                 creationDate = now,
-                modificationDate = now
-            )
+                modificationDate = now,
+            ),
         )
 
         every { budgetService.getEntriesByBudgetId(budgetId, testUserEmail) } returns expectedEntries
@@ -411,7 +430,7 @@ class BudgetControllerTest {
             amount = BigDecimal("150.00"),
             description = "Groceries",
             category = "Food",
-            type = EntryType.OUTCOME
+            type = EntryType.OUTCOME,
         )
         val now = LocalDateTime.now()
         val expectedResponse = BudgetEntryResponse(
@@ -424,7 +443,7 @@ class BudgetControllerTest {
             createdByEmail = testUserEmail,
             updatedByEmail = null,
             creationDate = now,
-            modificationDate = now
+            modificationDate = now,
         )
 
         every { budgetService.createEntry(budgetId, request, testUserEmail) } returns expectedResponse
@@ -448,7 +467,7 @@ class BudgetControllerTest {
             amount = BigDecimal("100.00"),
             description = "Test",
             category = "Test",
-            type = EntryType.OUTCOME
+            type = EntryType.OUTCOME,
         )
 
         every { budgetService.createEntry(budgetId, request, testUserEmail) } throws
@@ -474,7 +493,7 @@ class BudgetControllerTest {
             amount = BigDecimal("200.00"),
             description = "Updated Groceries",
             category = "Food",
-            type = EntryType.OUTCOME
+            type = EntryType.OUTCOME,
         )
         val now = LocalDateTime.now()
         val expectedResponse = BudgetEntryResponse(
@@ -487,7 +506,7 @@ class BudgetControllerTest {
             createdByEmail = testUserEmail,
             updatedByEmail = testUserEmail,
             creationDate = now.minusDays(1),
-            modificationDate = now
+            modificationDate = now,
         )
 
         every { budgetService.updateEntry(budgetId, entryId, request, testUserEmail) } returns expectedResponse
@@ -512,7 +531,7 @@ class BudgetControllerTest {
             amount = BigDecimal("100.00"),
             description = "Test",
             category = "Test",
-            type = EntryType.OUTCOME
+            type = EntryType.OUTCOME,
         )
 
         every { budgetService.updateEntry(budgetId, entryId, request, testUserEmail) } throws
@@ -536,7 +555,7 @@ class BudgetControllerTest {
             amount = BigDecimal("100.00"),
             description = "Test",
             category = "Test",
-            type = EntryType.OUTCOME
+            type = EntryType.OUTCOME,
         )
 
         every { budgetService.updateEntry(budgetId, entryId, request, testUserEmail) } throws
@@ -560,7 +579,7 @@ class BudgetControllerTest {
             amount = BigDecimal("100.00"),
             description = "Test",
             category = "Test",
-            type = EntryType.OUTCOME
+            type = EntryType.OUTCOME,
         )
 
         every { budgetService.updateEntry(budgetId, entryId, request, testUserEmail) } throws
@@ -638,13 +657,13 @@ class BudgetControllerTest {
 
         // When
         val flux = budgetController.streamEntries(budgetId, authentication, MockHttpServletResponse())
-        val emitted = flux.take(COLLECT_WINDOW).collectList().block()!!
+        val emitted = flux.take(collectWindow).collectList().block()!!
 
         // Then - only keep-alives get through; re-sending these would make the author
         // re-sync the list they just wrote and notify them about themselves
         assertTrue(
             emitted.all { it.data() == null },
-            "Author received their own events: ${emitted.mapNotNull { it.data() }}"
+            "Author received their own events: ${emitted.mapNotNull { it.data() }}",
         )
     }
 
@@ -660,7 +679,7 @@ class BudgetControllerTest {
 
         // When
         val flux = budgetController.streamEntries(budgetId, authentication, MockHttpServletResponse())
-        val emitted = flux.take(COLLECT_WINDOW).collectList().block()!!
+        val emitted = flux.take(collectWindow).collectList().block()!!
 
         // Then - all three actions arrive, tagged as budget-entry events
         val delivered = emitted.mapNotNull { it.data() }
@@ -676,7 +695,7 @@ class BudgetControllerTest {
         val mixed = listOf(
             event(BudgetEntryAction.CREATED, "first@example.com"),
             event(BudgetEntryAction.CREATED, testUserEmail),
-            event(BudgetEntryAction.CREATED, "second@example.com")
+            event(BudgetEntryAction.CREATED, "second@example.com"),
         )
 
         every { budgetService.verifyUserHasAccessToBudget(budgetId, testUserEmail) } just Runs
@@ -684,12 +703,12 @@ class BudgetControllerTest {
 
         // When
         val flux = budgetController.streamEntries(budgetId, authentication, MockHttpServletResponse())
-        val emitted = flux.take(COLLECT_WINDOW).collectList().block()!!
+        val emitted = flux.take(collectWindow).collectList().block()!!
 
         // Then - only the subscriber's own event is dropped
         assertEquals(
             listOf("first@example.com", "second@example.com"),
-            emitted.mapNotNull { it.data() }.map { it.userInfo.email }
+            emitted.mapNotNull { it.data() }.map { it.userInfo.email },
         )
     }
 
@@ -697,7 +716,7 @@ class BudgetControllerTest {
         budgetId = 1L,
         entryId = 99L,
         action = action,
-        userInfo = UserEventInfo(email = authorEmail, name = "Author")
+        userInfo = UserEventInfo(email = authorEmail, name = "Author"),
     )
 
     @Test
@@ -735,7 +754,7 @@ class BudgetControllerTest {
                 // Verify the error is the expected exception
                 assertTrue(error is com.budgethunter.exception.ForbiddenAccessException)
                 assertTrue(error.message!!.contains("don't have access"))
-            }
+            },
         )
 
         verify(exactly = 1) { budgetService.verifyUserHasAccessToBudget(budgetId, testUserEmail) }
@@ -938,5 +957,4 @@ class BudgetControllerTest {
         assertTrue(exception.message!!.contains("Cannot remove the last collaborator"))
         verify(exactly = 1) { budgetService.removeCollaborator(budgetId, collaboratorEmail, testUserEmail) }
     }
-
 }

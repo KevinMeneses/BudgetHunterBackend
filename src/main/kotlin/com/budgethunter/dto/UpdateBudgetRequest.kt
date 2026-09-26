@@ -9,5 +9,5 @@ data class UpdateBudgetRequest(
     val name: String,
 
     @field:PositiveOrZero(message = "Budget amount must be zero or positive")
-    val amount: BigDecimal
+    val amount: BigDecimal,
 )

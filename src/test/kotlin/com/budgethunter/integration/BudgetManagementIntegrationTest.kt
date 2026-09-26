@@ -1,9 +1,20 @@
 package com.budgethunter.integration
 
-import com.budgethunter.dto.*
+import com.budgethunter.dto.AddCollaboratorRequest
+import com.budgethunter.dto.BudgetEntryResponse
+import com.budgethunter.dto.BudgetResponse
+import com.budgethunter.dto.CreateBudgetEntryRequest
+import com.budgethunter.dto.CreateBudgetRequest
+import com.budgethunter.dto.SignInRequest
+import com.budgethunter.dto.SignInResponse
+import com.budgethunter.dto.SignUpRequest
+import com.budgethunter.dto.UpdateBudgetEntryRequest
+import com.budgethunter.dto.UserResponse
 import com.budgethunter.model.EntryType
 import com.fasterxml.jackson.databind.ObjectMapper
-import org.junit.jupiter.api.Assertions.*
+import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertNotNull
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
@@ -11,8 +22,12 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.http.MediaType
 import org.springframework.test.web.servlet.MockMvc
-import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*
-import org.springframework.test.web.servlet.result.MockMvcResultMatchers.*
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put
+import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath
+import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
 import org.springframework.transaction.annotation.Transactional
 import java.math.BigDecimal
 
@@ -53,7 +68,7 @@ class BudgetManagementIntegrationTest {
         mockMvc.perform(
             post("/api/users/sign_up")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(signUpRequest))
+                .content(objectMapper.writeValueAsString(signUpRequest)),
         )
 
         val signInRequest = SignInRequest(email = email, password = password)
@@ -61,7 +76,7 @@ class BudgetManagementIntegrationTest {
         val result = mockMvc.perform(
             post("/api/users/sign_in")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(signInRequest))
+                .content(objectMapper.writeValueAsString(signInRequest)),
         ).andReturn()
 
         val response = objectMapper.readValue(result.response.contentAsString, SignInResponse::class.java)
@@ -75,7 +90,7 @@ class BudgetManagementIntegrationTest {
         // Given
         val request = CreateBudgetRequest(
             name = "Monthly Budget",
-            amount = BigDecimal("2500.00")
+            amount = BigDecimal("2500.00"),
         )
 
         // When & Then
@@ -83,7 +98,7 @@ class BudgetManagementIntegrationTest {
             post("/api/budgets")
                 .header("Authorization", "Bearer $user1AuthToken")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(request))
+                .content(objectMapper.writeValueAsString(request)),
         )
             .andExpect(status().isCreated)
             .andExpect(jsonPath("$.id").exists())
@@ -101,14 +116,14 @@ class BudgetManagementIntegrationTest {
         // Given
         val request = CreateBudgetRequest(
             name = "Test Budget",
-            amount = BigDecimal("1000.00")
+            amount = BigDecimal("1000.00"),
         )
 
         // When & Then
         mockMvc.perform(
             post("/api/budgets")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(request))
+                .content(objectMapper.writeValueAsString(request)),
         )
             .andExpect(status().isUnauthorized)
     }
@@ -125,20 +140,20 @@ class BudgetManagementIntegrationTest {
             post("/api/budgets")
                 .header("Authorization", "Bearer $user1AuthToken")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(budget1))
+                .content(objectMapper.writeValueAsString(budget1)),
         )
 
         mockMvc.perform(
             post("/api/budgets")
                 .header("Authorization", "Bearer $user1AuthToken")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(budget2))
+                .content(objectMapper.writeValueAsString(budget2)),
         )
 
         // When & Then
         val result = mockMvc.perform(
             get("/api/budgets")
-                .header("Authorization", "Bearer $user1AuthToken")
+                .header("Authorization", "Bearer $user1AuthToken"),
         )
             .andExpect(status().isOk)
             .andExpect(jsonPath("$").isArray)
@@ -154,7 +169,7 @@ class BudgetManagementIntegrationTest {
         // When & Then
         mockMvc.perform(
             get("/api/budgets")
-                .header("Authorization", "Bearer $user1AuthToken")
+                .header("Authorization", "Bearer $user1AuthToken"),
         )
             .andExpect(status().isOk)
             .andExpect(jsonPath("$").isArray)
@@ -172,7 +187,7 @@ class BudgetManagementIntegrationTest {
             post("/api/budgets")
                 .header("Authorization", "Bearer $user1AuthToken")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(createRequest))
+                .content(objectMapper.writeValueAsString(createRequest)),
         ).andReturn()
 
         val budget = objectMapper.readValue(createResult.response.contentAsString, BudgetResponse::class.java)
@@ -180,14 +195,14 @@ class BudgetManagementIntegrationTest {
         // When - User 1 adds User 2 as collaborator
         val addCollaboratorRequest = AddCollaboratorRequest(
             budgetId = budget.id,
-            email = user2Email
+            email = user2Email,
         )
 
         mockMvc.perform(
             post("/api/budgets/${budget.id}/collaborators")
                 .header("Authorization", "Bearer $user1AuthToken")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(addCollaboratorRequest))
+                .content(objectMapper.writeValueAsString(addCollaboratorRequest)),
         )
             .andExpect(status().isCreated)
             .andExpect(jsonPath("$.budgetId").value(budget.id))
@@ -197,7 +212,7 @@ class BudgetManagementIntegrationTest {
         // Then - User 2 should see the budget
         mockMvc.perform(
             get("/api/budgets")
-                .header("Authorization", "Bearer $user2AuthToken")
+                .header("Authorization", "Bearer $user2AuthToken"),
         )
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.length()").value(1))
@@ -213,7 +228,7 @@ class BudgetManagementIntegrationTest {
             post("/api/budgets")
                 .header("Authorization", "Bearer $user1AuthToken")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(createRequest))
+                .content(objectMapper.writeValueAsString(createRequest)),
         ).andReturn()
 
         val budget = objectMapper.readValue(createResult.response.contentAsString, BudgetResponse::class.java)
@@ -221,14 +236,14 @@ class BudgetManagementIntegrationTest {
         // When - User 2 tries to add collaborator to User 1's budget
         val addCollaboratorRequest = AddCollaboratorRequest(
             budgetId = budget.id,
-            email = user2Email
+            email = user2Email,
         )
 
         mockMvc.perform(
             post("/api/budgets/${budget.id}/collaborators")
                 .header("Authorization", "Bearer $user2AuthToken")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(addCollaboratorRequest))
+                .content(objectMapper.writeValueAsString(addCollaboratorRequest)),
         )
             .andExpect(status().isForbidden)
     }
@@ -242,7 +257,7 @@ class BudgetManagementIntegrationTest {
             post("/api/budgets")
                 .header("Authorization", "Bearer $user1AuthToken")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(createRequest))
+                .content(objectMapper.writeValueAsString(createRequest)),
         ).andReturn()
 
         val budget = objectMapper.readValue(createResult.response.contentAsString, BudgetResponse::class.java)
@@ -253,13 +268,13 @@ class BudgetManagementIntegrationTest {
             post("/api/budgets/${budget.id}/collaborators")
                 .header("Authorization", "Bearer $user1AuthToken")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(addCollaboratorRequest))
+                .content(objectMapper.writeValueAsString(addCollaboratorRequest)),
         )
 
         // When & Then
         val result = mockMvc.perform(
             get("/api/budgets/${budget.id}/collaborators")
-                .header("Authorization", "Bearer $user1AuthToken")
+                .header("Authorization", "Bearer $user1AuthToken"),
         )
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.length()").value(2)) // User 1 and User 2
@@ -282,7 +297,7 @@ class BudgetManagementIntegrationTest {
             post("/api/budgets")
                 .header("Authorization", "Bearer $user1AuthToken")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(createBudgetRequest))
+                .content(objectMapper.writeValueAsString(createBudgetRequest)),
         ).andReturn()
 
         val budget = objectMapper.readValue(budgetResult.response.contentAsString, BudgetResponse::class.java)
@@ -292,14 +307,14 @@ class BudgetManagementIntegrationTest {
             amount = BigDecimal("150.00"),
             description = "Groceries",
             category = "Food",
-            type = EntryType.OUTCOME
+            type = EntryType.OUTCOME,
         )
 
         mockMvc.perform(
             post("/api/budgets/${budget.id}/entries")
                 .header("Authorization", "Bearer $user1AuthToken")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(entryRequest))
+                .content(objectMapper.writeValueAsString(entryRequest)),
         )
             .andExpect(status().isCreated)
             .andExpect(jsonPath("$.id").exists())
@@ -318,7 +333,7 @@ class BudgetManagementIntegrationTest {
             post("/api/budgets")
                 .header("Authorization", "Bearer $user1AuthToken")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(createBudgetRequest))
+                .content(objectMapper.writeValueAsString(createBudgetRequest)),
         ).andReturn()
 
         val budget = objectMapper.readValue(budgetResult.response.contentAsString, BudgetResponse::class.java)
@@ -327,14 +342,14 @@ class BudgetManagementIntegrationTest {
             amount = BigDecimal("100.00"),
             description = "Original",
             category = "Test",
-            type = EntryType.OUTCOME
+            type = EntryType.OUTCOME,
         )
 
         val entryResult = mockMvc.perform(
             post("/api/budgets/${budget.id}/entries")
                 .header("Authorization", "Bearer $user1AuthToken")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(createEntryRequest))
+                .content(objectMapper.writeValueAsString(createEntryRequest)),
         ).andReturn()
 
         val entry = objectMapper.readValue(entryResult.response.contentAsString, BudgetEntryResponse::class.java)
@@ -344,14 +359,14 @@ class BudgetManagementIntegrationTest {
             amount = BigDecimal("200.00"),
             description = "Updated",
             category = "Updated Category",
-            type = EntryType.INCOME
+            type = EntryType.INCOME,
         )
 
         mockMvc.perform(
             put("/api/budgets/${budget.id}/entries/${entry.id}")
                 .header("Authorization", "Bearer $user1AuthToken")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(updateEntryRequest))
+                .content(objectMapper.writeValueAsString(updateEntryRequest)),
         )
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.id").value(entry.id))
@@ -369,7 +384,7 @@ class BudgetManagementIntegrationTest {
             post("/api/budgets")
                 .header("Authorization", "Bearer $user1AuthToken")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(createBudgetRequest))
+                .content(objectMapper.writeValueAsString(createBudgetRequest)),
         ).andReturn()
 
         val budget = objectMapper.readValue(budgetResult.response.contentAsString, BudgetResponse::class.java)
@@ -382,20 +397,20 @@ class BudgetManagementIntegrationTest {
             post("/api/budgets/${budget.id}/entries")
                 .header("Authorization", "Bearer $user1AuthToken")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(entry1))
+                .content(objectMapper.writeValueAsString(entry1)),
         )
 
         mockMvc.perform(
             post("/api/budgets/${budget.id}/entries")
                 .header("Authorization", "Bearer $user1AuthToken")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(entry2))
+                .content(objectMapper.writeValueAsString(entry2)),
         )
 
         // When & Then
         mockMvc.perform(
             get("/api/budgets/${budget.id}/entries")
-                .header("Authorization", "Bearer $user1AuthToken")
+                .header("Authorization", "Bearer $user1AuthToken"),
         )
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.length()").value(2))
@@ -412,7 +427,7 @@ class BudgetManagementIntegrationTest {
             post("/api/budgets")
                 .header("Authorization", "Bearer $user1AuthToken")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(createBudgetRequest))
+                .content(objectMapper.writeValueAsString(createBudgetRequest)),
         ).andReturn()
 
         val budget = objectMapper.readValue(budgetResult.response.contentAsString, BudgetResponse::class.java)
@@ -421,14 +436,14 @@ class BudgetManagementIntegrationTest {
             amount = BigDecimal("100.00"),
             description = "Test Entry",
             category = "Test",
-            type = EntryType.OUTCOME
+            type = EntryType.OUTCOME,
         )
 
         val entryResult = mockMvc.perform(
             post("/api/budgets/${budget.id}/entries")
                 .header("Authorization", "Bearer $user1AuthToken")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(entryRequest))
+                .content(objectMapper.writeValueAsString(entryRequest)),
         ).andReturn()
 
         val entry = objectMapper.readValue(entryResult.response.contentAsString, BudgetEntryResponse::class.java)
@@ -436,14 +451,14 @@ class BudgetManagementIntegrationTest {
         // When - Delete the entry
         mockMvc.perform(
             delete("/api/budgets/${budget.id}/entries/${entry.id}")
-                .header("Authorization", "Bearer $user1AuthToken")
+                .header("Authorization", "Bearer $user1AuthToken"),
         )
             .andExpect(status().isNoContent)
 
         // Then - Entry should not be found
         mockMvc.perform(
             get("/api/budgets/${budget.id}/entries")
-                .header("Authorization", "Bearer $user1AuthToken")
+                .header("Authorization", "Bearer $user1AuthToken"),
         )
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.length()").value(0))
@@ -458,7 +473,7 @@ class BudgetManagementIntegrationTest {
             post("/api/budgets")
                 .header("Authorization", "Bearer $user1AuthToken")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(createBudgetRequest))
+                .content(objectMapper.writeValueAsString(createBudgetRequest)),
         ).andReturn()
 
         val budget = objectMapper.readValue(budgetResult.response.contentAsString, BudgetResponse::class.java)
@@ -467,14 +482,14 @@ class BudgetManagementIntegrationTest {
             amount = BigDecimal("100.00"),
             description = "Test Entry",
             category = "Test",
-            type = EntryType.OUTCOME
+            type = EntryType.OUTCOME,
         )
 
         val entryResult = mockMvc.perform(
             post("/api/budgets/${budget.id}/entries")
                 .header("Authorization", "Bearer $user1AuthToken")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(entryRequest))
+                .content(objectMapper.writeValueAsString(entryRequest)),
         ).andReturn()
 
         val entry = objectMapper.readValue(entryResult.response.contentAsString, BudgetEntryResponse::class.java)
@@ -482,7 +497,7 @@ class BudgetManagementIntegrationTest {
         // When - User 2 tries to delete User 1's entry
         mockMvc.perform(
             delete("/api/budgets/${budget.id}/entries/${entry.id}")
-                .header("Authorization", "Bearer $user2AuthToken")
+                .header("Authorization", "Bearer $user2AuthToken"),
         )
             .andExpect(status().isForbidden)
     }
@@ -496,7 +511,7 @@ class BudgetManagementIntegrationTest {
             post("/api/budgets")
                 .header("Authorization", "Bearer $user1AuthToken")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(createBudgetRequest))
+                .content(objectMapper.writeValueAsString(createBudgetRequest)),
         ).andReturn()
 
         val budget = objectMapper.readValue(budgetResult.response.contentAsString, BudgetResponse::class.java)
@@ -507,7 +522,7 @@ class BudgetManagementIntegrationTest {
             post("/api/budgets/${budget.id}/collaborators")
                 .header("Authorization", "Bearer $user1AuthToken")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(addCollaboratorRequest))
+                .content(objectMapper.writeValueAsString(addCollaboratorRequest)),
         )
 
         // User 2 creates entry
@@ -515,14 +530,14 @@ class BudgetManagementIntegrationTest {
             amount = BigDecimal("150.00"),
             description = "User 2 Entry",
             category = "Test",
-            type = EntryType.OUTCOME
+            type = EntryType.OUTCOME,
         )
 
         val entryResult = mockMvc.perform(
             post("/api/budgets/${budget.id}/entries")
                 .header("Authorization", "Bearer $user2AuthToken")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(entryRequest))
+                .content(objectMapper.writeValueAsString(entryRequest)),
         ).andReturn()
 
         val entry = objectMapper.readValue(entryResult.response.contentAsString, BudgetEntryResponse::class.java)
@@ -530,14 +545,14 @@ class BudgetManagementIntegrationTest {
         // When - User 1 deletes User 2's entry (both have access)
         mockMvc.perform(
             delete("/api/budgets/${budget.id}/entries/${entry.id}")
-                .header("Authorization", "Bearer $user1AuthToken")
+                .header("Authorization", "Bearer $user1AuthToken"),
         )
             .andExpect(status().isNoContent)
 
         // Then - Entry should be deleted
         mockMvc.perform(
             get("/api/budgets/${budget.id}/entries")
-                .header("Authorization", "Bearer $user1AuthToken")
+                .header("Authorization", "Bearer $user1AuthToken"),
         )
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.length()").value(0))
@@ -554,7 +569,7 @@ class BudgetManagementIntegrationTest {
             post("/api/budgets")
                 .header("Authorization", "Bearer $user1AuthToken")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(createBudgetRequest))
+                .content(objectMapper.writeValueAsString(createBudgetRequest)),
         ).andReturn()
 
         val budget = objectMapper.readValue(budgetResult.response.contentAsString, BudgetResponse::class.java)
@@ -564,13 +579,13 @@ class BudgetManagementIntegrationTest {
             post("/api/budgets/${budget.id}/collaborators")
                 .header("Authorization", "Bearer $user1AuthToken")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(addCollaboratorRequest))
+                .content(objectMapper.writeValueAsString(addCollaboratorRequest)),
         )
 
         // Verify User 2 has access
         mockMvc.perform(
             get("/api/budgets")
-                .header("Authorization", "Bearer $user2AuthToken")
+                .header("Authorization", "Bearer $user2AuthToken"),
         )
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.length()").value(1))
@@ -578,14 +593,14 @@ class BudgetManagementIntegrationTest {
         // When - Remove User 2 as collaborator
         mockMvc.perform(
             delete("/api/budgets/${budget.id}/collaborators/$user2Email")
-                .header("Authorization", "Bearer $user1AuthToken")
+                .header("Authorization", "Bearer $user1AuthToken"),
         )
             .andExpect(status().isNoContent)
 
         // Then - User 2 should no longer have access
         mockMvc.perform(
             get("/api/budgets")
-                .header("Authorization", "Bearer $user2AuthToken")
+                .header("Authorization", "Bearer $user2AuthToken"),
         )
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.length()").value(0))
@@ -593,7 +608,7 @@ class BudgetManagementIntegrationTest {
         // And collaborators list should only have User 1
         mockMvc.perform(
             get("/api/budgets/${budget.id}/collaborators")
-                .header("Authorization", "Bearer $user1AuthToken")
+                .header("Authorization", "Bearer $user1AuthToken"),
         )
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.length()").value(1))
@@ -609,7 +624,7 @@ class BudgetManagementIntegrationTest {
             post("/api/budgets")
                 .header("Authorization", "Bearer $user1AuthToken")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(createBudgetRequest))
+                .content(objectMapper.writeValueAsString(createBudgetRequest)),
         ).andReturn()
 
         val budget = objectMapper.readValue(budgetResult.response.contentAsString, BudgetResponse::class.java)
@@ -617,14 +632,14 @@ class BudgetManagementIntegrationTest {
         // When - Try to remove User 1 (the only collaborator)
         mockMvc.perform(
             delete("/api/budgets/${budget.id}/collaborators/$user1Email")
-                .header("Authorization", "Bearer $user1AuthToken")
+                .header("Authorization", "Bearer $user1AuthToken"),
         )
             .andExpect(status().isConflict)
 
         // Then - User 1 should still have access
         mockMvc.perform(
             get("/api/budgets")
-                .header("Authorization", "Bearer $user1AuthToken")
+                .header("Authorization", "Bearer $user1AuthToken"),
         )
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.length()").value(1))
@@ -639,7 +654,7 @@ class BudgetManagementIntegrationTest {
             post("/api/budgets")
                 .header("Authorization", "Bearer $user1AuthToken")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(createBudgetRequest))
+                .content(objectMapper.writeValueAsString(createBudgetRequest)),
         ).andReturn()
 
         val budget = objectMapper.readValue(budgetResult.response.contentAsString, BudgetResponse::class.java)
@@ -647,7 +662,7 @@ class BudgetManagementIntegrationTest {
         // When - User 2 tries to remove User 1 from their own budget
         mockMvc.perform(
             delete("/api/budgets/${budget.id}/collaborators/$user1Email")
-                .header("Authorization", "Bearer $user2AuthToken")
+                .header("Authorization", "Bearer $user2AuthToken"),
         )
             .andExpect(status().isForbidden)
     }
@@ -663,7 +678,7 @@ class BudgetManagementIntegrationTest {
             post("/api/budgets")
                 .header("Authorization", "Bearer $user1AuthToken")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(createBudgetRequest))
+                .content(objectMapper.writeValueAsString(createBudgetRequest)),
         ).andReturn()
 
         val budget = objectMapper.readValue(budgetResult.response.contentAsString, BudgetResponse::class.java)
@@ -674,7 +689,7 @@ class BudgetManagementIntegrationTest {
             post("/api/budgets/${budget.id}/collaborators")
                 .header("Authorization", "Bearer $user1AuthToken")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(addCollaboratorRequest))
+                .content(objectMapper.writeValueAsString(addCollaboratorRequest)),
         )
 
         // Add entry
@@ -682,26 +697,26 @@ class BudgetManagementIntegrationTest {
             amount = BigDecimal("100.00"),
             description = "Test Entry",
             category = "Test",
-            type = EntryType.OUTCOME
+            type = EntryType.OUTCOME,
         )
         mockMvc.perform(
             post("/api/budgets/${budget.id}/entries")
                 .header("Authorization", "Bearer $user1AuthToken")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(entryRequest))
+                .content(objectMapper.writeValueAsString(entryRequest)),
         )
 
         // When - Delete the budget
         mockMvc.perform(
             delete("/api/budgets/${budget.id}")
-                .header("Authorization", "Bearer $user1AuthToken")
+                .header("Authorization", "Bearer $user1AuthToken"),
         )
             .andExpect(status().isNoContent)
 
         // Then - Budget should not be accessible by User 1
         mockMvc.perform(
             get("/api/budgets")
-                .header("Authorization", "Bearer $user1AuthToken")
+                .header("Authorization", "Bearer $user1AuthToken"),
         )
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.length()").value(0))
@@ -709,7 +724,7 @@ class BudgetManagementIntegrationTest {
         // And Budget should not be accessible by User 2
         mockMvc.perform(
             get("/api/budgets")
-                .header("Authorization", "Bearer $user2AuthToken")
+                .header("Authorization", "Bearer $user2AuthToken"),
         )
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.length()").value(0))
@@ -724,7 +739,7 @@ class BudgetManagementIntegrationTest {
             post("/api/budgets")
                 .header("Authorization", "Bearer $user1AuthToken")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(createBudgetRequest))
+                .content(objectMapper.writeValueAsString(createBudgetRequest)),
         ).andReturn()
 
         val budget = objectMapper.readValue(budgetResult.response.contentAsString, BudgetResponse::class.java)
@@ -735,7 +750,7 @@ class BudgetManagementIntegrationTest {
             post("/api/budgets/${budget.id}/collaborators")
                 .header("Authorization", "Bearer $user1AuthToken")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(addCollaboratorRequest))
+                .content(objectMapper.writeValueAsString(addCollaboratorRequest)),
         )
 
         // Add multiple entries
@@ -747,27 +762,27 @@ class BudgetManagementIntegrationTest {
             post("/api/budgets/${budget.id}/entries")
                 .header("Authorization", "Bearer $user1AuthToken")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(entry1))
+                .content(objectMapper.writeValueAsString(entry1)),
         )
 
         mockMvc.perform(
             post("/api/budgets/${budget.id}/entries")
                 .header("Authorization", "Bearer $user1AuthToken")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(entry2))
+                .content(objectMapper.writeValueAsString(entry2)),
         )
 
         mockMvc.perform(
             post("/api/budgets/${budget.id}/entries")
                 .header("Authorization", "Bearer $user2AuthToken")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(entry3))
+                .content(objectMapper.writeValueAsString(entry3)),
         )
 
         // Verify entries exist
         mockMvc.perform(
             get("/api/budgets/${budget.id}/entries")
-                .header("Authorization", "Bearer $user1AuthToken")
+                .header("Authorization", "Bearer $user1AuthToken"),
         )
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.length()").value(3))
@@ -775,14 +790,14 @@ class BudgetManagementIntegrationTest {
         // When - Delete the budget
         mockMvc.perform(
             delete("/api/budgets/${budget.id}")
-                .header("Authorization", "Bearer $user1AuthToken")
+                .header("Authorization", "Bearer $user1AuthToken"),
         )
             .andExpect(status().isNoContent)
 
         // Then - Budget and all entries should be deleted
         mockMvc.perform(
             get("/api/budgets")
-                .header("Authorization", "Bearer $user1AuthToken")
+                .header("Authorization", "Bearer $user1AuthToken"),
         )
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.length()").value(0))
@@ -797,7 +812,7 @@ class BudgetManagementIntegrationTest {
             post("/api/budgets")
                 .header("Authorization", "Bearer $user1AuthToken")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(createBudgetRequest))
+                .content(objectMapper.writeValueAsString(createBudgetRequest)),
         ).andReturn()
 
         val budget = objectMapper.readValue(budgetResult.response.contentAsString, BudgetResponse::class.java)
@@ -805,14 +820,14 @@ class BudgetManagementIntegrationTest {
         // When - User 2 tries to delete User 1's budget
         mockMvc.perform(
             delete("/api/budgets/${budget.id}")
-                .header("Authorization", "Bearer $user2AuthToken")
+                .header("Authorization", "Bearer $user2AuthToken"),
         )
             .andExpect(status().isForbidden)
 
         // Then - Budget should still exist
         mockMvc.perform(
             get("/api/budgets")
-                .header("Authorization", "Bearer $user1AuthToken")
+                .header("Authorization", "Bearer $user1AuthToken"),
         )
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.length()").value(1))
@@ -829,7 +844,7 @@ class BudgetManagementIntegrationTest {
             post("/api/budgets")
                 .header("Authorization", "Bearer $user1AuthToken")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(createBudgetRequest))
+                .content(objectMapper.writeValueAsString(createBudgetRequest)),
         ).andReturn()
 
         val budget = objectMapper.readValue(budgetResult.response.contentAsString, BudgetResponse::class.java)
@@ -841,44 +856,50 @@ class BudgetManagementIntegrationTest {
             post("/api/budgets/${budget.id}/collaborators")
                 .header("Authorization", "Bearer $user1AuthToken")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(addCollaboratorRequest))
+                .content(objectMapper.writeValueAsString(addCollaboratorRequest)),
         ).andExpect(status().isCreated)
 
         // Step 3: User 1 adds entry
         val entry1Request = CreateBudgetEntryRequest(
-            BigDecimal("300.00"), "User 1 Entry", "Shopping", EntryType.OUTCOME
+            BigDecimal("300.00"),
+            "User 1 Entry",
+            "Shopping",
+            EntryType.OUTCOME,
         )
 
         mockMvc.perform(
             post("/api/budgets/${budget.id}/entries")
                 .header("Authorization", "Bearer $user1AuthToken")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(entry1Request))
+                .content(objectMapper.writeValueAsString(entry1Request)),
         ).andExpect(status().isCreated)
 
         // Step 4: User 2 adds entry (as collaborator)
         val entry2Request = CreateBudgetEntryRequest(
-            BigDecimal("500.00"), "User 2 Entry", "Income", EntryType.INCOME
+            BigDecimal("500.00"),
+            "User 2 Entry",
+            "Income",
+            EntryType.INCOME,
         )
 
         mockMvc.perform(
             post("/api/budgets/${budget.id}/entries")
                 .header("Authorization", "Bearer $user2AuthToken")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(entry2Request))
+                .content(objectMapper.writeValueAsString(entry2Request)),
         ).andExpect(status().isCreated)
 
         // Step 5: Both users can see all entries
         val user1Entries = mockMvc.perform(
             get("/api/budgets/${budget.id}/entries")
-                .header("Authorization", "Bearer $user1AuthToken")
+                .header("Authorization", "Bearer $user1AuthToken"),
         )
             .andExpect(status().isOk)
             .andReturn()
 
         val user2Entries = mockMvc.perform(
             get("/api/budgets/${budget.id}/entries")
-                .header("Authorization", "Bearer $user2AuthToken")
+                .header("Authorization", "Bearer $user2AuthToken"),
         )
             .andExpect(status().isOk)
             .andReturn()

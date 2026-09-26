@@ -96,12 +96,12 @@ tasks.withType<Test> {
     useJUnitPlatform()
 }
 
-// Quality gates run by CI (.github/workflows/ci.yml). Both linters start from a baseline so
-// the existing code passes as-is; new code is held to the rules. Regenerate the baselines
-// with `./gradlew ktlintGenerateBaseline detektBaseline` only when deliberately accepting debt.
+// Quality gates run by CI (.github/workflows/ci.yml). ktlint runs with no baseline: the tree
+// satisfies the rules, in the intellij_idea style configured in .editorconfig. detekt still starts
+// from one - its findings are design issues that need reading, not reformatting. Regenerate that
+// one with `./gradlew detektBaseline` only when deliberately accepting debt.
 ktlint {
     version.set("1.3.1")
-    baseline.set(file("config/ktlint/baseline.xml"))
 }
 
 detekt {

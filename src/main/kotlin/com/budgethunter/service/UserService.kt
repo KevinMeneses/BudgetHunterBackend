@@ -1,7 +1,7 @@
 package com.budgethunter.service
 
-import com.budgethunter.dto.GoogleSignInRequest
 import com.budgethunter.dto.CurrentUserResponse
+import com.budgethunter.dto.GoogleSignInRequest
 import com.budgethunter.dto.RefreshTokenRequest
 import com.budgethunter.dto.SetPasswordRequest
 import com.budgethunter.dto.SignInRequest
@@ -25,7 +25,7 @@ class UserService(
     private val userRepository: UserRepository,
     private val passwordEncoder: PasswordEncoder,
     private val jwtUtil: JwtUtil,
-    private val googleTokenVerifier: GoogleTokenVerifier
+    private val googleTokenVerifier: GoogleTokenVerifier,
 ) {
 
     private val logger = LoggerFactory.getLogger(UserService::class.java)
@@ -40,14 +40,14 @@ class UserService(
             email = request.email,
             name = request.name,
             password = passwordEncoder.encode(request.password),
-            authProvider = AuthProvider.PASSWORD
+            authProvider = AuthProvider.PASSWORD,
         )
 
         val savedUser = userRepository.save(user)
 
         return UserResponse(
             email = savedUser.email,
-            name = savedUser.name
+            name = savedUser.name,
         )
     }
 
@@ -125,23 +125,22 @@ class UserService(
                 name = info.name?.takeIf { it.isNotBlank() } ?: email.substringBefore('@'),
                 password = null,
                 googleSubject = info.subject,
-                authProvider = AuthProvider.GOOGLE
+                authProvider = AuthProvider.GOOGLE,
             )
 
         return issueSession(user)
     }
 
-    fun getCurrentUser(email: String): CurrentUserResponse =
-        userRepository.findById(email)
-            .orElseThrow { BadCredentialsException("User not found") }
-            .let {
-                CurrentUserResponse(
-                    email = it.email,
-                    name = it.name,
-                    hasPassword = it.password != null,
-                    authProvider = it.authProvider
-                )
-            }
+    fun getCurrentUser(email: String): CurrentUserResponse = userRepository.findById(email)
+        .orElseThrow { BadCredentialsException("User not found") }
+        .let {
+            CurrentUserResponse(
+                email = it.email,
+                name = it.name,
+                hasPassword = it.password != null,
+                authProvider = it.authProvider,
+            )
+        }
 
     /**
      * Sets or replaces the account password.
@@ -189,7 +188,7 @@ class UserService(
             authToken = authToken,
             refreshToken = refreshToken,
             email = savedUser.email,
-            name = savedUser.name
+            name = savedUser.name,
         )
     }
 }

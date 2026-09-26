@@ -1,20 +1,34 @@
 package com.budgethunter.service
 
-import com.budgethunter.dto.*
-import com.budgethunter.model.*
+import com.budgethunter.dto.AddCollaboratorRequest
+import com.budgethunter.dto.CreateBudgetRequest
+import com.budgethunter.dto.PutEntryRequest
+import com.budgethunter.dto.UpdateBudgetRequest
+import com.budgethunter.model.Budget
+import com.budgethunter.model.BudgetEntry
+import com.budgethunter.model.EntryType
+import com.budgethunter.model.User
+import com.budgethunter.model.UserBudgetId
 import com.budgethunter.repository.BudgetEntryRepository
 import com.budgethunter.repository.BudgetRepository
 import com.budgethunter.repository.UserBudgetRepository
 import com.budgethunter.repository.UserRepository
-import io.mockk.*
+import io.mockk.Runs
+import io.mockk.clearAllMocks
+import io.mockk.every
+import io.mockk.just
+import io.mockk.mockk
+import io.mockk.verify
 import org.junit.jupiter.api.AfterEach
-import org.junit.jupiter.api.Assertions.*
+import org.junit.jupiter.api.Assertions.assertDoesNotThrow
+import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
 import java.math.BigDecimal
 import java.time.LocalDateTime
-import java.util.*
+import java.util.Optional
 
 class BudgetServiceTest {
 
@@ -29,12 +43,12 @@ class BudgetServiceTest {
     private val testUser = User(
         email = testUserEmail,
         name = "Test User",
-        password = "encodedPassword"
+        password = "encodedPassword",
     )
     private val testBudget = Budget(
         id = 1L,
         name = "Test Budget",
-        amount = BigDecimal("1000.00")
+        amount = BigDecimal("1000.00"),
     )
 
     @BeforeEach
@@ -49,7 +63,7 @@ class BudgetServiceTest {
             userBudgetRepository,
             userRepository,
             budgetEntryRepository,
-            reactiveSseService
+            reactiveSseService,
         )
     }
 
@@ -65,12 +79,12 @@ class BudgetServiceTest {
         // Given
         val request = CreateBudgetRequest(
             name = "Monthly Budget",
-            amount = BigDecimal("2500.00")
+            amount = BigDecimal("2500.00"),
         )
         val savedBudget = Budget(
             id = 1L,
             name = request.name,
-            amount = request.amount
+            amount = request.amount,
         )
 
         every { userRepository.findById(testUserEmail) } returns Optional.of(testUser)
@@ -95,7 +109,7 @@ class BudgetServiceTest {
         // Given
         val request = CreateBudgetRequest(
             name = "Monthly Budget",
-            amount = BigDecimal("2500.00")
+            amount = BigDecimal("2500.00"),
         )
 
         every { userRepository.findById(testUserEmail) } returns Optional.empty()
@@ -117,7 +131,7 @@ class BudgetServiceTest {
         // Given
         val budgets = listOf(
             Budget(id = 1L, name = "Budget 1", amount = BigDecimal("1000.00")),
-            Budget(id = 2L, name = "Budget 2", amount = BigDecimal("2000.00"))
+            Budget(id = 2L, name = "Budget 2", amount = BigDecimal("2000.00")),
         )
 
         every { userBudgetRepository.findBudgetsByUserEmail(testUserEmail) } returns budgets
@@ -156,16 +170,16 @@ class BudgetServiceTest {
         val budgetId = 1L
         val request = UpdateBudgetRequest(
             name = "Updated Budget Name",
-            amount = BigDecimal("3500.00")
+            amount = BigDecimal("3500.00"),
         )
         val existingBudget = Budget(
             id = budgetId,
             name = "Old Budget Name",
-            amount = BigDecimal("2000.00")
+            amount = BigDecimal("2000.00"),
         )
         val updatedBudget = existingBudget.copy(
             name = request.name,
-            amount = request.amount
+            amount = request.amount,
         )
         val userBudgetId = UserBudgetId(budgetId = budgetId, userEmail = testUserEmail)
 
@@ -192,7 +206,7 @@ class BudgetServiceTest {
         val budgetId = 999L
         val request = UpdateBudgetRequest(
             name = "Updated Budget",
-            amount = BigDecimal("2000.00")
+            amount = BigDecimal("2000.00"),
         )
         val userBudgetId = UserBudgetId(budgetId = budgetId, userEmail = testUserEmail)
 
@@ -216,7 +230,7 @@ class BudgetServiceTest {
         val budgetId = 1L
         val request = UpdateBudgetRequest(
             name = "Updated Budget",
-            amount = BigDecimal("2000.00")
+            amount = BigDecimal("2000.00"),
         )
         val userBudgetId = UserBudgetId(budgetId = budgetId, userEmail = testUserEmail)
 
@@ -242,11 +256,11 @@ class BudgetServiceTest {
         val collaborator = User(
             email = collaboratorEmail,
             name = "Collaborator User",
-            password = "encodedPassword"
+            password = "encodedPassword",
         )
         val request = AddCollaboratorRequest(
             budgetId = 1L,
-            email = collaboratorEmail
+            email = collaboratorEmail,
         )
         val userBudgetId = UserBudgetId(budgetId = 1L, userEmail = testUserEmail)
 
@@ -276,7 +290,7 @@ class BudgetServiceTest {
         // Given
         val request = AddCollaboratorRequest(
             budgetId = 1L,
-            email = "collaborator@example.com"
+            email = "collaborator@example.com",
         )
         val userBudgetId = UserBudgetId(budgetId = 1L, userEmail = testUserEmail)
 
@@ -297,7 +311,7 @@ class BudgetServiceTest {
         // Given
         val request = AddCollaboratorRequest(
             budgetId = 999L,
-            email = "collaborator@example.com"
+            email = "collaborator@example.com",
         )
         val userBudgetId = UserBudgetId(budgetId = 999L, userEmail = testUserEmail)
 
@@ -319,7 +333,7 @@ class BudgetServiceTest {
         val nonExistentEmail = "nonexistent@example.com"
         val request = AddCollaboratorRequest(
             budgetId = 1L,
-            email = nonExistentEmail
+            email = nonExistentEmail,
         )
         val userBudgetId = UserBudgetId(budgetId = 1L, userEmail = testUserEmail)
 
@@ -343,11 +357,11 @@ class BudgetServiceTest {
         val collaborator = User(
             email = collaboratorEmail,
             name = "Existing Collaborator",
-            password = "encodedPassword"
+            password = "encodedPassword",
         )
         val request = AddCollaboratorRequest(
             budgetId = 1L,
-            email = collaboratorEmail
+            email = collaboratorEmail,
         )
         val userBudgetId = UserBudgetId(budgetId = 1L, userEmail = testUserEmail)
         val collaboratorBudgetId = UserBudgetId(budgetId = 1L, userEmail = collaboratorEmail)
@@ -376,7 +390,7 @@ class BudgetServiceTest {
         val userBudgetId = UserBudgetId(budgetId = budgetId, userEmail = testUserEmail)
         val collaborators = listOf(
             testUser,
-            User(email = "user2@example.com", name = "User 2", password = "pass")
+            User(email = "user2@example.com", name = "User 2", password = "pass"),
         )
 
         every { userBudgetRepository.existsById(userBudgetId) } returns true
@@ -445,7 +459,7 @@ class BudgetServiceTest {
                 type = EntryType.OUTCOME,
                 createdBy = testUser,
                 creationDate = now,
-                modificationDate = now
+                modificationDate = now,
             ),
             BudgetEntry(
                 id = 2L,
@@ -456,8 +470,8 @@ class BudgetServiceTest {
                 type = EntryType.OUTCOME,
                 createdBy = testUser,
                 creationDate = now,
-                modificationDate = now
-            )
+                modificationDate = now,
+            ),
         )
 
         every { userBudgetRepository.existsById(userBudgetId) } returns true
@@ -487,7 +501,7 @@ class BudgetServiceTest {
             amount = BigDecimal("150.00"),
             description = "Groceries",
             category = "Food",
-            type = EntryType.OUTCOME
+            type = EntryType.OUTCOME,
         )
         val userBudgetId = UserBudgetId(budgetId = 1L, userEmail = testUserEmail)
         val savedEntry = BudgetEntry(
@@ -499,7 +513,7 @@ class BudgetServiceTest {
             type = request.type,
             createdBy = testUser,
             creationDate = LocalDateTime.now(),
-            modificationDate = LocalDateTime.now()
+            modificationDate = LocalDateTime.now(),
         )
 
         every { userBudgetRepository.existsById(userBudgetId) } returns true
@@ -534,7 +548,7 @@ class BudgetServiceTest {
             type = EntryType.OUTCOME,
             createdBy = testUser,
             creationDate = LocalDateTime.now().minusDays(1),
-            modificationDate = LocalDateTime.now().minusDays(1)
+            modificationDate = LocalDateTime.now().minusDays(1),
         )
         val request = PutEntryRequest(
             id = 1L,
@@ -542,7 +556,7 @@ class BudgetServiceTest {
             amount = BigDecimal("200.00"),
             description = "Updated Description",
             category = "Updated Category",
-            type = EntryType.INCOME
+            type = EntryType.INCOME,
         )
         val userBudgetId = UserBudgetId(budgetId = 1L, userEmail = testUserEmail)
         val updatedEntry = existingEntry.copy(
@@ -551,7 +565,7 @@ class BudgetServiceTest {
             category = request.category,
             type = request.type,
             updatedBy = testUser,
-            modificationDate = LocalDateTime.now()
+            modificationDate = LocalDateTime.now(),
         )
 
         every { userBudgetRepository.existsById(userBudgetId) } returns true
@@ -583,7 +597,7 @@ class BudgetServiceTest {
             amount = BigDecimal("150.00"),
             description = "Test",
             category = "Test",
-            type = EntryType.OUTCOME
+            type = EntryType.OUTCOME,
         )
         val userBudgetId = UserBudgetId(budgetId = 1L, userEmail = testUserEmail)
 
@@ -610,7 +624,7 @@ class BudgetServiceTest {
             type = EntryType.OUTCOME,
             createdBy = testUser,
             creationDate = LocalDateTime.now(),
-            modificationDate = LocalDateTime.now()
+            modificationDate = LocalDateTime.now(),
         )
         val request = PutEntryRequest(
             id = 1L,
@@ -618,7 +632,7 @@ class BudgetServiceTest {
             amount = BigDecimal("200.00"),
             description = "Updated",
             category = "Updated",
-            type = EntryType.INCOME
+            type = EntryType.INCOME,
         )
         val userBudgetId = UserBudgetId(budgetId = 1L, userEmail = testUserEmail)
 

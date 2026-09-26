@@ -9,5 +9,5 @@ data class SignInRequest(
     val email: String,
 
     @field:NotBlank(message = "Password is required")
-    val password: String
+    val password: String,
 )

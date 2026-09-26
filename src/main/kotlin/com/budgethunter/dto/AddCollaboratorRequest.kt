@@ -11,5 +11,5 @@ data class AddCollaboratorRequest(
 
     @field:NotNull(message = "Email is required")
     @field:Email(message = "Email must be valid")
-    val email: String
+    val email: String,
 )

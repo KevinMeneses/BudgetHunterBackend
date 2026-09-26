@@ -1,6 +1,15 @@
 package com.budgethunter.controller
 
-import com.budgethunter.dto.*
+import com.budgethunter.dto.AddCollaboratorRequest
+import com.budgethunter.dto.BudgetEntryEvent
+import com.budgethunter.dto.BudgetEntryResponse
+import com.budgethunter.dto.BudgetResponse
+import com.budgethunter.dto.CollaboratorResponse
+import com.budgethunter.dto.CreateBudgetEntryRequest
+import com.budgethunter.dto.CreateBudgetRequest
+import com.budgethunter.dto.UpdateBudgetEntryRequest
+import com.budgethunter.dto.UpdateBudgetRequest
+import com.budgethunter.dto.UserResponse
 import com.budgethunter.service.BudgetService
 import com.budgethunter.service.ReactiveSseService
 import io.swagger.v3.oas.annotations.Operation
@@ -18,18 +27,26 @@ import org.springframework.http.MediaType
 import org.springframework.http.ResponseEntity
 import org.springframework.http.codec.ServerSentEvent
 import org.springframework.security.core.Authentication
-import org.springframework.web.bind.annotation.*
+import org.springframework.web.bind.annotation.DeleteMapping
+import org.springframework.web.bind.annotation.GetMapping
+import org.springframework.web.bind.annotation.PathVariable
+import org.springframework.web.bind.annotation.PostMapping
+import org.springframework.web.bind.annotation.PutMapping
+import org.springframework.web.bind.annotation.RequestBody
+import org.springframework.web.bind.annotation.RequestMapping
+import org.springframework.web.bind.annotation.RequestParam
+import org.springframework.web.bind.annotation.RestController
 import reactor.core.publisher.Flux
 import java.time.Duration
 
 @RestController
 @RequestMapping("/api/budgets")
-@Tag(name = "Budget Management", description = "Endpoints for managing budgets, collaborators, and budget entries with real-time SSE notifications")
+@Tag(
+    name = "Budget Management",
+    description = "Endpoints for managing budgets, collaborators, and budget entries with real-time SSE notifications",
+)
 @SecurityRequirement(name = "bearerAuth")
-class BudgetController(
-    private val budgetService: BudgetService,
-    private val reactiveSseService: ReactiveSseService
-) {
+class BudgetController(private val budgetService: BudgetService, private val reactiveSseService: ReactiveSseService) {
 
     companion object {
         /**
@@ -45,31 +62,29 @@ class BudgetController(
     @PostMapping
     @Operation(
         summary = "Create a new budget",
-        description = "Creates a new budget with the specified name and amount. The authenticated user becomes the budget owner and is automatically added as a collaborator."
+        description = "Creates a new budget with the specified name and amount. The authenticated user becomes the budget owner and is " +
+            "automatically added as a collaborator.",
     )
     @ApiResponses(
         value = [
             ApiResponse(
                 responseCode = "201",
                 description = "Budget successfully created",
-                content = [Content(schema = Schema(implementation = BudgetResponse::class))]
+                content = [Content(schema = Schema(implementation = BudgetResponse::class))],
             ),
             ApiResponse(
                 responseCode = "400",
                 description = "Invalid request - validation errors (e.g., missing name, invalid amount)",
-                content = [Content()]
+                content = [Content()],
             ),
             ApiResponse(
                 responseCode = "401",
                 description = "Unauthorized - missing or invalid JWT token",
-                content = [Content()]
-            )
-        ]
+                content = [Content()],
+            ),
+        ],
     )
-    fun createBudget(
-        @Valid @RequestBody request: CreateBudgetRequest,
-        authentication: Authentication
-    ): ResponseEntity<BudgetResponse> {
+    fun createBudget(@Valid @RequestBody request: CreateBudgetRequest, authentication: Authentication): ResponseEntity<BudgetResponse> {
         val userEmail = authentication.principal as String
         val response = budgetService.createBudget(request, userEmail)
         return ResponseEntity.status(HttpStatus.CREATED).body(response)
@@ -78,21 +93,22 @@ class BudgetController(
     @GetMapping
     @Operation(
         summary = "Get all budgets for authenticated user",
-        description = "Retrieves all budgets that the authenticated user has access to, including owned budgets and budgets where the user is a collaborator. Supports optional pagination via query parameters."
+        description = "Retrieves all budgets that the authenticated user has access to, including owned budgets and budgets where the " +
+            "user is a collaborator. Supports optional pagination via query parameters.",
     )
     @ApiResponses(
         value = [
             ApiResponse(
                 responseCode = "200",
                 description = "Successfully retrieved budgets list",
-                content = [Content(schema = Schema(implementation = BudgetResponse::class))]
+                content = [Content(schema = Schema(implementation = BudgetResponse::class))],
             ),
             ApiResponse(
                 responseCode = "401",
                 description = "Unauthorized - missing or invalid JWT token",
-                content = [Content()]
-            )
-        ]
+                content = [Content()],
+            ),
+        ],
     )
     fun getBudgets(
         @Parameter(description = "Page number (0-indexed). If not provided, returns all results", required = false)
@@ -103,7 +119,7 @@ class BudgetController(
         @RequestParam(required = false, defaultValue = "id") sortBy: String,
         @Parameter(description = "Sort direction (asc or desc)", required = false, example = "asc")
         @RequestParam(required = false, defaultValue = "asc") sortDirection: String,
-        authentication: Authentication
+        authentication: Authentication,
     ): ResponseEntity<*> {
         val userEmail = authentication.principal as String
 
@@ -121,42 +137,42 @@ class BudgetController(
     @PutMapping("/{budgetId}")
     @Operation(
         summary = "Update a budget",
-        description = "Updates an existing budget's name and/or amount. Only users with access to the budget can update it."
+        description = "Updates an existing budget's name and/or amount. Only users with access to the budget can update it.",
     )
     @ApiResponses(
         value = [
             ApiResponse(
                 responseCode = "200",
                 description = "Budget successfully updated",
-                content = [Content(schema = Schema(implementation = BudgetResponse::class))]
+                content = [Content(schema = Schema(implementation = BudgetResponse::class))],
             ),
             ApiResponse(
                 responseCode = "400",
                 description = "Invalid request - validation errors (e.g., missing name, invalid amount)",
-                content = [Content()]
+                content = [Content()],
             ),
             ApiResponse(
                 responseCode = "401",
                 description = "Unauthorized - missing or invalid JWT token",
-                content = [Content()]
+                content = [Content()],
             ),
             ApiResponse(
                 responseCode = "403",
                 description = "Forbidden - user does not have access to this budget",
-                content = [Content()]
+                content = [Content()],
             ),
             ApiResponse(
                 responseCode = "404",
                 description = "Budget not found",
-                content = [Content()]
-            )
-        ]
+                content = [Content()],
+            ),
+        ],
     )
     fun updateBudget(
         @Parameter(description = "ID of the budget to update", required = true)
         @PathVariable budgetId: Long,
         @Valid @RequestBody request: UpdateBudgetRequest,
-        authentication: Authentication
+        authentication: Authentication,
     ): ResponseEntity<BudgetResponse> {
         val userEmail = authentication.principal as String
         val response = budgetService.updateBudget(budgetId, request, userEmail)
@@ -166,47 +182,48 @@ class BudgetController(
     @PostMapping("/{budgetId}/collaborators")
     @Operation(
         summary = "Add a collaborator to a budget",
-        description = "Adds a new collaborator to the budget by email. The user must exist in the system. Only users with access to the budget can add collaborators."
+        description = "Adds a new collaborator to the budget by email. The user must exist in the system. Only users with access to the " +
+            "budget can add collaborators.",
     )
     @ApiResponses(
         value = [
             ApiResponse(
                 responseCode = "201",
                 description = "Collaborator successfully added",
-                content = [Content(schema = Schema(implementation = CollaboratorResponse::class))]
+                content = [Content(schema = Schema(implementation = CollaboratorResponse::class))],
             ),
             ApiResponse(
                 responseCode = "400",
                 description = "Invalid request - validation errors (e.g., invalid email format)",
-                content = [Content()]
+                content = [Content()],
             ),
             ApiResponse(
                 responseCode = "401",
                 description = "Unauthorized - missing or invalid JWT token",
-                content = [Content()]
+                content = [Content()],
             ),
             ApiResponse(
                 responseCode = "403",
                 description = "Forbidden - user does not have access to this budget",
-                content = [Content()]
+                content = [Content()],
             ),
             ApiResponse(
                 responseCode = "404",
                 description = "Budget not found or collaborator user not found",
-                content = [Content()]
+                content = [Content()],
             ),
             ApiResponse(
                 responseCode = "409",
                 description = "Collaborator already has access to this budget",
-                content = [Content()]
-            )
-        ]
+                content = [Content()],
+            ),
+        ],
     )
     fun addCollaborator(
         @Parameter(description = "ID of the budget", required = true)
         @PathVariable budgetId: Long,
         @Valid @RequestBody request: AddCollaboratorRequest,
-        authentication: Authentication
+        authentication: Authentication,
     ): ResponseEntity<CollaboratorResponse> {
         val userEmail = authentication.principal as String
         val response = budgetService.addCollaborator(budgetId, request, userEmail)
@@ -216,36 +233,37 @@ class BudgetController(
     @GetMapping("/{budgetId}/collaborators")
     @Operation(
         summary = "Get all collaborators for a budget",
-        description = "Retrieves the list of all users who have access to the specified budget. Only users with access to the budget can view its collaborators."
+        description = "Retrieves the list of all users who have access to the specified budget. Only users with access to the budget can " +
+            "view its collaborators.",
     )
     @ApiResponses(
         value = [
             ApiResponse(
                 responseCode = "200",
                 description = "Successfully retrieved collaborators list",
-                content = [Content(schema = Schema(implementation = UserResponse::class))]
+                content = [Content(schema = Schema(implementation = UserResponse::class))],
             ),
             ApiResponse(
                 responseCode = "401",
                 description = "Unauthorized - missing or invalid JWT token",
-                content = [Content()]
+                content = [Content()],
             ),
             ApiResponse(
                 responseCode = "403",
                 description = "Forbidden - user does not have access to this budget",
-                content = [Content()]
+                content = [Content()],
             ),
             ApiResponse(
                 responseCode = "404",
                 description = "Budget not found",
-                content = [Content()]
-            )
-        ]
+                content = [Content()],
+            ),
+        ],
     )
     fun getCollaborators(
         @Parameter(description = "ID of the budget", required = true)
         @PathVariable budgetId: Long,
-        authentication: Authentication
+        authentication: Authentication,
     ): ResponseEntity<List<UserResponse>> {
         val userEmail = authentication.principal as String
         val collaborators = budgetService.getCollaboratorsByBudgetId(budgetId, userEmail)
@@ -255,42 +273,43 @@ class BudgetController(
     @PostMapping("/{budgetId}/entries")
     @Operation(
         summary = "Create a budget entry",
-        description = "Creates a new income or expense entry within the budget. Type must be either INCOME or EXPENSE. Entry is tracked with creation timestamp and creator information. Triggers SSE notification to all connected clients."
+        description = "Creates a new income or expense entry within the budget. Type must be either INCOME or EXPENSE. Entry is tracked " +
+            "with creation timestamp and creator information. Triggers SSE notification to all connected clients.",
     )
     @ApiResponses(
         value = [
             ApiResponse(
                 responseCode = "201",
                 description = "Budget entry successfully created",
-                content = [Content(schema = Schema(implementation = BudgetEntryResponse::class))]
+                content = [Content(schema = Schema(implementation = BudgetEntryResponse::class))],
             ),
             ApiResponse(
                 responseCode = "400",
                 description = "Invalid request - validation errors (e.g., missing amount, invalid type, invalid category)",
-                content = [Content()]
+                content = [Content()],
             ),
             ApiResponse(
                 responseCode = "401",
                 description = "Unauthorized - missing or invalid JWT token",
-                content = [Content()]
+                content = [Content()],
             ),
             ApiResponse(
                 responseCode = "403",
                 description = "Forbidden - user does not have access to this budget",
-                content = [Content()]
+                content = [Content()],
             ),
             ApiResponse(
                 responseCode = "404",
                 description = "Budget not found",
-                content = [Content()]
-            )
-        ]
+                content = [Content()],
+            ),
+        ],
     )
     fun createEntry(
         @Parameter(description = "ID of the budget", required = true)
         @PathVariable budgetId: Long,
         @Valid @RequestBody request: CreateBudgetEntryRequest,
-        authentication: Authentication
+        authentication: Authentication,
     ): ResponseEntity<BudgetEntryResponse> {
         val userEmail = authentication.principal as String
         val response = budgetService.createEntry(budgetId, request, userEmail)
@@ -300,36 +319,37 @@ class BudgetController(
     @PutMapping("/{budgetId}/entries/{entryId}")
     @Operation(
         summary = "Update a budget entry",
-        description = "Updates an existing budget entry. Can modify amount, description, category, and type. Update is tracked with modification timestamp and updater information. Triggers SSE notification to all connected clients."
+        description = "Updates an existing budget entry. Can modify amount, description, category, and type. Update is tracked with " +
+            "modification timestamp and updater information. Triggers SSE notification to all connected clients.",
     )
     @ApiResponses(
         value = [
             ApiResponse(
                 responseCode = "200",
                 description = "Budget entry successfully updated",
-                content = [Content(schema = Schema(implementation = BudgetEntryResponse::class))]
+                content = [Content(schema = Schema(implementation = BudgetEntryResponse::class))],
             ),
             ApiResponse(
                 responseCode = "400",
                 description = "Invalid request - validation errors (e.g., invalid amount, invalid type, invalid category)",
-                content = [Content()]
+                content = [Content()],
             ),
             ApiResponse(
                 responseCode = "401",
                 description = "Unauthorized - missing or invalid JWT token",
-                content = [Content()]
+                content = [Content()],
             ),
             ApiResponse(
                 responseCode = "403",
                 description = "Forbidden - user does not have access to this budget",
-                content = [Content()]
+                content = [Content()],
             ),
             ApiResponse(
                 responseCode = "404",
                 description = "Budget or entry not found",
-                content = [Content()]
-            )
-        ]
+                content = [Content()],
+            ),
+        ],
     )
     fun updateEntry(
         @Parameter(description = "ID of the budget", required = true)
@@ -337,7 +357,7 @@ class BudgetController(
         @Parameter(description = "ID of the budget entry to update", required = true)
         @PathVariable entryId: Long,
         @Valid @RequestBody request: UpdateBudgetEntryRequest,
-        authentication: Authentication
+        authentication: Authentication,
     ): ResponseEntity<BudgetEntryResponse> {
         val userEmail = authentication.principal as String
         val response = budgetService.updateEntry(budgetId, entryId, request, userEmail)
@@ -347,31 +367,32 @@ class BudgetController(
     @GetMapping("/{budgetId}/entries")
     @Operation(
         summary = "Get all budget entries",
-        description = "Retrieves all income and expense entries for the specified budget. Only users with access to the budget can view its entries. Supports optional pagination via query parameters."
+        description = "Retrieves all income and expense entries for the specified budget. Only users with access to the budget can view " +
+            "its entries. Supports optional pagination via query parameters.",
     )
     @ApiResponses(
         value = [
             ApiResponse(
                 responseCode = "200",
                 description = "Successfully retrieved budget entries list",
-                content = [Content(schema = Schema(implementation = BudgetEntryResponse::class))]
+                content = [Content(schema = Schema(implementation = BudgetEntryResponse::class))],
             ),
             ApiResponse(
                 responseCode = "401",
                 description = "Unauthorized - missing or invalid JWT token",
-                content = [Content()]
+                content = [Content()],
             ),
             ApiResponse(
                 responseCode = "403",
                 description = "Forbidden - user does not have access to this budget",
-                content = [Content()]
+                content = [Content()],
             ),
             ApiResponse(
                 responseCode = "404",
                 description = "Budget not found",
-                content = [Content()]
-            )
-        ]
+                content = [Content()],
+            ),
+        ],
     )
     fun getEntries(
         @Parameter(description = "ID of the budget", required = true)
@@ -380,11 +401,15 @@ class BudgetController(
         @RequestParam(required = false) page: Int?,
         @Parameter(description = "Number of items per page", required = false, example = "20")
         @RequestParam(required = false) size: Int?,
-        @Parameter(description = "Field to sort by (modificationDate, creationDate, amount, description, category, type)", required = false, example = "modificationDate")
+        @Parameter(
+            description = "Field to sort by (modificationDate, creationDate, amount, description, category, type)",
+            required = false,
+            example = "modificationDate",
+        )
         @RequestParam(required = false, defaultValue = "modificationDate") sortBy: String,
         @Parameter(description = "Sort direction (asc or desc)", required = false, example = "desc")
         @RequestParam(required = false, defaultValue = "desc") sortDirection: String,
-        authentication: Authentication
+        authentication: Authentication,
     ): ResponseEntity<*> {
         val userEmail = authentication.principal as String
 
@@ -402,37 +427,41 @@ class BudgetController(
     @GetMapping("/{budgetId}/entries/stream", produces = [MediaType.TEXT_EVENT_STREAM_VALUE])
     @Operation(
         summary = "Subscribe to real-time budget entry updates",
-        description = "Opens a Server-Sent Events (SSE) stream that pushes real-time notifications when budget entries are created, updated, or deleted by OTHER collaborators. Your own changes are never echoed back, so there is no need to de-duplicate them client-side. Connection stays open and events are sent as they occur; a ':keep-alive' comment is sent on subscribe and every 15 seconds. Event type is 'budget-entry'."
+        description = "Opens a Server-Sent Events (SSE) stream that pushes real-time notifications when budget entries are created, " +
+            "updated, or deleted by OTHER collaborators. Your own changes are never echoed back, so there is no need to de-duplicate them" +
+            "client-side. Connection stays open and events are sent as they occur; a ':keep-alive' comment is sent on subscribe and every" +
+            "15" +
+            "seconds. Event type is 'budget-entry'.",
     )
     @ApiResponses(
         value = [
             ApiResponse(
                 responseCode = "200",
                 description = "SSE stream established. Returns a stream of budget entry events.",
-                content = [Content(mediaType = MediaType.TEXT_EVENT_STREAM_VALUE)]
+                content = [Content(mediaType = MediaType.TEXT_EVENT_STREAM_VALUE)],
             ),
             ApiResponse(
                 responseCode = "401",
                 description = "Unauthorized - missing or invalid JWT token",
-                content = [Content()]
+                content = [Content()],
             ),
             ApiResponse(
                 responseCode = "403",
                 description = "Forbidden - user does not have access to this budget",
-                content = [Content()]
+                content = [Content()],
             ),
             ApiResponse(
                 responseCode = "404",
                 description = "Budget not found",
-                content = [Content()]
-            )
-        ]
+                content = [Content()],
+            ),
+        ],
     )
     fun streamEntries(
         @Parameter(description = "ID of the budget to subscribe to", required = true)
         @PathVariable budgetId: Long,
         authentication: Authentication,
-        response: HttpServletResponse
+        response: HttpServletResponse,
     ): Flux<ServerSentEvent<BudgetEntryEvent>> {
         val userEmail = authentication.principal as String
 
@@ -494,36 +523,38 @@ class BudgetController(
     @DeleteMapping("/{budgetId}")
     @Operation(
         summary = "Delete a budget",
-        description = "Permanently deletes a budget and all its associated entries and collaborator relationships. Only users with access to the budget can delete it."
+        description =
+        "Permanently deletes a budget and all its associated entries and collaborator relationships. Only users with access " +
+            "to the budget can delete it.",
     )
     @ApiResponses(
         value = [
             ApiResponse(
                 responseCode = "204",
                 description = "Budget successfully deleted",
-                content = [Content()]
+                content = [Content()],
             ),
             ApiResponse(
                 responseCode = "401",
                 description = "Unauthorized - missing or invalid JWT token",
-                content = [Content()]
+                content = [Content()],
             ),
             ApiResponse(
                 responseCode = "403",
                 description = "Forbidden - user does not have access to this budget",
-                content = [Content()]
+                content = [Content()],
             ),
             ApiResponse(
                 responseCode = "404",
                 description = "Budget not found",
-                content = [Content()]
-            )
-        ]
+                content = [Content()],
+            ),
+        ],
     )
     fun deleteBudget(
         @Parameter(description = "ID of the budget to delete", required = true)
         @PathVariable budgetId: Long,
-        authentication: Authentication
+        authentication: Authentication,
     ): ResponseEntity<Void> {
         val userEmail = authentication.principal as String
         budgetService.deleteBudget(budgetId, userEmail)
@@ -533,38 +564,39 @@ class BudgetController(
     @DeleteMapping("/{budgetId}/entries/{entryId}")
     @Operation(
         summary = "Delete a budget entry",
-        description = "Permanently deletes a budget entry. Only users with access to the budget can delete its entries. Triggers SSE notification to all connected clients."
+        description = "Permanently deletes a budget entry. Only users with access to the budget can delete its entries. Triggers SSE " +
+            "notification to all connected clients.",
     )
     @ApiResponses(
         value = [
             ApiResponse(
                 responseCode = "204",
                 description = "Budget entry successfully deleted",
-                content = [Content()]
+                content = [Content()],
             ),
             ApiResponse(
                 responseCode = "401",
                 description = "Unauthorized - missing or invalid JWT token",
-                content = [Content()]
+                content = [Content()],
             ),
             ApiResponse(
                 responseCode = "403",
                 description = "Forbidden - user does not have access to this budget",
-                content = [Content()]
+                content = [Content()],
             ),
             ApiResponse(
                 responseCode = "404",
                 description = "Budget or entry not found",
-                content = [Content()]
-            )
-        ]
+                content = [Content()],
+            ),
+        ],
     )
     fun deleteEntry(
         @Parameter(description = "ID of the budget", required = true)
         @PathVariable budgetId: Long,
         @Parameter(description = "ID of the budget entry to delete", required = true)
         @PathVariable entryId: Long,
-        authentication: Authentication
+        authentication: Authentication,
     ): ResponseEntity<Void> {
         val userEmail = authentication.principal as String
         budgetService.deleteEntry(budgetId, entryId, userEmail)
@@ -574,38 +606,39 @@ class BudgetController(
     @DeleteMapping("/{budgetId}/collaborators/{collaboratorEmail}")
     @Operation(
         summary = "Remove a collaborator from a budget",
-        description = "Removes a user's access to the budget by their email. Only users with access to the budget can remove collaborators."
+        description = "Removes a user's access to the budget by their email. Only users with access to the budget can remove " +
+            "collaborators.",
     )
     @ApiResponses(
         value = [
             ApiResponse(
                 responseCode = "204",
                 description = "Collaborator successfully removed",
-                content = [Content()]
+                content = [Content()],
             ),
             ApiResponse(
                 responseCode = "401",
                 description = "Unauthorized - missing or invalid JWT token",
-                content = [Content()]
+                content = [Content()],
             ),
             ApiResponse(
                 responseCode = "403",
                 description = "Forbidden - user does not have access to this budget",
-                content = [Content()]
+                content = [Content()],
             ),
             ApiResponse(
                 responseCode = "404",
                 description = "Budget not found or collaborator not found in budget",
-                content = [Content()]
-            )
-        ]
+                content = [Content()],
+            ),
+        ],
     )
     fun removeCollaborator(
         @Parameter(description = "ID of the budget", required = true)
         @PathVariable budgetId: Long,
         @Parameter(description = "Email of the collaborator to remove", required = true)
         @PathVariable collaboratorEmail: String,
-        authentication: Authentication
+        authentication: Authentication,
     ): ResponseEntity<Void> {
         val userEmail = authentication.principal as String
         budgetService.removeCollaborator(budgetId, collaboratorEmail, userEmail)

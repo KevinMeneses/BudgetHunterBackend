@@ -13,5 +13,5 @@ data class SetPasswordRequest(
 
     @field:NotBlank(message = "Password is required")
     @field:Size(min = 6, message = "Password must be at least 6 characters")
-    val newPassword: String
+    val newPassword: String,
 )

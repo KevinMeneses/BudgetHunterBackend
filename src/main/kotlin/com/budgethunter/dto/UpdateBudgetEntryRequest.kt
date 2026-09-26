@@ -16,5 +16,5 @@ data class UpdateBudgetEntryRequest(
     val category: String,
 
     @field:NotNull(message = "Entry type is required")
-    val type: EntryType
+    val type: EntryType,
 )

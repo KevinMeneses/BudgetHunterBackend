@@ -17,5 +17,5 @@ data class CurrentUserResponse(
      * decide between offering to set a first password and offering to change an existing one.
      */
     val hasPassword: Boolean,
-    val authProvider: AuthProvider
+    val authProvider: AuthProvider,
 )

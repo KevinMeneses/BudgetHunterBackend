@@ -1,0 +1,8 @@
+root = true
+
+[*.{kt,kts}]
+# intellij_idea, not ktlint_official: the official style re-lays-out working code - splitting
+# `val x = foo.bar()` across three lines, breaking signatures that fit on one, adding trailing
+# commas. This style matches what IntelliJ does by default, so the formatter and the IDE agree.
+ktlint_code_style = intellij_idea
+max_line_length = 140

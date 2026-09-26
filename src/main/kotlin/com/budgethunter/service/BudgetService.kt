@@ -1,6 +1,19 @@
 package com.budgethunter.service
 
-import com.budgethunter.dto.*
+import com.budgethunter.dto.AddCollaboratorRequest
+import com.budgethunter.dto.BudgetEntryAction
+import com.budgethunter.dto.BudgetEntryEvent
+import com.budgethunter.dto.BudgetEntryResponse
+import com.budgethunter.dto.BudgetResponse
+import com.budgethunter.dto.CollaboratorResponse
+import com.budgethunter.dto.CreateBudgetEntryRequest
+import com.budgethunter.dto.CreateBudgetRequest
+import com.budgethunter.dto.PageResponse
+import com.budgethunter.dto.PutEntryRequest
+import com.budgethunter.dto.UpdateBudgetEntryRequest
+import com.budgethunter.dto.UpdateBudgetRequest
+import com.budgethunter.dto.UserEventInfo
+import com.budgethunter.dto.UserResponse
 import com.budgethunter.exception.ForbiddenAccessException
 import com.budgethunter.model.Budget
 import com.budgethunter.model.BudgetEntry
@@ -23,7 +36,7 @@ class BudgetService(
     private val userBudgetRepository: UserBudgetRepository,
     private val userRepository: UserRepository,
     private val budgetEntryRepository: BudgetEntryRepository,
-    private val reactiveSseService: ReactiveSseService
+    private val reactiveSseService: ReactiveSseService,
 ) {
 
     @Transactional
@@ -33,7 +46,7 @@ class BudgetService(
 
         val budget = Budget(
             name = request.name,
-            amount = request.amount
+            amount = request.amount,
         )
 
         val savedBudget = budgetRepository.save(budget)
@@ -41,10 +54,10 @@ class BudgetService(
         val userBudget = UserBudget(
             id = UserBudgetId(
                 budgetId = savedBudget.id,
-                userEmail = userEmail
+                userEmail = userEmail,
             ),
             budget = savedBudget,
-            user = user
+            user = user,
         )
 
         userBudgetRepository.save(userBudget)
@@ -52,7 +65,7 @@ class BudgetService(
         return BudgetResponse(
             id = savedBudget.id!!,
             name = savedBudget.name,
-            amount = savedBudget.amount
+            amount = savedBudget.amount,
         )
     }
 
@@ -63,13 +76,19 @@ class BudgetService(
             BudgetResponse(
                 id = budget.id!!,
                 name = budget.name,
-                amount = budget.amount
+                amount = budget.amount,
             )
         }
     }
 
     @Transactional(readOnly = true)
-    fun getBudgetsByUserEmail(userEmail: String, page: Int, size: Int, sortBy: String = "id", sortDirection: String = "asc"): PageResponse<BudgetResponse> {
+    fun getBudgetsByUserEmail(
+        userEmail: String,
+        page: Int,
+        size: Int,
+        sortBy: String = "id",
+        sortDirection: String = "asc",
+    ): PageResponse<BudgetResponse> {
         val sort = if (sortDirection.lowercase() == "desc") {
             Sort.by(sortBy).descending()
         } else {
@@ -83,7 +102,7 @@ class BudgetService(
             BudgetResponse(
                 id = budget.id!!,
                 name = budget.name,
-                amount = budget.amount
+                amount = budget.amount,
             )
         }
     }
@@ -97,7 +116,7 @@ class BudgetService(
 
         val updatedBudget = budget.copy(
             name = request.name,
-            amount = request.amount
+            amount = request.amount,
         )
 
         val savedBudget = budgetRepository.save(updatedBudget)
@@ -105,7 +124,7 @@ class BudgetService(
         return BudgetResponse(
             id = savedBudget.id!!,
             name = savedBudget.name,
-            amount = savedBudget.amount
+            amount = savedBudget.amount,
         )
     }
 
@@ -121,7 +140,7 @@ class BudgetService(
 
         val userBudgetId = UserBudgetId(
             budgetId = budgetId,
-            userEmail = request.email
+            userEmail = request.email,
         )
 
         if (userBudgetRepository.existsById(userBudgetId)) {
@@ -131,7 +150,7 @@ class BudgetService(
         val userBudget = UserBudget(
             id = userBudgetId,
             budget = budget,
-            user = collaborator
+            user = collaborator,
         )
 
         userBudgetRepository.save(userBudget)
@@ -140,7 +159,7 @@ class BudgetService(
             budgetId = budget.id!!,
             budgetName = budget.name,
             collaboratorEmail = collaborator.email,
-            collaboratorName = collaborator.name
+            collaboratorName = collaborator.name,
         )
     }
 
@@ -156,7 +175,7 @@ class BudgetService(
         return users.map { user ->
             UserResponse(
                 email = user.email,
-                name = user.name
+                name = user.name,
             )
         }
     }
@@ -174,7 +193,14 @@ class BudgetService(
     }
 
     @Transactional(readOnly = true)
-    fun getEntriesByBudgetId(budgetId: Long, authenticatedUserEmail: String, page: Int, size: Int, sortBy: String = "modificationDate", sortDirection: String = "desc"): PageResponse<BudgetEntryResponse> {
+    fun getEntriesByBudgetId(
+        budgetId: Long,
+        authenticatedUserEmail: String,
+        page: Int,
+        size: Int,
+        sortBy: String = "modificationDate",
+        sortDirection: String = "desc",
+    ): PageResponse<BudgetEntryResponse> {
         verifyUserHasAccessToBudget(budgetId, authenticatedUserEmail)
 
         if (!budgetRepository.existsById(budgetId)) {
@@ -211,7 +237,7 @@ class BudgetService(
             type = request.type,
             createdBy = user,
             creationDate = LocalDateTime.now(),
-            modificationDate = LocalDateTime.now()
+            modificationDate = LocalDateTime.now(),
         )
 
         val savedEntry = budgetEntryRepository.save(newEntry)
@@ -242,7 +268,7 @@ class BudgetService(
             category = request.category,
             type = request.type,
             updatedBy = user,
-            modificationDate = LocalDateTime.now()
+            modificationDate = LocalDateTime.now(),
         )
 
         val savedEntry = budgetEntryRepository.save(updatedEntry)
@@ -287,7 +313,7 @@ class BudgetService(
             type = request.type,
             createdBy = user,
             creationDate = LocalDateTime.now(),
-            modificationDate = LocalDateTime.now()
+            modificationDate = LocalDateTime.now(),
         )
 
         return budgetEntryRepository.save(newEntry)
@@ -307,7 +333,7 @@ class BudgetService(
             category = request.category,
             type = request.type,
             updatedBy = user,
-            modificationDate = LocalDateTime.now()
+            modificationDate = LocalDateTime.now(),
         )
 
         return budgetEntryRepository.save(updatedEntry)
@@ -323,7 +349,7 @@ class BudgetService(
         createdByEmail = this.createdBy?.email,
         updatedByEmail = this.updatedBy?.email,
         creationDate = this.creationDate,
-        modificationDate = this.modificationDate
+        modificationDate = this.modificationDate,
     )
 
     @Transactional
@@ -401,22 +427,20 @@ class BudgetService(
             action = action,
             userInfo = UserEventInfo(
                 email = user.email,
-                name = user.name
-            )
+                name = user.name,
+            ),
         )
 
         reactiveSseService.broadcastEvent(budgetEntry.budget.id, event)
     }
 
-    private fun <T, R> Page<T>.toPageResponse(transform: (T) -> R): PageResponse<R> {
-        return PageResponse(
-            content = this.content.map(transform),
-            page = this.number,
-            size = this.size,
-            totalElements = this.totalElements,
-            totalPages = this.totalPages,
-            isFirst = this.isFirst,
-            isLast = this.isLast
-        )
-    }
+    private fun <T, R> Page<T>.toPageResponse(transform: (T) -> R): PageResponse<R> = PageResponse(
+        content = this.content.map(transform),
+        page = this.number,
+        size = this.size,
+        totalElements = this.totalElements,
+        totalPages = this.totalPages,
+        isFirst = this.isFirst,
+        isLast = this.isLast,
+    )
 }

@@ -6,7 +6,10 @@ import com.budgethunter.dto.SignInResponse
 import com.budgethunter.dto.SignUpRequest
 import com.budgethunter.dto.UserResponse
 import com.fasterxml.jackson.databind.ObjectMapper
-import org.junit.jupiter.api.Assertions.*
+import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertNotEquals
+import org.junit.jupiter.api.Assertions.assertNotNull
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
@@ -14,8 +17,9 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.http.MediaType
 import org.springframework.test.web.servlet.MockMvc
-import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*
-import org.springframework.test.web.servlet.result.MockMvcResultMatchers.*
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
+import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath
+import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
 import org.springframework.transaction.annotation.Transactional
 
 @SpringBootTest
@@ -46,14 +50,14 @@ class AuthenticationIntegrationTest {
         val request = SignUpRequest(
             email = testEmail,
             name = testName,
-            password = testPassword
+            password = testPassword,
         )
 
         // When & Then
         val result = mockMvc.perform(
             post("/api/users/sign_up")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(request))
+                .content(objectMapper.writeValueAsString(request)),
         )
             .andExpect(status().isCreated)
             .andExpect(jsonPath("$.email").value(testEmail))
@@ -71,14 +75,14 @@ class AuthenticationIntegrationTest {
         val request = SignUpRequest(
             email = "invalid-email",
             name = testName,
-            password = testPassword
+            password = testPassword,
         )
 
         // When & Then
         mockMvc.perform(
             post("/api/users/sign_up")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(request))
+                .content(objectMapper.writeValueAsString(request)),
         )
             .andExpect(status().isBadRequest)
     }
@@ -89,13 +93,13 @@ class AuthenticationIntegrationTest {
         val request = SignUpRequest(
             email = testEmail,
             name = testName,
-            password = testPassword
+            password = testPassword,
         )
 
         mockMvc.perform(
             post("/api/users/sign_up")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(request))
+                .content(objectMapper.writeValueAsString(request)),
         )
             .andExpect(status().isCreated)
 
@@ -103,7 +107,7 @@ class AuthenticationIntegrationTest {
         mockMvc.perform(
             post("/api/users/sign_up")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(request))
+                .content(objectMapper.writeValueAsString(request)),
         )
             .andExpect(status().isBadRequest)
     }
@@ -116,26 +120,26 @@ class AuthenticationIntegrationTest {
         val signUpRequest = SignUpRequest(
             email = testEmail,
             name = testName,
-            password = testPassword
+            password = testPassword,
         )
 
         mockMvc.perform(
             post("/api/users/sign_up")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(signUpRequest))
+                .content(objectMapper.writeValueAsString(signUpRequest)),
         )
             .andExpect(status().isCreated)
 
         // When - Sign in
         val signInRequest = SignInRequest(
             email = testEmail,
-            password = testPassword
+            password = testPassword,
         )
 
         val result = mockMvc.perform(
             post("/api/users/sign_in")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(signInRequest))
+                .content(objectMapper.writeValueAsString(signInRequest)),
         )
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.authToken").exists())
@@ -156,14 +160,14 @@ class AuthenticationIntegrationTest {
         // Given
         val signInRequest = SignInRequest(
             email = "nonexistent@example.com",
-            password = testPassword
+            password = testPassword,
         )
 
         // When & Then
         mockMvc.perform(
             post("/api/users/sign_in")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(signInRequest))
+                .content(objectMapper.writeValueAsString(signInRequest)),
         )
             .andExpect(status().isUnauthorized)
     }
@@ -174,26 +178,26 @@ class AuthenticationIntegrationTest {
         val signUpRequest = SignUpRequest(
             email = testEmail,
             name = testName,
-            password = testPassword
+            password = testPassword,
         )
 
         mockMvc.perform(
             post("/api/users/sign_up")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(signUpRequest))
+                .content(objectMapper.writeValueAsString(signUpRequest)),
         )
             .andExpect(status().isCreated)
 
         // When - Try to sign in with wrong password
         val signInRequest = SignInRequest(
             email = testEmail,
-            password = "WrongPassword123!"
+            password = "WrongPassword123!",
         )
 
         mockMvc.perform(
             post("/api/users/sign_in")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(signInRequest))
+                .content(objectMapper.writeValueAsString(signInRequest)),
         )
             .andExpect(status().isUnauthorized)
     }
@@ -206,25 +210,25 @@ class AuthenticationIntegrationTest {
         val signUpRequest = SignUpRequest(
             email = testEmail,
             name = testName,
-            password = testPassword
+            password = testPassword,
         )
 
         mockMvc.perform(
             post("/api/users/sign_up")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(signUpRequest))
+                .content(objectMapper.writeValueAsString(signUpRequest)),
         )
             .andExpect(status().isCreated)
 
         val signInRequest = SignInRequest(
             email = testEmail,
-            password = testPassword
+            password = testPassword,
         )
 
         val signInResult = mockMvc.perform(
             post("/api/users/sign_in")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(signInRequest))
+                .content(objectMapper.writeValueAsString(signInRequest)),
         )
             .andExpect(status().isOk)
             .andReturn()
@@ -238,7 +242,7 @@ class AuthenticationIntegrationTest {
         val result = mockMvc.perform(
             post("/api/users/refresh_token")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(refreshRequest))
+                .content(objectMapper.writeValueAsString(refreshRequest)),
         )
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.authToken").exists())
@@ -261,7 +265,7 @@ class AuthenticationIntegrationTest {
         mockMvc.perform(
             post("/api/users/refresh_token")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(refreshRequest))
+                .content(objectMapper.writeValueAsString(refreshRequest)),
         )
             .andExpect(status().isUnauthorized)
     }
@@ -274,13 +278,13 @@ class AuthenticationIntegrationTest {
         val signUpRequest = SignUpRequest(
             email = testEmail,
             name = testName,
-            password = testPassword
+            password = testPassword,
         )
 
         mockMvc.perform(
             post("/api/users/sign_up")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(signUpRequest))
+                .content(objectMapper.writeValueAsString(signUpRequest)),
         )
             .andExpect(status().isCreated)
             .andExpect(jsonPath("$.email").value(testEmail))
@@ -288,13 +292,13 @@ class AuthenticationIntegrationTest {
         // Step 2: Sign in
         val signInRequest = SignInRequest(
             email = testEmail,
-            password = testPassword
+            password = testPassword,
         )
 
         val signInResult = mockMvc.perform(
             post("/api/users/sign_in")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(signInRequest))
+                .content(objectMapper.writeValueAsString(signInRequest)),
         )
             .andExpect(status().isOk)
             .andReturn()
@@ -308,7 +312,7 @@ class AuthenticationIntegrationTest {
         val refreshResult = mockMvc.perform(
             post("/api/users/refresh_token")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(refreshRequest))
+                .content(objectMapper.writeValueAsString(refreshRequest)),
         )
             .andExpect(status().isOk)
             .andReturn()
@@ -324,7 +328,7 @@ class AuthenticationIntegrationTest {
         mockMvc.perform(
             post("/api/users/refresh_token")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(refreshRequest))
+                .content(objectMapper.writeValueAsString(refreshRequest)),
         )
             .andExpect(status().isUnauthorized)
     }

@@ -32,9 +32,7 @@ import org.springframework.web.servlet.HandlerInterceptor
  * - false: Request is rejected, controller is never called
  */
 @Component
-class RateLimitInterceptor(
-    private val rateLimitConfig: RateLimitConfig
-) : HandlerInterceptor {
+class RateLimitInterceptor(private val rateLimitConfig: RateLimitConfig) : HandlerInterceptor {
 
     private val logger = LoggerFactory.getLogger(RateLimitInterceptor::class.java)
 
@@ -46,11 +44,7 @@ class RateLimitInterceptor(
      * @param handler The controller method that would be called
      * @return true to continue, false to stop the request
      */
-    override fun preHandle(
-        request: HttpServletRequest,
-        response: HttpServletResponse,
-        handler: Any
-    ): Boolean {
+    override fun preHandle(request: HttpServletRequest, response: HttpServletResponse, handler: Any): Boolean {
         // STEP 1: Identify the client by IP address
         val clientIp = getClientIp(request)
 
@@ -76,7 +70,7 @@ class RateLimitInterceptor(
             // nanosToWait / 1_000_000_000 converts nanoseconds to seconds
             response.addHeader(
                 "X-Rate-Limit-Retry-After-Seconds",
-                (probe.nanosToWaitForRefill / 1_000_000_000).toString()
+                (probe.nanosToWaitForRefill / 1_000_000_000).toString(),
             )
 
             logger.debug("Rate limit check passed for IP: $clientIp (${probe.remainingTokens} tokens remaining)")
@@ -93,13 +87,15 @@ class RateLimitInterceptor(
 
             // Set response body with helpful error message
             response.contentType = "application/json"
-            response.writer.write("""
+            response.writer.write(
+                """
                 {
                     "error": "Too Many Requests",
                     "message": "You have exceeded the rate limit. Please try again in ${probe.nanosToWaitForRefill / 1_000_000_000} seconds.",
                     "status": 429
                 }
-            """.trimIndent())
+                """.trimIndent(),
+            )
 
             logger.warn("Rate limit exceeded for IP: $clientIp (retry after ${probe.nanosToWaitForRefill / 1_000_000_000}s)")
 

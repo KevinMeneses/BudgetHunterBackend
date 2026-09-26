@@ -1,19 +1,11 @@
 package com.budgethunter.dto
 
-data class BudgetEntryEvent(
-    val budgetId: Long,
-    val entryId: Long,
-    val action: BudgetEntryAction,
-    val userInfo: UserEventInfo
-)
+data class BudgetEntryEvent(val budgetId: Long, val entryId: Long, val action: BudgetEntryAction, val userInfo: UserEventInfo)
 
 enum class BudgetEntryAction {
     CREATED,
     UPDATED,
-    DELETED
+    DELETED,
 }
 
-data class UserEventInfo(
-    val email: String,
-    val name: String
-)
+data class UserEventInfo(val email: String, val name: String)

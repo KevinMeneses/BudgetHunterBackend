@@ -27,5 +27,5 @@ data class PageResponse<T>(
     val isFirst: Boolean,
 
     @Schema(description = "Whether this is the last page", example = "false")
-    val isLast: Boolean
+    val isLast: Boolean,
 )

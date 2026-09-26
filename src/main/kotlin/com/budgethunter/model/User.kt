@@ -1,6 +1,13 @@
 package com.budgethunter.model
 
-import jakarta.persistence.*
+import jakarta.persistence.CascadeType
+import jakarta.persistence.Column
+import jakarta.persistence.Entity
+import jakarta.persistence.EnumType
+import jakarta.persistence.Enumerated
+import jakarta.persistence.Id
+import jakarta.persistence.OneToMany
+import jakarta.persistence.Table
 import jakarta.validation.constraints.Email
 import jakarta.validation.constraints.NotBlank
 import java.time.Instant
@@ -39,5 +46,5 @@ data class User(
     var refreshTokenExpiry: Instant? = null,
 
     @field:OneToMany(mappedBy = "user", cascade = [CascadeType.ALL], orphanRemoval = true)
-    val userBudgets: MutableList<UserBudget> = mutableListOf()
+    val userBudgets: MutableList<UserBudget> = mutableListOf(),
 )

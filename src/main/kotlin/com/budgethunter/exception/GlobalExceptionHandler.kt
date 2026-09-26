@@ -8,11 +8,7 @@ import org.springframework.web.bind.MethodArgumentNotValidException
 import org.springframework.web.bind.annotation.ExceptionHandler
 import org.springframework.web.bind.annotation.RestControllerAdvice
 
-data class ErrorResponse(
-    val status: Int,
-    val message: String,
-    val errors: List<String>? = null
-)
+data class ErrorResponse(val status: Int, val message: String, val errors: List<String>? = null)
 
 @RestControllerAdvice
 class GlobalExceptionHandler {
@@ -24,7 +20,7 @@ class GlobalExceptionHandler {
         logger.warn("Bad request: ${ex.message}")
         val errorResponse = ErrorResponse(
             status = HttpStatus.BAD_REQUEST.value(),
-            message = ex.message ?: "Invalid request"
+            message = ex.message ?: "Invalid request",
         )
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(errorResponse)
     }
@@ -34,7 +30,7 @@ class GlobalExceptionHandler {
         logger.warn("Conflict: ${ex.message}")
         val errorResponse = ErrorResponse(
             status = HttpStatus.CONFLICT.value(),
-            message = ex.message ?: "Conflict"
+            message = ex.message ?: "Conflict",
         )
         return ResponseEntity.status(HttpStatus.CONFLICT).body(errorResponse)
     }
@@ -44,7 +40,7 @@ class GlobalExceptionHandler {
         logger.warn("Authentication failed: ${ex.message}")
         val errorResponse = ErrorResponse(
             status = HttpStatus.UNAUTHORIZED.value(),
-            message = ex.message ?: "Invalid credentials"
+            message = ex.message ?: "Invalid credentials",
         )
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(errorResponse)
     }
@@ -54,7 +50,7 @@ class GlobalExceptionHandler {
         logger.warn("Forbidden access: ${ex.message}")
         val errorResponse = ErrorResponse(
             status = HttpStatus.FORBIDDEN.value(),
-            message = ex.message ?: "Access denied"
+            message = ex.message ?: "Access denied",
         )
         return ResponseEntity.status(HttpStatus.FORBIDDEN).body(errorResponse)
     }
@@ -66,7 +62,7 @@ class GlobalExceptionHandler {
         val errorResponse = ErrorResponse(
             status = HttpStatus.BAD_REQUEST.value(),
             message = "Validation failed",
-            errors = errors
+            errors = errors,
         )
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(errorResponse)
     }
@@ -78,7 +74,7 @@ class GlobalExceptionHandler {
 
         val errorResponse = ErrorResponse(
             status = HttpStatus.INTERNAL_SERVER_ERROR.value(),
-            message = "An unexpected error occurred"
+            message = "An unexpected error occurred",
         )
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse)
     }

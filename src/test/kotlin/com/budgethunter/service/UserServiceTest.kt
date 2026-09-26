@@ -11,16 +11,22 @@ import com.budgethunter.repository.UserRepository
 import com.budgethunter.util.GoogleTokenVerifier
 import com.budgethunter.util.GoogleUserInfo
 import com.budgethunter.util.JwtUtil
-import io.mockk.*
+import io.mockk.clearAllMocks
+import io.mockk.every
+import io.mockk.mockk
+import io.mockk.slot
+import io.mockk.verify
 import org.junit.jupiter.api.AfterEach
-import org.junit.jupiter.api.Assertions.*
+import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertFalse
+import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
 import org.springframework.security.authentication.BadCredentialsException
 import org.springframework.security.crypto.password.PasswordEncoder
 import java.time.Instant
-import java.util.*
+import java.util.Optional
 
 class UserServiceTest {
 
@@ -52,13 +58,13 @@ class UserServiceTest {
         val request = SignUpRequest(
             email = "test@example.com",
             name = "Test User",
-            password = "password123"
+            password = "password123",
         )
         val encodedPassword = "encodedPassword123"
         val savedUser = User(
             email = request.email,
             name = request.name,
-            password = encodedPassword
+            password = encodedPassword,
         )
 
         every { userRepository.existsByEmail(request.email) } returns false
@@ -83,7 +89,7 @@ class UserServiceTest {
         val request = SignUpRequest(
             email = "existing@example.com",
             name = "Test User",
-            password = "password123"
+            password = "password123",
         )
 
         every { userRepository.existsByEmail(request.email) } returns true
@@ -106,12 +112,12 @@ class UserServiceTest {
         // Given
         val request = SignInRequest(
             email = "test@example.com",
-            password = "password123"
+            password = "password123",
         )
         val user = User(
             email = request.email,
             name = "Test User",
-            password = "encodedPassword"
+            password = "encodedPassword",
         )
         val authToken = "jwt-auth-token"
         val refreshToken = "refresh-token-uuid"
@@ -146,7 +152,7 @@ class UserServiceTest {
         // Given
         val request = SignInRequest(
             email = "nonexistent@example.com",
-            password = "password123"
+            password = "password123",
         )
 
         every { userRepository.findById(request.email) } returns Optional.empty()
@@ -166,12 +172,12 @@ class UserServiceTest {
         // Given
         val request = SignInRequest(
             email = "test@example.com",
-            password = "wrongpassword"
+            password = "wrongpassword",
         )
         val user = User(
             email = request.email,
             name = "Test User",
-            password = "encodedPassword"
+            password = "encodedPassword",
         )
 
         every { userRepository.findById(request.email) } returns Optional.of(user)
@@ -200,7 +206,7 @@ class UserServiceTest {
             name = "Test User",
             password = "encodedPassword",
             refreshToken = refreshToken,
-            refreshTokenExpiry = Instant.now().plusSeconds(3600)
+            refreshTokenExpiry = Instant.now().plusSeconds(3600),
         )
         val newAuthToken = "new-jwt-auth-token"
         val newRefreshToken = "new-refresh-token-uuid"
@@ -256,7 +262,7 @@ class UserServiceTest {
             name = "Test User",
             password = "encodedPassword",
             refreshToken = refreshToken,
-            refreshTokenExpiry = Instant.now().minusSeconds(3600) // Expired 1 hour ago
+            refreshTokenExpiry = Instant.now().minusSeconds(3600), // Expired 1 hour ago
         )
 
         every { userRepository.findByRefreshToken(refreshToken) } returns Optional.of(user)
@@ -281,7 +287,7 @@ class UserServiceTest {
             name = "Test User",
             password = "encodedPassword",
             refreshToken = refreshToken,
-            refreshTokenExpiry = null
+            refreshTokenExpiry = null,
         )
 
         every { userRepository.findByRefreshToken(refreshToken) } returns Optional.of(user)
@@ -302,7 +308,7 @@ class UserServiceTest {
         subject: String = "google-sub-123",
         email: String = "test@example.com",
         emailVerified: Boolean = true,
-        name: String? = "Test User"
+        name: String? = "Test User",
     ) = GoogleUserInfo(subject, email, emailVerified, name)
 
     private fun stubSessionIssuing() {
@@ -344,7 +350,7 @@ class UserServiceTest {
             email = "test@example.com",
             name = "Existing User",
             password = "encodedPassword",
-            authProvider = AuthProvider.PASSWORD
+            authProvider = AuthProvider.PASSWORD,
         )
         every { googleTokenVerifier.verify(request.idToken) } returns googleInfo()
         every { userRepository.findByGoogleSubject("google-sub-123") } returns Optional.empty()
@@ -371,7 +377,7 @@ class UserServiceTest {
             name = "Test User",
             password = null,
             googleSubject = "google-sub-123",
-            authProvider = AuthProvider.GOOGLE
+            authProvider = AuthProvider.GOOGLE,
         )
         every { googleTokenVerifier.verify(request.idToken) } returns googleInfo(email = "new@example.com")
         every { userRepository.findByGoogleSubject("google-sub-123") } returns Optional.of(existing)
@@ -450,7 +456,7 @@ class UserServiceTest {
             name = "Test User",
             password = null,
             googleSubject = "google-sub-123",
-            authProvider = AuthProvider.GOOGLE
+            authProvider = AuthProvider.GOOGLE,
         )
         every { userRepository.findById(request.email) } returns Optional.of(googleOnlyUser)
 
@@ -469,7 +475,7 @@ class UserServiceTest {
             name = "Test User",
             password = null,
             googleSubject = "google-sub-123",
-            authProvider = AuthProvider.GOOGLE
+            authProvider = AuthProvider.GOOGLE,
         )
         every { userRepository.findById("test@example.com") } returns Optional.of(user)
         every { passwordEncoder.encode("newPassword") } returns "encodedNewPassword"
@@ -508,7 +514,7 @@ class UserServiceTest {
         assertThrows<BadCredentialsException> {
             userService.setPassword(
                 "test@example.com",
-                SetPasswordRequest(currentPassword = "wrongPassword", newPassword = "newPassword")
+                SetPasswordRequest(currentPassword = "wrongPassword", newPassword = "newPassword"),
             )
         }
         assertEquals("encodedPassword", user.password)
@@ -526,7 +532,7 @@ class UserServiceTest {
         // When
         userService.setPassword(
             "test@example.com",
-            SetPasswordRequest(currentPassword = "oldPassword", newPassword = "newPassword")
+            SetPasswordRequest(currentPassword = "oldPassword", newPassword = "newPassword"),
         )
 
         // Then
@@ -544,7 +550,7 @@ class UserServiceTest {
             name = "Test User",
             password = null,
             googleSubject = "google-sub-123",
-            authProvider = AuthProvider.GOOGLE
+            authProvider = AuthProvider.GOOGLE,
         )
         every { userRepository.findById("test@example.com") } returns Optional.of(user)
 

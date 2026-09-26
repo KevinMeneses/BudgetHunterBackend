@@ -11,8 +11,8 @@ import org.springframework.boot.test.context.SpringBootTest
  */
 @SpringBootTest(
     properties = [
-        "google.auth.client-ids=web-client-id.apps.googleusercontent.com, ios-client-id.apps.googleusercontent.com"
-    ]
+        "google.auth.client-ids=web-client-id.apps.googleusercontent.com, ios-client-id.apps.googleusercontent.com",
+    ],
 )
 class GoogleIdTokenVerifierAdapterTest {
 
@@ -26,9 +26,9 @@ class GoogleIdTokenVerifierAdapterTest {
         assertEquals(
             listOf(
                 "web-client-id.apps.googleusercontent.com",
-                "ios-client-id.apps.googleusercontent.com"
+                "ios-client-id.apps.googleusercontent.com",
             ),
-            adapter.audiences
+            adapter.audiences,
         )
     }
 }

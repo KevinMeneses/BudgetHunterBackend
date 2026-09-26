@@ -1,7 +1,17 @@
 package com.budgethunter.integration
 
 import com.budgethunter.controller.BudgetController
-import com.budgethunter.dto.*
+import com.budgethunter.dto.AddCollaboratorRequest
+import com.budgethunter.dto.BudgetEntryAction
+import com.budgethunter.dto.BudgetEntryEvent
+import com.budgethunter.dto.BudgetEntryResponse
+import com.budgethunter.dto.BudgetResponse
+import com.budgethunter.dto.CreateBudgetEntryRequest
+import com.budgethunter.dto.CreateBudgetRequest
+import com.budgethunter.dto.SignInRequest
+import com.budgethunter.dto.SignInResponse
+import com.budgethunter.dto.SignUpRequest
+import com.budgethunter.dto.UpdateBudgetEntryRequest
 import com.budgethunter.model.EntryType
 import com.fasterxml.jackson.databind.ObjectMapper
 import org.junit.jupiter.api.Assertions.assertEquals
@@ -86,7 +96,7 @@ class SseStreamDeliveryIntegrationTest {
         // The whole point: data arrives right away, not one heartbeat interval later
         assertTrue(
             elapsed < BudgetController.HEARTBEAT_INTERVAL,
-            "First keep-alive took $elapsed, expected well under ${BudgetController.HEARTBEAT_INTERVAL}"
+            "First keep-alive took $elapsed, expected well under ${BudgetController.HEARTBEAT_INTERVAL}",
         )
     }
 
@@ -109,7 +119,7 @@ class SseStreamDeliveryIntegrationTest {
 
         assertTrue(
             contentType.orElse("").startsWith(MediaType.TEXT_EVENT_STREAM_VALUE),
-            "Expected text/event-stream, got ${contentType.orElse("<none>")}"
+            "Expected text/event-stream, got ${contentType.orElse("<none>")}",
         )
     }
 
@@ -125,7 +135,7 @@ class SseStreamDeliveryIntegrationTest {
     fun `stream should be rejected for a budget the user cannot access`() {
         val otherUserToken = createAndAuthenticateUser(
             email = "sse-stream-outsider@example.com",
-            name = "Outsider"
+            name = "Outsider",
         )
 
         val response = openStream(token = otherUserToken)
@@ -194,7 +204,7 @@ class SseStreamDeliveryIntegrationTest {
                 // ...while the author does not get their own change echoed back
                 assertNull(
                     authorStream.nextEvent(SELF_ECHO_WINDOW),
-                    "The author must not receive their own event"
+                    "The author must not receive their own event",
                 )
             }
         }
@@ -214,9 +224,7 @@ class SseStreamDeliveryIntegrationTest {
      * reads. Comment frames (`:keep-alive`) and data frames are kept apart, because the
      * point of most of these tests is which data frames do *not* arrive.
      */
-    private inner class StreamReader(
-        private val response: HttpResponse<java.io.InputStream>
-    ) : AutoCloseable {
+    private inner class StreamReader(private val response: HttpResponse<java.io.InputStream>) : AutoCloseable {
         private val lines = LinkedBlockingQueue<String>()
 
         init {
@@ -243,7 +251,7 @@ class SseStreamDeliveryIntegrationTest {
                 if (line.startsWith("data:")) {
                     return objectMapper.readValue(
                         line.removePrefix("data:").trim(),
-                        BudgetEntryEvent::class.java
+                        BudgetEntryEvent::class.java,
                     )
                 }
             }
@@ -263,7 +271,7 @@ class SseStreamDeliveryIntegrationTest {
         restTemplate.postForEntity(
             "/api/budgets/$budgetId/collaborators",
             HttpEntity(AddCollaboratorRequest(budgetId, email), headers),
-            String::class.java
+            String::class.java,
         )
 
         return collaboratorToken
@@ -276,13 +284,13 @@ class SseStreamDeliveryIntegrationTest {
             amount = BigDecimal("42.00"),
             description = description,
             category = "SSE",
-            type = EntryType.OUTCOME
+            type = EntryType.OUTCOME,
         )
 
         val response = restTemplate.postForEntity(
             "/api/budgets/$budgetId/entries",
             HttpEntity(request, headers),
-            BudgetEntryResponse::class.java
+            BudgetEntryResponse::class.java,
         )
 
         return requireNotNull(response.body) { "Entry creation failed: ${response.statusCode}" }
@@ -295,14 +303,14 @@ class SseStreamDeliveryIntegrationTest {
             amount = BigDecimal("84.00"),
             description = description,
             category = "SSE",
-            type = EntryType.OUTCOME
+            type = EntryType.OUTCOME,
         )
 
         restTemplate.exchange(
             "/api/budgets/$budgetId/entries/$entryId",
             HttpMethod.PUT,
             HttpEntity(request, headers),
-            String::class.java
+            String::class.java,
         )
     }
 
@@ -312,7 +320,7 @@ class SseStreamDeliveryIntegrationTest {
             "/api/budgets/$budgetId/entries/$entryId",
             HttpMethod.DELETE,
             HttpEntity<Void>(headers),
-            String::class.java
+            String::class.java,
         )
     }
 
@@ -321,10 +329,7 @@ class SseStreamDeliveryIntegrationTest {
      * headers are available - which, for a streaming response, only happens once the
      * server has actually flushed them.
      */
-    private fun openStream(
-        token: String? = authToken,
-        budgetId: Long = this.budgetId
-    ): HttpResponse<java.io.InputStream> {
+    private fun openStream(token: String? = authToken, budgetId: Long = this.budgetId): HttpResponse<java.io.InputStream> {
         val request = HttpRequest.newBuilder()
             .uri(URI.create("http://localhost:$port/api/budgets/$budgetId/entries/stream"))
             .header(HttpHeaders.ACCEPT, MediaType.TEXT_EVENT_STREAM_VALUE)
@@ -354,13 +359,13 @@ class SseStreamDeliveryIntegrationTest {
         restTemplate.postForEntity(
             "/api/users/sign_up",
             HttpEntity(SignUpRequest(email = email, name = name, password = userPassword), jsonHeaders()),
-            String::class.java
+            String::class.java,
         )
 
         val response = restTemplate.postForEntity(
             "/api/users/sign_in",
             HttpEntity(SignInRequest(email = email, password = userPassword), jsonHeaders()),
-            SignInResponse::class.java
+            SignInResponse::class.java,
         )
 
         return requireNotNull(response.body) { "Sign in failed: ${response.statusCode}" }.authToken
@@ -373,7 +378,7 @@ class SseStreamDeliveryIntegrationTest {
         val response = restTemplate.postForEntity(
             "/api/budgets",
             HttpEntity(CreateBudgetRequest(name = "SSE Stream Delivery Budget", amount = BigDecimal("1000.00")), headers),
-            BudgetResponse::class.java
+            BudgetResponse::class.java,
         )
 
         return requireNotNull(response.body) { "Budget creation failed: ${response.statusCode}" }.id

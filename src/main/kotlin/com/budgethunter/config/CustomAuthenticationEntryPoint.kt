@@ -13,21 +13,15 @@ import org.springframework.stereotype.Component
  * instead of the default 403 Forbidden.
  */
 @Component
-class CustomAuthenticationEntryPoint(
-    private val objectMapper: ObjectMapper
-) : AuthenticationEntryPoint {
+class CustomAuthenticationEntryPoint(private val objectMapper: ObjectMapper) : AuthenticationEntryPoint {
 
-    override fun commence(
-        request: HttpServletRequest,
-        response: HttpServletResponse,
-        authException: AuthenticationException
-    ) {
+    override fun commence(request: HttpServletRequest, response: HttpServletResponse, authException: AuthenticationException) {
         response.status = HttpServletResponse.SC_UNAUTHORIZED
         response.contentType = MediaType.APPLICATION_JSON_VALUE
 
         val errorResponse = mapOf(
             "status" to 401,
-            "message" to "Authentication required"
+            "message" to "Authentication required",
         )
 
         response.writer.write(objectMapper.writeValueAsString(errorResponse))

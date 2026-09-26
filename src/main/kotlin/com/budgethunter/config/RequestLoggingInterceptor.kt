@@ -32,15 +32,11 @@ class RequestLoggingInterceptor : HandlerInterceptor {
             "/actuator/health/liveness",
             "/actuator/health/readiness",
             "/swagger-ui",
-            "/v3/api-docs"
+            "/v3/api-docs",
         )
     }
 
-    override fun preHandle(
-        request: HttpServletRequest,
-        response: HttpServletResponse,
-        handler: Any
-    ): Boolean {
+    override fun preHandle(request: HttpServletRequest, response: HttpServletResponse, handler: Any): Boolean {
         // Skip logging for health checks and documentation endpoints
         if (shouldSkipLogging(request.requestURI)) {
             return true
@@ -60,21 +56,11 @@ class RequestLoggingInterceptor : HandlerInterceptor {
         return true
     }
 
-    override fun postHandle(
-        request: HttpServletRequest,
-        response: HttpServletResponse,
-        handler: Any,
-        modelAndView: ModelAndView?
-    ) {
+    override fun postHandle(request: HttpServletRequest, response: HttpServletResponse, handler: Any, modelAndView: ModelAndView?) {
         // Not used - we log in afterCompletion to include exception handling
     }
 
-    override fun afterCompletion(
-        request: HttpServletRequest,
-        response: HttpServletResponse,
-        handler: Any,
-        ex: Exception?
-    ) {
+    override fun afterCompletion(request: HttpServletRequest, response: HttpServletResponse, handler: Any, ex: Exception?) {
         // Skip logging for health checks and documentation endpoints
         if (shouldSkipLogging(request.requestURI)) {
             return
@@ -90,7 +76,10 @@ class RequestLoggingInterceptor : HandlerInterceptor {
 
         // Log response with duration
         if (ex != null) {
-            logger.error("← Response: $method $uri | Status: $status | Duration: ${duration}ms | User: $userEmail | Error: ${ex.message}", ex)
+            logger.error(
+                "← Response: $method $uri | Status: $status | Duration: ${duration}ms | User: $userEmail | Error: ${ex.message}",
+                ex,
+            )
         } else if (status >= 400) {
             logger.warn("← Response: $method $uri | Status: $status | Duration: ${duration}ms | User: $userEmail")
         } else {
@@ -98,7 +87,5 @@ class RequestLoggingInterceptor : HandlerInterceptor {
         }
     }
 
-    private fun shouldSkipLogging(uri: String): Boolean {
-        return SKIP_LOGGING.any { uri.startsWith(it) }
-    }
+    private fun shouldSkipLogging(uri: String): Boolean = SKIP_LOGGING.any { uri.startsWith(it) }
 }
