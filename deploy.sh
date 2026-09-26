@@ -51,7 +51,9 @@ echo ""
 
 # Build locally
 echo "🔨 Building application locally..."
-./gradlew clean build -x test
+# Only the JAR is needed here. Lint, tests and the coverage floor are CI's job
+# (.github/workflows/ci.yml), and `build -x test` would now fail on koverVerify at 0%.
+./gradlew clean bootJar
 echo -e "${GREEN}✅ Build complete${NC}"
 echo ""
 

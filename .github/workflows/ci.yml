@@ -1,0 +1,158 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  JAVA_VERSION: "17"
+
+jobs:
+  lint:
+    name: Lint (ktlint + detekt)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write # detekt findings show up in the Security tab and inline on PRs
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: ${{ env.JAVA_VERSION }}
+      - uses: gradle/actions/setup-gradle@v6
+
+      - name: ktlint + detekt
+        run: ./gradlew ktlintCheck detekt --continue
+
+      - name: Upload detekt SARIF
+        # Fork PRs get a read-only token and cannot upload.
+        if: always() && hashFiles('build/reports/detekt/detekt.sarif') != '' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: build/reports/detekt/detekt.sarif
+          category: detekt
+
+      - name: Upload lint reports
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: lint-reports
+          path: |
+            build/reports/ktlint/
+            build/reports/detekt/
+
+  test:
+    name: Build & test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      checks: write # test results annotated on the PR
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: ${{ env.JAVA_VERSION }}
+      - uses: gradle/actions/setup-gradle@v6
+
+      - name: Test, coverage floor and boot JAR
+        run: ./gradlew test koverVerify koverXmlReport koverHtmlReport bootJar
+
+      - name: Publish test results
+        if: always()
+        uses: mikepenz/action-junit-report@v6
+        with:
+          report_paths: build/test-results/test/*.xml
+          detailed_summary: true
+          include_passed: false
+
+      - name: Coverage summary
+        if: always() && hashFiles('build/reports/kover/report.xml') != ''
+        run: |
+          python3 - <<'EOF' >> "$GITHUB_STEP_SUMMARY"
+          import xml.etree.ElementTree as ET
+          root = ET.parse("build/reports/kover/report.xml").getroot()
+          print("### Coverage (Kover)\n\n| Metric | Covered | Total | % |\n|---|---:|---:|---:|")
+          for c in root.findall("counter"):
+              covered, missed = int(c.get("covered")), int(c.get("missed"))
+              total = covered + missed
+              pct = 100 * covered / total if total else 0
+              print(f"| {c.get('type').title()} | {covered} | {total} | {pct:.1f}% |")
+          EOF
+
+      - name: Upload test & coverage reports
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: test-reports
+          path: |
+            build/reports/tests/
+            build/reports/kover/
+
+      - name: Upload boot JAR
+        uses: actions/upload-artifact@v7
+        with:
+          name: app-jar
+          path: build/libs/budgethunter-backend-*-SNAPSHOT.jar
+          retention-days: 7
+
+  scripts-and-config:
+    name: Scripts, compose & workflows
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: shellcheck
+        run: shellcheck --severity=warning deploy.sh setup-ssl.sh
+
+      - name: docker compose config
+        # Placeholders only: this validates the file's structure, not real secrets.
+        env:
+          DATABASE_PASSWORD: placeholder
+          JWT_SECRET: placeholder
+        run: docker compose -f docker-compose.yml config --quiet
+
+      - name: actionlint
+        run: |
+          bash <(curl -sSfL https://raw.githubusercontent.com/rhysd/actionlint/v1.7.12/scripts/download-actionlint.bash) 1.7.12
+          ./actionlint -color
+
+  dependency-submission:
+    name: Submit dependency graph
+    # Fork PRs have a read-only token and cannot submit.
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: ${{ env.JAVA_VERSION }}
+      - uses: gradle/actions/dependency-submission@v6
+
+  dependency-review:
+    name: Dependency review
+    if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
+    needs: dependency-submission
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/dependency-review-action@v5
+        with:
+          fail-on-severity: high
+          comment-summary-in-pr: on-failure
+          retry-on-snapshot-warnings: true

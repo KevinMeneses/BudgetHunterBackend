@@ -34,7 +34,18 @@ BudgetHunter Backend is a collaborative budget tracking application API built wi
 
 # Clean build
 ./gradlew clean build
+
+# Lint (ktlint + detekt) and auto-format
+./gradlew ktlintCheck detekt
+./gradlew ktlintFormat
+
+# Coverage report + 80% line floor (Kover)
+./gradlew koverHtmlReport koverVerify
 ```
+
+`./gradlew check` runs lint, tests and the coverage floor — the same gates as CI.
+Existing lint violations are frozen in `config/ktlint/baseline.xml` and
+`config/detekt/baseline.xml`; new code must pass without touching them.
 
 Tests always run under the `debug` profile (H2 in-memory, rate limiting off), pinned by
 `src/test/resources/application.properties`. Without it they would inherit
@@ -47,6 +58,15 @@ must be mirrored there or the tests will silently run against a different config
 than production. `spring.jpa.open-in-view=false` is mirrored for exactly this reason:
 it exists to prevent transaction leaks in the streaming endpoints, so the SSE tests must
 run with it off too.
+
+## CI/CD (`.github/workflows/`)
+
+- `ci.yml` — every PR and push to main: lint, tests + coverage, shellcheck, compose
+  validation, actionlint, dependency review.
+- `codeql.yml` — CodeQL security analysis (PRs, main, weekly).
+- `deploy.yml` — manual (*Actions → Deploy → Run workflow*), deploys any branch/tag/SHA by
+  running `deploy.sh` with secrets from the `production` environment. See the header of the
+  file for the required secrets.
 
 ## Database Architecture
 

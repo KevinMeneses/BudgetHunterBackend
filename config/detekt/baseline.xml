@@ -1,0 +1,122 @@
+<?xml version="1.0" ?>
+<SmellBaseline>
+  <ManuallySuppressedIssues></ManuallySuppressedIssues>
+  <CurrentIssues>
+    <ID>LargeClass:BudgetControllerTest.kt$BudgetControllerTest</ID>
+    <ID>LargeClass:BudgetManagementIntegrationTest.kt$BudgetManagementIntegrationTest</ID>
+    <ID>LongMethod:ConcurrentBudgetEntryTest.kt$ConcurrentBudgetEntryTest$@Test fun `rapid mixed operations from multiple users should maintain data consistency`()</ID>
+    <ID>LongMethod:ConcurrentBudgetEntryTest.kt$ConcurrentBudgetEntryTest$@Test fun `system should handle interleaved creates and updates without data loss`()</ID>
+    <ID>LongParameterList:BudgetController.kt$BudgetController$( @Parameter(description = "ID of the budget", required = true) @PathVariable budgetId: Long, @Parameter(description = "Page number (0-indexed). If not provided, returns all results", required = false) @RequestParam(required = false) page: Int?, @Parameter(description = "Number of items per page", required = false, example = "20") @RequestParam(required = false) size: Int?, @Parameter(description = "Field to sort by (modificationDate, creationDate, amount, description, category, type)", required = false, example = "modificationDate") @RequestParam(required = false, defaultValue = "modificationDate") sortBy: String, @Parameter(description = "Sort direction (asc or desc)", required = false, example = "desc") @RequestParam(required = false, defaultValue = "desc") sortDirection: String, authentication: Authentication )</ID>
+    <ID>LongParameterList:BudgetService.kt$BudgetService$(budgetId: Long, authenticatedUserEmail: String, page: Int, size: Int, sortBy: String = "modificationDate", sortDirection: String = "desc")</ID>
+    <ID>MagicNumber:CustomAuthenticationEntryPoint.kt$CustomAuthenticationEntryPoint$401</ID>
+    <ID>MagicNumber:JwtAuthenticationFilter.kt$JwtAuthenticationFilter$7</ID>
+    <ID>MagicNumber:JwtUtil.kt$JwtUtil$604800000</ID>
+    <ID>MagicNumber:JwtUtil.kt$JwtUtil$86400000</ID>
+    <ID>MagicNumber:RateLimitConfig.kt$RateLimitConfig$100</ID>
+    <ID>MagicNumber:RateLimitInterceptor.kt$RateLimitInterceptor$1_000_000_000</ID>
+    <ID>MagicNumber:RequestLoggingInterceptor.kt$RequestLoggingInterceptor$400</ID>
+    <ID>MaxLineLength:AuthenticationIntegrationTest.kt$AuthenticationIntegrationTest$// Note: Auth tokens may be the same if generated within the same second (JWT includes seconds-precision timestamp)</ID>
+    <ID>MaxLineLength:BudgetController.kt$BudgetController$@Parameter(description = "Field to sort by (modificationDate, creationDate, amount, description, category, type)", required = false, example = "modificationDate")</ID>
+    <ID>MaxLineLength:BudgetController.kt$BudgetController$@Tag(name = "Budget Management", description = "Endpoints for managing budgets, collaborators, and budget entries with real-time SSE notifications")</ID>
+    <ID>MaxLineLength:BudgetController.kt$BudgetController$description = "Adds a new collaborator to the budget by email. The user must exist in the system. Only users with access to the budget can add collaborators."</ID>
+    <ID>MaxLineLength:BudgetController.kt$BudgetController$description = "Creates a new budget with the specified name and amount. The authenticated user becomes the budget owner and is automatically added as a collaborator."</ID>
+    <ID>MaxLineLength:BudgetController.kt$BudgetController$description = "Creates a new income or expense entry within the budget. Type must be either INCOME or EXPENSE. Entry is tracked with creation timestamp and creator information. Triggers SSE notification to all connected clients."</ID>
+    <ID>MaxLineLength:BudgetController.kt$BudgetController$description = "Invalid request - validation errors (e.g., invalid amount, invalid type, invalid category)"</ID>
+    <ID>MaxLineLength:BudgetController.kt$BudgetController$description = "Invalid request - validation errors (e.g., missing amount, invalid type, invalid category)"</ID>
+    <ID>MaxLineLength:BudgetController.kt$BudgetController$description = "Opens a Server-Sent Events (SSE) stream that pushes real-time notifications when budget entries are created, updated, or deleted by OTHER collaborators. Your own changes are never echoed back, so there is no need to de-duplicate them client-side. Connection stays open and events are sent as they occur; a ':keep-alive' comment is sent on subscribe and every 15 seconds. Event type is 'budget-entry'."</ID>
+    <ID>MaxLineLength:BudgetController.kt$BudgetController$description = "Permanently deletes a budget and all its associated entries and collaborator relationships. Only users with access to the budget can delete it."</ID>
+    <ID>MaxLineLength:BudgetController.kt$BudgetController$description = "Permanently deletes a budget entry. Only users with access to the budget can delete its entries. Triggers SSE notification to all connected clients."</ID>
+    <ID>MaxLineLength:BudgetController.kt$BudgetController$description = "Removes a user's access to the budget by their email. Only users with access to the budget can remove collaborators."</ID>
+    <ID>MaxLineLength:BudgetController.kt$BudgetController$description = "Retrieves all budgets that the authenticated user has access to, including owned budgets and budgets where the user is a collaborator. Supports optional pagination via query parameters."</ID>
+    <ID>MaxLineLength:BudgetController.kt$BudgetController$description = "Retrieves all income and expense entries for the specified budget. Only users with access to the budget can view its entries. Supports optional pagination via query parameters."</ID>
+    <ID>MaxLineLength:BudgetController.kt$BudgetController$description = "Retrieves the list of all users who have access to the specified budget. Only users with access to the budget can view its collaborators."</ID>
+    <ID>MaxLineLength:BudgetController.kt$BudgetController$description = "Updates an existing budget entry. Can modify amount, description, category, and type. Update is tracked with modification timestamp and updater information. Triggers SSE notification to all connected clients."</ID>
+    <ID>MaxLineLength:BudgetController.kt$BudgetController$description = "Updates an existing budget's name and/or amount. Only users with access to the budget can update it."</ID>
+    <ID>MaxLineLength:BudgetController.kt$BudgetController$val paginatedEntries = budgetService.getEntriesByBudgetId(budgetId, userEmail, page, size, sortBy, sortDirection)</ID>
+    <ID>MaxLineLength:BudgetControllerTest.kt$BudgetControllerTest$val expectedException = com.budgethunter.exception.ForbiddenAccessException("You don't have access to budget with id: $budgetId")</ID>
+    <ID>MaxLineLength:BudgetManagementIntegrationTest.kt$BudgetManagementIntegrationTest$val entries1 = objectMapper.readValue(user1Entries.response.contentAsString, Array&lt;BudgetEntryResponse&gt;::class.java)</ID>
+    <ID>MaxLineLength:BudgetManagementIntegrationTest.kt$BudgetManagementIntegrationTest$val entries2 = objectMapper.readValue(user2Entries.response.contentAsString, Array&lt;BudgetEntryResponse&gt;::class.java)</ID>
+    <ID>MaxLineLength:BudgetService.kt$BudgetService$fun</ID>
+    <ID>MaxLineLength:BudgetService.kt$BudgetService$private</ID>
+    <ID>MaxLineLength:ConcurrentBudgetEntryTest.kt$ConcurrentBudgetEntryTest$val createdEntry = objectMapper.readValue(createResult.response.contentAsString, BudgetEntryResponse::class.java)</ID>
+    <ID>MaxLineLength:ConcurrentBudgetEntryTest.kt$ConcurrentBudgetEntryTest$val entries = objectMapper.readValue(entriesResult.response.contentAsString, Array&lt;BudgetEntryResponse&gt;::class.java)</ID>
+    <ID>MaxLineLength:ConcurrentBudgetEntryTest.kt$ConcurrentBudgetEntryTest$val entries = objectMapper.readValue(finalResult.response.contentAsString, Array&lt;BudgetEntryResponse&gt;::class.java)</ID>
+    <ID>MaxLineLength:ConcurrentBudgetEntryTest.kt$ConcurrentBudgetEntryTest$val entry = objectMapper.readValue(result.response.contentAsString, BudgetEntryResponse::class.java)</ID>
+    <ID>MaxLineLength:ConcurrentBudgetEntryTest.kt$ConcurrentBudgetEntryTest$val finalEntries = objectMapper.readValue(finalResult.response.contentAsString, Array&lt;BudgetEntryResponse&gt;::class.java)</ID>
+    <ID>MaxLineLength:RateLimitInterceptor.kt$RateLimitInterceptor$logger.warn("Rate limit exceeded for IP: $clientIp (retry after ${probe.nanosToWaitForRefill / 1_000_000_000}s)")</ID>
+    <ID>MaxLineLength:RateLimitInterceptor.kt$RateLimitInterceptor$response.addHeader("X-Rate-Limit-Retry-After-Seconds", (probe.nanosToWaitForRefill / 1_000_000_000).toString())</ID>
+    <ID>MaxLineLength:ReactiveSseIntegrationTest.kt$ReactiveSseIntegrationTest$val createdEntry = objectMapper.readValue(createResult.response.contentAsString, BudgetEntryResponse::class.java)</ID>
+    <ID>MaxLineLength:RequestLoggingInterceptor.kt$RequestLoggingInterceptor$logger.error("← Response: $method $uri | Status: $status | Duration: ${duration}ms | User: $userEmail | Error: ${ex.message}", ex)</ID>
+    <ID>MaxLineLength:SseIntegrationTest.kt$SseIntegrationTest$val createdEntry = objectMapper.readValue(createResult.response.contentAsString, BudgetEntryResponse::class.java)</ID>
+    <ID>MaxLineLength:SseIntegrationTest.kt$SseIntegrationTest$val entries = objectMapper.readValue(entriesResult.response.contentAsString, Array&lt;BudgetEntryResponse&gt;::class.java)</ID>
+    <ID>MaxLineLength:SseStreamDeliveryIntegrationTest.kt$SseStreamDeliveryIntegrationTest$HttpEntity(CreateBudgetRequest(name = "SSE Stream Delivery Budget", amount = BigDecimal("1000.00")), headers)</ID>
+    <ID>MaxLineLength:UserController.kt$UserController$"Creates the account on first use. If an account already exists with the same verified email it is linked "</ID>
+    <ID>MaxLineLength:UserController.kt$UserController$ApiResponse(responseCode = "400", description = "Invalid request - the new password is missing or too short", content = [Content()])</ID>
+    <ID>MaxLineLength:UserController.kt$UserController$ApiResponse(responseCode = "401", description = "Missing access token, or the current password is missing or incorrect", content = [Content()])</ID>
+    <ID>MaxLineLength:UserController.kt$UserController$description</ID>
+    <ID>MaxLineLength:UserController.kt$UserController$description = "Authenticates a user with email and password. Returns JWT access token (15 minutes expiry) and refresh token (7 days expiry) for subsequent authenticated requests."</ID>
+    <ID>MaxLineLength:UserController.kt$UserController$description = "Creates a new user account with email and password. Email must be unique and valid. Password must meet security requirements."</ID>
+    <ID>MaxLineLength:UserController.kt$UserController$description = "Exchanges a valid refresh token for a new access token and refresh token pair. Implements token rotation - the old refresh token is invalidated and a new one is issued."</ID>
+    <ID>MaxLineLength:UserController.kt$UserController$description = "Returns the current user's profile, including whether the account can also be signed into with a password."</ID>
+    <ID>MaxLineLength:UserController.kt$UserController$description = "The Google ID token is invalid, expired, issued for another audience, or carries an unverified email"</ID>
+    <ID>NewLineAtEndOfFile:CustomAuthenticationEntryPoint.kt$com.budgethunter.config.CustomAuthenticationEntryPoint.kt</ID>
+    <ID>NewLineAtEndOfFile:ForbiddenAccessException.kt$com.budgethunter.exception.ForbiddenAccessException.kt</ID>
+    <ID>ReturnCount:RateLimitInterceptor.kt$RateLimitInterceptor$private fun getClientIp(request: HttpServletRequest): String</ID>
+    <ID>ReturnCount:SseStreamDeliveryIntegrationTest.kt$SseStreamDeliveryIntegrationTest.StreamReader$fun nextEvent(timeout: Duration): BudgetEntryEvent?</ID>
+    <ID>SerialVersionUIDInSerializableClass:UserBudget.kt$UserBudgetId : Serializable</ID>
+    <ID>SpreadOperator:BudgetHunterApplication.kt$(*args)</ID>
+    <ID>SwallowedException:JwtAuthenticationFilter.kt$JwtAuthenticationFilter$e: Exception</ID>
+    <ID>ThrowsCount:BudgetService.kt$BudgetService$@Transactional fun removeCollaborator(budgetId: Long, collaboratorEmail: String, authenticatedUserEmail: String)</ID>
+    <ID>TooGenericExceptionCaught:BudgetController.kt$BudgetController$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:GoogleTokenVerifier.kt$GoogleIdTokenVerifierAdapter$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:JwtAuthenticationFilter.kt$JwtAuthenticationFilter$e: Exception</ID>
+    <ID>TooManyFunctions:BudgetController.kt$BudgetController</ID>
+    <ID>TooManyFunctions:BudgetService.kt$BudgetService</ID>
+    <ID>UseCheckOrError:BudgetService.kt$BudgetService$throw IllegalStateException("Cannot remove the last collaborator from budget $budgetId")</ID>
+    <ID>UseCheckOrError:BudgetService.kt$BudgetService$throw IllegalStateException("User ${request.email} is already a collaborator on budget $budgetId")</ID>
+    <ID>UseRequire:BudgetService.kt$BudgetService$throw IllegalArgumentException("Budget entry $entryId does not belong to budget $budgetId")</ID>
+    <ID>UseRequire:BudgetService.kt$BudgetService$throw IllegalArgumentException("Budget entry ${request.id} does not belong to budget ${budget.id}")</ID>
+    <ID>UseRequire:BudgetService.kt$BudgetService$throw IllegalArgumentException("Budget not found with id: $budgetId")</ID>
+    <ID>UseRequire:BudgetService.kt$BudgetService$throw IllegalArgumentException("User $collaboratorEmail is not a collaborator on budget $budgetId")</ID>
+    <ID>UseRequire:UserService.kt$UserService$throw IllegalArgumentException("Email already exists")</ID>
+    <ID>VariableNaming:BudgetControllerTest.kt$BudgetControllerTest$/** Window used to collect what a stream emits before the 15s heartbeat repeats. */ private val COLLECT_WINDOW: Duration = Duration.ofMillis(500)</ID>
+    <ID>WildcardImport:AuthenticationIntegrationTest.kt$import org.junit.jupiter.api.Assertions.*</ID>
+    <ID>WildcardImport:AuthenticationIntegrationTest.kt$import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*</ID>
+    <ID>WildcardImport:AuthenticationIntegrationTest.kt$import org.springframework.test.web.servlet.result.MockMvcResultMatchers.*</ID>
+    <ID>WildcardImport:Budget.kt$import jakarta.persistence.*</ID>
+    <ID>WildcardImport:BudgetController.kt$import com.budgethunter.dto.*</ID>
+    <ID>WildcardImport:BudgetController.kt$import org.springframework.web.bind.annotation.*</ID>
+    <ID>WildcardImport:BudgetControllerTest.kt$import com.budgethunter.dto.*</ID>
+    <ID>WildcardImport:BudgetControllerTest.kt$import io.mockk.*</ID>
+    <ID>WildcardImport:BudgetControllerTest.kt$import org.junit.jupiter.api.Assertions.*</ID>
+    <ID>WildcardImport:BudgetEntry.kt$import jakarta.persistence.*</ID>
+    <ID>WildcardImport:BudgetManagementIntegrationTest.kt$import com.budgethunter.dto.*</ID>
+    <ID>WildcardImport:BudgetManagementIntegrationTest.kt$import org.junit.jupiter.api.Assertions.*</ID>
+    <ID>WildcardImport:BudgetManagementIntegrationTest.kt$import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*</ID>
+    <ID>WildcardImport:BudgetManagementIntegrationTest.kt$import org.springframework.test.web.servlet.result.MockMvcResultMatchers.*</ID>
+    <ID>WildcardImport:BudgetService.kt$import com.budgethunter.dto.*</ID>
+    <ID>WildcardImport:BudgetServiceTest.kt$import com.budgethunter.dto.*</ID>
+    <ID>WildcardImport:BudgetServiceTest.kt$import com.budgethunter.model.*</ID>
+    <ID>WildcardImport:BudgetServiceTest.kt$import io.mockk.*</ID>
+    <ID>WildcardImport:BudgetServiceTest.kt$import org.junit.jupiter.api.Assertions.*</ID>
+    <ID>WildcardImport:ConcurrentBudgetEntryTest.kt$import com.budgethunter.dto.*</ID>
+    <ID>WildcardImport:ConcurrentBudgetEntryTest.kt$import org.junit.jupiter.api.Assertions.*</ID>
+    <ID>WildcardImport:ConcurrentBudgetEntryTest.kt$import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*</ID>
+    <ID>WildcardImport:GoogleAuthenticationIntegrationTest.kt$import org.junit.jupiter.api.Assertions.*</ID>
+    <ID>WildcardImport:GoogleAuthenticationIntegrationTest.kt$import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*</ID>
+    <ID>WildcardImport:GoogleAuthenticationIntegrationTest.kt$import org.springframework.test.web.servlet.result.MockMvcResultMatchers.*</ID>
+    <ID>WildcardImport:ReactiveSseIntegrationTest.kt$import com.budgethunter.dto.*</ID>
+    <ID>WildcardImport:ReactiveSseIntegrationTest.kt$import org.junit.jupiter.api.Assertions.*</ID>
+    <ID>WildcardImport:SseIntegrationTest.kt$import com.budgethunter.dto.*</ID>
+    <ID>WildcardImport:SseIntegrationTest.kt$import org.junit.jupiter.api.Assertions.*</ID>
+    <ID>WildcardImport:SseIntegrationTest.kt$import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*</ID>
+    <ID>WildcardImport:SseStreamDeliveryIntegrationTest.kt$import com.budgethunter.dto.*</ID>
+    <ID>WildcardImport:User.kt$import jakarta.persistence.*</ID>
+    <ID>WildcardImport:UserBudget.kt$import jakarta.persistence.*</ID>
+    <ID>WildcardImport:UserController.kt$import org.springframework.web.bind.annotation.*</ID>
+    <ID>WildcardImport:UserControllerTest.kt$import io.mockk.*</ID>
+    <ID>WildcardImport:UserControllerTest.kt$import org.junit.jupiter.api.Assertions.*</ID>
+    <ID>WildcardImport:UserServiceTest.kt$import io.mockk.*</ID>
+    <ID>WildcardImport:UserServiceTest.kt$import org.junit.jupiter.api.Assertions.*</ID>
+  </CurrentIssues>
+</SmellBaseline>

@@ -1,0 +1,26 @@
+version: 2
+updates:
+  - package-ecosystem: gradle
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      spring-and-kotlin:
+        patterns:
+          - "org.springframework*"
+          - "io.spring*"
+          - "org.jetbrains.kotlin*"
+          - "org.jetbrains.kotlinx*"
+      test:
+        patterns:
+          - "io.mockk*"
+          - "io.projectreactor*"
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        patterns: ["*"]
