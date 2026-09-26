@@ -1,0 +1,25 @@
+root = true
+
+[*.{kt,kts}]
+# intellij_idea rather than ktlint_official: the official style splits `val x = foo.bar()` across
+# three lines and breaks chained calls one per line.
+ktlint_code_style = intellij_idea
+max_line_length = 140
+
+# ktlint is kept as a hygiene linter, not a layout authority. The rules below each decide how
+# working code should have been arranged and rewrite it to match; between them they accounted for
+# roughly 1400 of the 1482 entries the old baseline carried. Disabling them is what let the
+# baseline go: what remained were real problems, and those are fixed in the tree.
+#
+# If any of these is ever wanted, turn it on alone and run ktlintFormat, so its diff arrives on
+# its own rather than mixed into someone's feature branch.
+ktlint_standard_class-signature = disabled            # joins or splits class signatures
+ktlint_standard_function-signature = disabled         # joins or splits function signatures
+ktlint_standard_trailing-comma-on-call-site = disabled
+ktlint_standard_trailing-comma-on-declaration-site = disabled
+ktlint_standard_argument-list-wrapping = disabled     # one argument per line
+ktlint_standard_parameter-list-wrapping = disabled    # one parameter per line
+ktlint_standard_function-expression-body = disabled   # `{ return x }` -> `= x`
+ktlint_standard_wrapping = disabled
+ktlint_standard_string-template = disabled            # `${x}` -> `$x`, 35 call sites
+ktlint_standard_max-line-length = disabled            # detekt already reports this, at 140

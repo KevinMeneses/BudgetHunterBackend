@@ -1,1 +1,7 @@
 # Overrides on top of detekt's default rules (buildUponDefaultConfig = true).
+
+style:
+  # ktlint allows 140 columns (see .editorconfig); detekt defaults to 120. Two limits in one build
+  # means code the formatter accepts still fails the analyser.
+  MaxLineLength:
+    maxLineLength: 140

@@ -1,9 +1,18 @@
 package com.budgethunter.integration
 
-import com.budgethunter.dto.*
+import com.budgethunter.dto.AddCollaboratorRequest
+import com.budgethunter.dto.BudgetEntryResponse
+import com.budgethunter.dto.BudgetResponse
+import com.budgethunter.dto.CreateBudgetEntryRequest
+import com.budgethunter.dto.CreateBudgetRequest
+import com.budgethunter.dto.SignInRequest
+import com.budgethunter.dto.SignInResponse
+import com.budgethunter.dto.SignUpRequest
+import com.budgethunter.dto.UpdateBudgetEntryRequest
 import com.budgethunter.model.EntryType
 import com.fasterxml.jackson.databind.ObjectMapper
-import org.junit.jupiter.api.Assertions.*
+import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
@@ -11,7 +20,9 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.http.MediaType
 import org.springframework.test.web.servlet.MockMvc
-import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
 import org.springframework.transaction.annotation.Transactional
 import java.math.BigDecimal

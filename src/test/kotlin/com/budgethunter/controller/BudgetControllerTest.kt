@@ -1,12 +1,31 @@
 package com.budgethunter.controller
 
-import com.budgethunter.dto.*
+import com.budgethunter.dto.AddCollaboratorRequest
+import com.budgethunter.dto.BudgetEntryAction
+import com.budgethunter.dto.BudgetEntryEvent
+import com.budgethunter.dto.BudgetEntryResponse
+import com.budgethunter.dto.BudgetResponse
+import com.budgethunter.dto.CollaboratorResponse
+import com.budgethunter.dto.CreateBudgetEntryRequest
+import com.budgethunter.dto.CreateBudgetRequest
+import com.budgethunter.dto.UpdateBudgetEntryRequest
+import com.budgethunter.dto.UpdateBudgetRequest
+import com.budgethunter.dto.UserEventInfo
+import com.budgethunter.dto.UserResponse
 import com.budgethunter.model.EntryType
 import com.budgethunter.service.BudgetService
 import com.budgethunter.service.ReactiveSseService
-import io.mockk.*
+import io.mockk.Runs
+import io.mockk.clearAllMocks
+import io.mockk.every
+import io.mockk.just
+import io.mockk.mockk
+import io.mockk.verify
 import org.junit.jupiter.api.AfterEach
-import org.junit.jupiter.api.Assertions.*
+import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertNotNull
+import org.junit.jupiter.api.Assertions.assertNull
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.springframework.http.HttpStatus
@@ -28,7 +47,7 @@ class BudgetControllerTest {
     private val testUserEmail = "test@example.com"
 
     /** Window used to collect what a stream emits before the 15s heartbeat repeats. */
-    private val COLLECT_WINDOW: Duration = Duration.ofMillis(500)
+    private val collectWindow: Duration = Duration.ofMillis(500)
 
     @BeforeEach
     fun setup() {
@@ -638,7 +657,7 @@ class BudgetControllerTest {
 
         // When
         val flux = budgetController.streamEntries(budgetId, authentication, MockHttpServletResponse())
-        val emitted = flux.take(COLLECT_WINDOW).collectList().block()!!
+        val emitted = flux.take(collectWindow).collectList().block()!!
 
         // Then - only keep-alives get through; re-sending these would make the author
         // re-sync the list they just wrote and notify them about themselves
@@ -660,7 +679,7 @@ class BudgetControllerTest {
 
         // When
         val flux = budgetController.streamEntries(budgetId, authentication, MockHttpServletResponse())
-        val emitted = flux.take(COLLECT_WINDOW).collectList().block()!!
+        val emitted = flux.take(collectWindow).collectList().block()!!
 
         // Then - all three actions arrive, tagged as budget-entry events
         val delivered = emitted.mapNotNull { it.data() }
@@ -684,7 +703,7 @@ class BudgetControllerTest {
 
         // When
         val flux = budgetController.streamEntries(budgetId, authentication, MockHttpServletResponse())
-        val emitted = flux.take(COLLECT_WINDOW).collectList().block()!!
+        val emitted = flux.take(collectWindow).collectList().block()!!
 
         // Then - only the subscriber's own event is dropped
         assertEquals(
@@ -938,5 +957,4 @@ class BudgetControllerTest {
         assertTrue(exception.message!!.contains("Cannot remove the last collaborator"))
         verify(exactly = 1) { budgetService.removeCollaborator(budgetId, collaboratorEmail, testUserEmail) }
     }
-
 }
