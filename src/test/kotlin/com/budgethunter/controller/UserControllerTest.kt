@@ -10,13 +10,19 @@ import com.budgethunter.dto.SignUpRequest
 import com.budgethunter.dto.UserResponse
 import com.budgethunter.model.AuthProvider
 import com.budgethunter.service.UserService
-import io.mockk.*
+import io.mockk.Runs
+import io.mockk.clearAllMocks
+import io.mockk.every
+import io.mockk.just
+import io.mockk.mockk
+import io.mockk.verify
 import org.junit.jupiter.api.AfterEach
-import org.junit.jupiter.api.Assertions.*
+import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
-import org.springframework.http.HttpStatus
 import org.junit.jupiter.api.assertThrows
+import org.springframework.http.HttpStatus
 import org.springframework.security.authentication.BadCredentialsException
 import org.springframework.security.core.Authentication
 

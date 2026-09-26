@@ -11,16 +11,22 @@ import com.budgethunter.repository.UserRepository
 import com.budgethunter.util.GoogleTokenVerifier
 import com.budgethunter.util.GoogleUserInfo
 import com.budgethunter.util.JwtUtil
-import io.mockk.*
+import io.mockk.clearAllMocks
+import io.mockk.every
+import io.mockk.mockk
+import io.mockk.slot
+import io.mockk.verify
 import org.junit.jupiter.api.AfterEach
-import org.junit.jupiter.api.Assertions.*
+import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertFalse
+import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
 import org.springframework.security.authentication.BadCredentialsException
 import org.springframework.security.crypto.password.PasswordEncoder
 import java.time.Instant
-import java.util.*
+import java.util.Optional
 
 class UserServiceTest {
 

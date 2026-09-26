@@ -398,12 +398,21 @@ All endpoints from the system architecture diagram have been successfully implem
   - `deploy.yml`: manual deploy of any branch/tag/SHA through `deploy.sh`, optional pre-deploy
     `check`, serialized via concurrency, `production` environment secrets
   - `dependabot.yml`: weekly Gradle + Actions updates
-  - Lint baselines in `config/ktlint` and `config/detekt` freeze the existing violations
+  - ktlint runs with no baseline; the layout rules it would otherwise impose are disabled by
+    name in `.editorconfig`. detekt still uses `config/detekt/baseline.xml` for design findings
   - [x] ✅ `production` environment configured (2026-09-26): secrets SSH_PRIVATE_KEY (a deploy-only
     key, `id_ed25519_gha_deploy`, authorised on the droplet), ENV_FILE, SERVER_IP, SSH_KNOWN_HOSTS;
     variables DOMAIN and SERVER_USER; every deploy waits for a required reviewer
   - [ ] Protect `main`: require the CI checks before merging
-  - [ ] Pay down the lint baselines (`./gradlew ktlintFormat`, then regenerate)
+  - [x] ✅ ktlint baseline retired (2026-09-26): reading its 1482 entries by rule showed ~1400 were
+    layout opinions (534 trailing commas, 74 signature joins/splits, 37 wrappings, 45 rewrites like
+    `{ return x }` -> `= x`). Those rules are disabled by name in `.editorconfig`, each with its
+    reason; what the baseline genuinely hid was fixed instead: 38 wildcard imports expanded, 16
+    import blocks ordered, 2 final newlines, 1 rename. detekt's baseline went 116 -> 50 entries and
+    its line limit now matches ktlint's 140. `ktlintFormat` alone was the wrong tool here - it
+    reformats working code, which is what PRs #11 and #12 got wrong before #13
+  - [ ] Detekt baseline still holds 50 design findings (LongMethod, LongParameterList, MagicNumber,
+    19 long lines); worth reading one at a time rather than reformatting
 
 ---
 
