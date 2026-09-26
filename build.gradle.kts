@@ -1,8 +1,8 @@
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
 plugins {
-    id("org.springframework.boot") version "3.3.4"
-    id("io.spring.dependency-management") version "1.1.6"
+    id("org.springframework.boot") version "3.5.16"
+    id("io.spring.dependency-management") version "1.1.7"
     kotlin("jvm") version "2.0.20"
     kotlin("plugin.spring") version "2.0.20"
     kotlin("plugin.jpa") version "2.0.20"
@@ -18,6 +18,23 @@ java {
     sourceCompatibility = JavaVersion.VERSION_17
 }
 
+// Boot 3.5.16 pins netty 4.1.135.Final, which is affected by GHSA-c4c3-7fpv-j4q5 (SNI routing
+// bypass via a fragmented TLS ClientHello, fixed in 4.1.137.Final). Netty arrives through
+// reactor-netty and terminates no TLS here - the app serves plain HTTP on Tomcat behind Nginx -
+// but this is a patch-line bump, far cheaper than carrying an exception in the dependency review.
+extra["netty.version"] = "4.1.138.Final"
+
+// Boot 3.5.16 pins tomcat 10.1.55, affected by three critical advisories fixed in 10.1.58:
+// GHSA-9xv2-5v5q-p794 (DIGEST auth capture-replay), GHSA-gcx9-497g-6cp6 (improper access
+// control) and GHSA-h3x4-894j-xpx5 (FORM auth incorrect authorization).
+extra["tomcat.version"] = "10.1.60"
+
+// Boot 3.5.16 pins the PostgreSQL driver at 42.7.11, affected by GHSA-j92g-9f8w-j867: a server
+// offering unsupported certificate algorithms silently downgrades channel-binding auth instead
+// of failing. Fixed in 42.7.12. Production talks to PostgreSQL over SCRAM, so this is the one
+// override here that touches a path the app actually uses.
+extra["postgresql.version"] = "42.7.13"
+
 repositories {
     mavenCentral()
 }
@@ -28,21 +45,21 @@ dependencies {
 
     // Spring Boot Starters
     implementation("org.springframework.boot:spring-boot-starter-web")
-    implementation("org.springframework.boot:spring-boot-starter-webflux")  // For Flux SSE support
+    implementation("org.springframework.boot:spring-boot-starter-webflux") // For Flux SSE support
     implementation("org.springframework.boot:spring-boot-starter-data-jpa")
     implementation("org.springframework.boot:spring-boot-starter-validation")
     implementation("org.springframework.boot:spring-boot-starter-security")
-    implementation("org.springframework.boot:spring-boot-starter-actuator")  // Health checks & monitoring
+    implementation("org.springframework.boot:spring-boot-starter-actuator") // Health checks & monitoring
 
     // Kotlin
     implementation("org.jetbrains.kotlin:kotlin-reflect")
     implementation("org.jetbrains.kotlin:kotlin-stdlib-jdk8")
     implementation("com.fasterxml.jackson.module:jackson-module-kotlin")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core")
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-reactor")  // Coroutines ↔ Reactor bridge
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-reactor") // Coroutines ↔ Reactor bridge
 
     // OpenAPI/Swagger Documentation
-    implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:2.6.0")
+    implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:2.8.17")
 
     // Rate Limiting (Token Bucket algorithm)
     implementation("com.bucket4j:bucket4j-core:8.10.1")
@@ -63,9 +80,9 @@ dependencies {
     testImplementation("org.springframework.boot:spring-boot-starter-test")
     testImplementation("org.springframework.security:spring-security-test")
     testImplementation("io.mockk:mockk:1.13.12")
-    testImplementation("org.springframework.boot:spring-boot-starter-webflux")  // For WebTestClient
-    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test")  // For runTest
-    testImplementation("io.projectreactor:reactor-test")  // For StepVerifier
+    testImplementation("org.springframework.boot:spring-boot-starter-webflux") // For WebTestClient
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test") // For runTest
+    testImplementation("io.projectreactor:reactor-test") // For StepVerifier
 }
 
 tasks.withType<KotlinCompile> {
