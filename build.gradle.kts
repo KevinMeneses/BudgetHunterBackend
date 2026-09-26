@@ -29,6 +29,12 @@ extra["netty.version"] = "4.1.138.Final"
 // control) and GHSA-h3x4-894j-xpx5 (FORM auth incorrect authorization).
 extra["tomcat.version"] = "10.1.60"
 
+// Boot 3.5.16 pins the PostgreSQL driver at 42.7.11, affected by GHSA-j92g-9f8w-j867: a server
+// offering unsupported certificate algorithms silently downgrades channel-binding auth instead
+// of failing. Fixed in 42.7.12. Production talks to PostgreSQL over SCRAM, so this is the one
+// override here that touches a path the app actually uses.
+extra["postgresql.version"] = "42.7.13"
+
 repositories {
     mavenCentral()
 }
