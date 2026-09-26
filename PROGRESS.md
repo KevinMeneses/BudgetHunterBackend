@@ -399,7 +399,9 @@ All endpoints from the system architecture diagram have been successfully implem
     `check`, serialized via concurrency, `production` environment secrets
   - `dependabot.yml`: weekly Gradle + Actions updates
   - Lint baselines in `config/ktlint` and `config/detekt` freeze the existing violations
-  - [ ] Fill the `production` environment secrets (SSH_PRIVATE_KEY, ENV_FILE, SERVER_IP, SSH_KNOWN_HOSTS)
+  - [x] ✅ `production` environment configured (2026-09-26): secrets SSH_PRIVATE_KEY (a deploy-only
+    key, `id_ed25519_gha_deploy`, authorised on the droplet), ENV_FILE, SERVER_IP, SSH_KNOWN_HOSTS;
+    variables DOMAIN and SERVER_USER; every deploy waits for a required reviewer
   - [ ] Protect `main`: require the CI checks before merging
   - [ ] Pay down the lint baselines (`./gradlew ktlintFormat`, then regenerate)
 
