@@ -141,6 +141,13 @@ jobs:
           distribution: temurin
           java-version: ${{ env.JAVA_VERSION }}
       - uses: gradle/actions/dependency-submission@v6
+        with:
+          # The graph describes what the application resolves, not what builds it. Otherwise the
+          # Gradle plugin classpath lands in it too, and a CVE in a build-time-only transitive
+          # (e.g. freemarker, pulled in by Kover's coverage reporter) fails the dependency review
+          # for something that never reaches the JAR. Dependabot still updates those plugins,
+          # since it reads build.gradle.kts rather than the graph.
+          dependency-graph-include-configurations: "^(compile|runtime|testCompile|testRuntime)Classpath$"
 
   dependency-review:
     name: Dependency review
