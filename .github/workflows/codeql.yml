@@ -52,7 +52,16 @@ jobs:
       - name: Build
         if: matrix.build-mode == 'manual'
         # CodeQL must observe the compiler, so no build cache and no up-to-date shortcuts.
-        run: ./gradlew compileKotlin compileTestKotlin --no-build-cache --rerun-tasks
+        #
+        # in-process + 4g: under CodeQL's extractor the default Kotlin compile daemon dies with
+        # "GC overhead limit exceeded", so the compiler runs inside the Gradle daemon, whose heap
+        # we control here.
+        env:
+          GRADLE_OPTS: -Dorg.gradle.jvmargs=-Xmx4g
+        run: >
+          ./gradlew compileKotlin compileTestKotlin
+          --no-build-cache --rerun-tasks
+          -Dkotlin.compiler.execution.strategy=in-process
 
       - uses: github/codeql-action/analyze@v4
         with:
