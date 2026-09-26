@@ -6,6 +6,9 @@ plugins {
     kotlin("jvm") version "2.0.20"
     kotlin("plugin.spring") version "2.0.20"
     kotlin("plugin.jpa") version "2.0.20"
+    id("org.jlleitschuh.gradle.ktlint") version "12.1.1"
+    id("io.gitlab.arturbosch.detekt") version "1.23.7"
+    id("org.jetbrains.kotlinx.kover") version "0.8.3"
 }
 
 group = "com.budgethunter"
@@ -74,4 +77,47 @@ tasks.withType<KotlinCompile> {
 
 tasks.withType<Test> {
     useJUnitPlatform()
+}
+
+// Quality gates run by CI (.github/workflows/ci.yml). Both linters start from a baseline so
+// the existing code passes as-is; new code is held to the rules. Regenerate the baselines
+// with `./gradlew ktlintGenerateBaseline detektBaseline` only when deliberately accepting debt.
+ktlint {
+    version.set("1.3.1")
+    baseline.set(file("config/ktlint/baseline.xml"))
+}
+
+detekt {
+    buildUponDefaultConfig = true
+    config.setFrom(file("config/detekt/detekt.yml"))
+    baseline = file("config/detekt/baseline.xml")
+}
+
+// detekt 1.23.7 is compiled against Kotlin 2.0.10 and refuses to run on anything else, but the
+// Spring dependency-management plugin bumps every configuration to the project's Kotlin version.
+configurations.matching { it.name == "detekt" }.configureEach {
+    resolutionStrategy.eachDependency {
+        if (requested.group == "org.jetbrains.kotlin") useVersion("2.0.10")
+    }
+}
+
+tasks.withType<io.gitlab.arturbosch.detekt.Detekt>().configureEach {
+    jvmTarget = "17"
+    reports {
+        html.required.set(true)
+        sarif.required.set(true)
+        xml.required.set(false)
+        txt.required.set(false)
+    }
+}
+
+// Coverage floor enforced by `./gradlew check` (line coverage was ~86% when this was added).
+kover {
+    reports {
+        verify {
+            rule {
+                minBound(80)
+            }
+        }
+    }
 }

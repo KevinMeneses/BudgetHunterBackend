@@ -1,0 +1,148 @@
+name: Deploy
+
+# Manual deploy of any branch to the production droplet, reusing deploy.sh.
+# Actions → Deploy → Run workflow. Either pick the branch in "Use workflow from", or type
+# any branch/tag/SHA in "ref" (needed for branches that predate this workflow file).
+#
+# Required, in the "production" environment (Settings → Environments → production):
+#   secrets  SSH_PRIVATE_KEY   private key authorised on the server
+#            ENV_FILE          full contents of the server's .env (see .env.example)
+#            SERVER_IP         droplet IP
+#            SSH_KNOWN_HOSTS   output of `ssh-keyscan <SERVER_IP>` (recommended; falls back to a live scan)
+#   vars     SERVER_USER       optional, defaults to root
+#            DOMAIN            optional, enables the public HTTPS check (e.g. budgethunter.duckdns.org)
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "Branch, tag or SHA to deploy (empty = the branch selected above)"
+        required: false
+        default: ""
+      run_tests:
+        description: "Run lint + tests before deploying"
+        type: boolean
+        default: true
+
+# One deploy at a time; a second one waits instead of killing a deploy halfway through.
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  DEPLOY_REF: ${{ inputs.ref || github.ref_name }}
+
+jobs:
+  verify:
+    name: Verify ${{ inputs.ref || github.ref_name }}
+    if: inputs.run_tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ env.DEPLOY_REF }}
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: gradle/actions/setup-gradle@v6
+        with:
+          cache-read-only: true
+      - run: ./gradlew check
+
+  deploy:
+    name: Deploy ${{ inputs.ref || github.ref_name }}
+    needs: verify
+    # Runs when verify passed, or when it was skipped on purpose (run_tests = false).
+    if: ${{ !cancelled() && (needs.verify.result == 'success' || needs.verify.result == 'skipped') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment:
+      name: production
+      url: ${{ vars.DOMAIN && format('https://{0}/actuator/health', vars.DOMAIN) || '' }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ env.DEPLOY_REF }}
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: gradle/actions/setup-gradle@v6
+        with:
+          cache-read-only: true
+
+      - name: Check configuration
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+          ENV_FILE: ${{ secrets.ENV_FILE }}
+          SERVER_IP: ${{ secrets.SERVER_IP }}
+        run: |
+          missing=0
+          for name in SSH_PRIVATE_KEY ENV_FILE SERVER_IP; do
+            if [ -z "${!name}" ]; then
+              echo "::error::Secret $name is not set in the 'production' environment"
+              missing=1
+            fi
+          done
+          exit $missing
+
+      - name: Write .env and .env.server
+        env:
+          ENV_FILE: ${{ secrets.ENV_FILE }}
+          SERVER_IP: ${{ secrets.SERVER_IP }}
+          SERVER_USER: ${{ vars.SERVER_USER || 'root' }}
+          DOMAIN: ${{ vars.DOMAIN }}
+        run: |
+          umask 077
+          printf '%s\n' "$ENV_FILE" > .env
+          {
+            echo "SERVER_IP=$SERVER_IP"
+            echo "SERVER_USER=$SERVER_USER"
+            echo "DOMAIN=$DOMAIN"
+          } > .env.server
+
+      - name: Set up SSH
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+          SSH_KNOWN_HOSTS: ${{ secrets.SSH_KNOWN_HOSTS }}
+          SERVER_IP: ${{ secrets.SERVER_IP }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SSH_PRIVATE_KEY" > ~/.ssh/id_deploy
+          chmod 600 ~/.ssh/id_deploy
+          if [ -n "$SSH_KNOWN_HOSTS" ]; then
+            printf '%s\n' "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          else
+            echo "::warning::SSH_KNOWN_HOSTS is not set; trusting a live ssh-keyscan of the server"
+            ssh-keyscan -T 10 "$SERVER_IP" > ~/.ssh/known_hosts
+          fi
+          chmod 644 ~/.ssh/known_hosts
+          printf 'Host *\n  IdentityFile ~/.ssh/id_deploy\n  IdentitiesOnly yes\n  ServerAliveInterval 30\n' > ~/.ssh/config
+          chmod 600 ~/.ssh/config
+
+      - name: Deploy
+        run: ./deploy.sh
+
+      - name: Summary
+        if: always()
+        env:
+          RESULT: ${{ job.status }}
+        run: |
+          {
+            echo "### Deploy: $RESULT"
+            echo ""
+            echo "| | |"
+            echo "|---|---|"
+            echo "| Ref | \`$DEPLOY_REF\` |"
+            echo "| Commit | \`$(git rev-parse --short HEAD)\` $(git log -1 --pretty=%s | sed 's/|/\\|/g') |"
+            echo "| Tests | ${{ inputs.run_tests && 'ran' || 'skipped' }} |"
+            echo "| Triggered by | @$GITHUB_ACTOR |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Clean up secrets
+        if: always()
+        run: rm -f .env .env.server ~/.ssh/id_deploy

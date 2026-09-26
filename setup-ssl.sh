@@ -181,6 +181,8 @@ echo ""
 
 # Obtain SSL certificate
 echo "🔒 Obtaining SSL certificate from Let's Encrypt..."
+# Unquoted on purpose: $DOMAIN and $EMAIL are local and must expand before reaching the server.
+# shellcheck disable=SC2087
 ssh $SERVER_USER@$SERVER_IP << ENDSSH
 certbot --nginx -d $DOMAIN --non-interactive --agree-tos --email $EMAIL --redirect
 

@@ -390,6 +390,18 @@ All endpoints from the system architecture diagram have been successfully implem
   - Monitoring endpoint: `https://budgethunter.duckdns.org/actuator/health`
   - Email alerts enabled for downtime
   - Complete guide: `MONITORING.md`
+- [x] ✅ **CI/CD with GitHub Actions** (completed 2026-09-16)
+  - `ci.yml` (PRs + main): ktlint + detekt (SARIF to code scanning), tests + JUnit report,
+    Kover coverage floor (80% lines, ~86% today), boot JAR artifact, shellcheck, docker compose
+    validation, actionlint, Gradle dependency graph + dependency review (fails on high CVEs)
+  - `codeql.yml`: CodeQL security-and-quality for Kotlin and workflows (PRs, main, weekly)
+  - `deploy.yml`: manual deploy of any branch/tag/SHA through `deploy.sh`, optional pre-deploy
+    `check`, serialized via concurrency, `production` environment secrets
+  - `dependabot.yml`: weekly Gradle + Actions updates
+  - Lint baselines in `config/ktlint` and `config/detekt` freeze the existing violations
+  - [ ] Fill the `production` environment secrets (SSH_PRIVATE_KEY, ENV_FILE, SERVER_IP, SSH_KNOWN_HOSTS)
+  - [ ] Protect `main`: require the CI checks before merging
+  - [ ] Pay down the lint baselines (`./gradlew ktlintFormat`, then regenerate)
 
 ---
 
