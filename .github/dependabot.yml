@@ -47,14 +47,22 @@ updates:
         update-types: ["version-update:semver-major"]
       - dependency-name: "org.springframework*"
         update-types: ["version-update:semver-major"]
+      # Kotlin needs minors held back as well as majors, which PR #6 (2.0.20 -> 2.4.20) showed
+      # costs three separate pieces of work, none of them a version bump:
+      #   - `Smart cast to 'Long' is impossible` in BudgetService becomes an error, because the
+      #     JPA plugin makes entities open and Budget.id is a nullable Long
+      #   - Kover 0.8.3 reaches for a `compileKotlinTask` property the new plugin no longer has
+      #   - ktlint's engine 1.3.1 cannot read the 2.4 compiler ('KtTokens ... HEADER_KEYWORD'),
+      #     so it has to move too, bringing whatever its newer rules decide about this code
+      # Patches (2.0.21 and such) still come through, which is what a detekt pin bump needs.
       - dependency-name: "jvm"
-        update-types: ["version-update:semver-major"]
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]
       - dependency-name: "plugin.spring"
-        update-types: ["version-update:semver-major"]
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]
       - dependency-name: "plugin.jpa"
-        update-types: ["version-update:semver-major"]
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]
       - dependency-name: "org.jetbrains.kotlin*"
-        update-types: ["version-update:semver-major"]
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]
 
   - package-ecosystem: github-actions
     directory: /
