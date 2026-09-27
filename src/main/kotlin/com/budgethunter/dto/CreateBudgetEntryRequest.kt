@@ -4,6 +4,7 @@ import com.budgethunter.model.EntryType
 import jakarta.validation.constraints.NotBlank
 import jakarta.validation.constraints.NotNull
 import java.math.BigDecimal
+import java.time.LocalDate
 
 data class CreateBudgetEntryRequest(
     @field:NotNull(message = "Amount is required")
@@ -16,5 +17,9 @@ data class CreateBudgetEntryRequest(
     val category: String,
 
     @field:NotNull(message = "Entry type is required")
-    val type: EntryType
+    val type: EntryType,
+
+    // Optional for backwards compatibility with older app builds that don't send it yet.
+    // When omitted, the service defaults it to today's date.
+    val date: LocalDate? = null
 )

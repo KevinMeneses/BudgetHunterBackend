@@ -5,6 +5,7 @@ import jakarta.validation.constraints.NotBlank
 import jakarta.validation.constraints.NotNull
 import jakarta.validation.constraints.Positive
 import java.math.BigDecimal
+import java.time.LocalDate
 
 data class PutEntryRequest(
     val id: Long? = null,
@@ -23,5 +24,9 @@ data class PutEntryRequest(
     val category: String,
 
     @field:NotNull(message = "Entry type is required")
-    val type: EntryType
+    val type: EntryType,
+
+    // Optional for backwards compatibility. On create, a null defaults to today; on update
+    // (id != null), a null keeps the currently stored date instead of resetting it.
+    val date: LocalDate? = null
 )

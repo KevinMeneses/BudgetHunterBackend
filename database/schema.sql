@@ -33,7 +33,10 @@ CREATE TABLE IF NOT EXISTS users (
 CREATE TABLE IF NOT EXISTS budgets (
     id BIGSERIAL PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
-    amount DECIMAL(19, 2) NOT NULL
+    amount DECIMAL(19, 2) NOT NULL,
+    -- Nullable: the user-facing calendar date the app shows for this budget. NULL means it
+    -- predates this column and no local date is known for it yet.
+    date DATE
 );
 
 -- User-Budget junction table (many-to-many relationship)
@@ -57,6 +60,9 @@ CREATE TABLE IF NOT EXISTS budget_entries (
     updated_by VARCHAR(255),
     creation_date TIMESTAMP NOT NULL,
     modification_date TIMESTAMP NOT NULL,
+    -- Nullable: the user-facing calendar date the app shows for this entry. NULL means it
+    -- predates this column and no local date is known for it yet.
+    date DATE,
     CONSTRAINT fk_budget_entries_budget FOREIGN KEY (budget_id) REFERENCES budgets(id) ON DELETE CASCADE,
     CONSTRAINT fk_budget_entries_created_by FOREIGN KEY (created_by) REFERENCES users(email) ON DELETE SET NULL,
     CONSTRAINT fk_budget_entries_updated_by FOREIGN KEY (updated_by) REFERENCES users(email) ON DELETE SET NULL
@@ -103,3 +109,5 @@ COMMENT ON COLUMN users.refresh_token_expiry IS 'Expiration timestamp for the re
 COMMENT ON COLUMN budget_entries.type IS 'Entry type: INCOME or OUTCOME';
 COMMENT ON COLUMN budget_entries.created_by IS 'User email who created this entry (nullable for audit trail)';
 COMMENT ON COLUMN budget_entries.updated_by IS 'User email who last updated this entry (nullable for audit trail)';
+COMMENT ON COLUMN budgets.date IS 'User-facing calendar date shown in the app; NULL for rows that predate this column';
+COMMENT ON COLUMN budget_entries.date IS 'User-facing calendar date shown in the app; NULL for rows that predate this column';

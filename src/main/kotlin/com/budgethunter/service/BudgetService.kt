@@ -28,6 +28,7 @@ import org.springframework.data.domain.PageRequest
 import org.springframework.data.domain.Sort
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
+import java.time.LocalDate
 import java.time.LocalDateTime
 
 @Service
@@ -46,7 +47,8 @@ class BudgetService(
 
         val budget = Budget(
             name = request.name,
-            amount = request.amount
+            amount = request.amount,
+            date = request.date ?: LocalDate.now()
         )
 
         val savedBudget = budgetRepository.save(budget)
@@ -65,7 +67,8 @@ class BudgetService(
         return BudgetResponse(
             id = savedBudget.id!!,
             name = savedBudget.name,
-            amount = savedBudget.amount
+            amount = savedBudget.amount,
+            date = savedBudget.date
         )
     }
 
@@ -76,7 +79,8 @@ class BudgetService(
             BudgetResponse(
                 id = budget.id!!,
                 name = budget.name,
-                amount = budget.amount
+                amount = budget.amount,
+                date = budget.date
             )
         }
     }
@@ -96,7 +100,8 @@ class BudgetService(
             BudgetResponse(
                 id = budget.id!!,
                 name = budget.name,
-                amount = budget.amount
+                amount = budget.amount,
+                date = budget.date
             )
         }
     }
@@ -110,7 +115,8 @@ class BudgetService(
 
         val updatedBudget = budget.copy(
             name = request.name,
-            amount = request.amount
+            amount = request.amount,
+            date = request.date ?: budget.date
         )
 
         val savedBudget = budgetRepository.save(updatedBudget)
@@ -118,7 +124,8 @@ class BudgetService(
         return BudgetResponse(
             id = savedBudget.id!!,
             name = savedBudget.name,
-            amount = savedBudget.amount
+            amount = savedBudget.amount,
+            date = savedBudget.date
         )
     }
 
@@ -224,7 +231,8 @@ class BudgetService(
             type = request.type,
             createdBy = user,
             creationDate = LocalDateTime.now(),
-            modificationDate = LocalDateTime.now()
+            modificationDate = LocalDateTime.now(),
+            date = request.date ?: LocalDate.now()
         )
 
         val savedEntry = budgetEntryRepository.save(newEntry)
@@ -255,7 +263,8 @@ class BudgetService(
             category = request.category,
             type = request.type,
             updatedBy = user,
-            modificationDate = LocalDateTime.now()
+            modificationDate = LocalDateTime.now(),
+            date = request.date ?: existingEntry.date
         )
 
         val savedEntry = budgetEntryRepository.save(updatedEntry)
@@ -300,7 +309,8 @@ class BudgetService(
             type = request.type,
             createdBy = user,
             creationDate = LocalDateTime.now(),
-            modificationDate = LocalDateTime.now()
+            modificationDate = LocalDateTime.now(),
+            date = request.date ?: LocalDate.now()
         )
 
         return budgetEntryRepository.save(newEntry)
@@ -320,7 +330,8 @@ class BudgetService(
             category = request.category,
             type = request.type,
             updatedBy = user,
-            modificationDate = LocalDateTime.now()
+            modificationDate = LocalDateTime.now(),
+            date = request.date ?: existingEntry.date
         )
 
         return budgetEntryRepository.save(updatedEntry)
@@ -336,7 +347,8 @@ class BudgetService(
         createdByEmail = this.createdBy?.email,
         updatedByEmail = this.updatedBy?.email,
         creationDate = this.creationDate,
-        modificationDate = this.modificationDate
+        modificationDate = this.modificationDate,
+        date = this.date
     )
 
     @Transactional

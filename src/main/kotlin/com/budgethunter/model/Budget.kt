@@ -11,6 +11,7 @@ import jakarta.persistence.Table
 import jakarta.validation.constraints.NotBlank
 import jakarta.validation.constraints.PositiveOrZero
 import java.math.BigDecimal
+import java.time.LocalDate
 
 @Entity
 @Table(name = "budgets")
@@ -31,5 +32,11 @@ data class Budget(
     val userBudgets: MutableList<UserBudget> = mutableListOf(),
 
     @field:OneToMany(mappedBy = "budget", cascade = [CascadeType.ALL], orphanRemoval = true)
-    val budgetEntries: MutableList<BudgetEntry> = mutableListOf()
+    val budgetEntries: MutableList<BudgetEntry> = mutableListOf(),
+
+    // Nullable on purpose: the user-facing calendar date the app shows for this budget. Rows that
+    // predate this column only get an approximation (the date of their earliest entry) and stay
+    // NULL when they have no entries - see database/migrations/002_add_entity_dates.sql.
+    @field:Column(name = "date")
+    val date: LocalDate? = null
 )

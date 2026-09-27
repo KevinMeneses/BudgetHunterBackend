@@ -10,7 +10,13 @@ import com.budgethunter.dto.SignInResponse
 import com.budgethunter.dto.SignUpRequest
 import com.budgethunter.dto.UpdateBudgetEntryRequest
 import com.budgethunter.dto.UserResponse
+import com.budgethunter.model.Budget
 import com.budgethunter.model.EntryType
+import com.budgethunter.model.UserBudget
+import com.budgethunter.model.UserBudgetId
+import com.budgethunter.repository.BudgetRepository
+import com.budgethunter.repository.UserBudgetRepository
+import com.budgethunter.repository.UserRepository
 import com.fasterxml.jackson.databind.ObjectMapper
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNotNull
@@ -30,6 +36,7 @@ import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPat
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
 import org.springframework.transaction.annotation.Transactional
 import java.math.BigDecimal
+import java.time.LocalDate
 
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -41,6 +48,15 @@ class BudgetManagementIntegrationTest {
 
     @Autowired
     private lateinit var objectMapper: ObjectMapper
+
+    @Autowired
+    private lateinit var budgetRepository: BudgetRepository
+
+    @Autowired
+    private lateinit var userBudgetRepository: UserBudgetRepository
+
+    @Autowired
+    private lateinit var userRepository: UserRepository
 
     private val user1Email = "user1@example.com"
     private val user1Password = "Password123!"
@@ -112,6 +128,42 @@ class BudgetManagementIntegrationTest {
     }
 
     @Test
+    fun `should create budget with the supplied date formatted as yyyy-MM-dd`() {
+        // Given
+        val request = CreateBudgetRequest(
+            name = "Dated Budget",
+            amount = BigDecimal("1200.00"),
+            date = LocalDate.of(2026, 3, 15)
+        )
+
+        // When & Then
+        mockMvc.perform(
+            post("/api/budgets")
+                .header("Authorization", "Bearer $user1AuthToken")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(request))
+        )
+            .andExpect(status().isCreated)
+            .andExpect(jsonPath("$.date").value("2026-03-15"))
+    }
+
+    @Test
+    fun `should default budget date to today when the request omits it`() {
+        // Given - older app builds don't send "date" at all
+        val request = CreateBudgetRequest(name = "Undated Budget", amount = BigDecimal("500.00"))
+
+        // When & Then
+        mockMvc.perform(
+            post("/api/budgets")
+                .header("Authorization", "Bearer $user1AuthToken")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(request))
+        )
+            .andExpect(status().isCreated)
+            .andExpect(jsonPath("$.date").value(LocalDate.now().toString()))
+    }
+
+    @Test
     fun `should return 401 when creating budget without authentication`() {
         // Given
         val request = CreateBudgetRequest(
@@ -174,6 +226,45 @@ class BudgetManagementIntegrationTest {
             .andExpect(status().isOk)
             .andExpect(jsonPath("$").isArray)
             .andExpect(jsonPath("$.length()").value(0))
+    }
+
+    @Test
+    fun `should return budgets newest-first by date, with dateless budgets last`() {
+        // Given - three budgets created directly through the repository so a NULL date
+        // (pre-migration rows the API can no longer produce, since it always defaults to
+        // today) can sit alongside dated ones and prove the NULLS LAST tie-break.
+        val user1 = userRepository.findById(user1Email).get()
+
+        val olderBudget = budgetRepository.save(
+            Budget(name = "Older Budget", amount = BigDecimal("100.00"), date = LocalDate.now().minusDays(5))
+        )
+        val newerBudget = budgetRepository.save(
+            Budget(name = "Newer Budget", amount = BigDecimal("200.00"), date = LocalDate.now())
+        )
+        val datelessBudget = budgetRepository.save(
+            Budget(name = "Dateless Budget", amount = BigDecimal("300.00"), date = null)
+        )
+
+        listOf(olderBudget, newerBudget, datelessBudget).forEach { budget ->
+            userBudgetRepository.save(
+                UserBudget(
+                    id = UserBudgetId(budgetId = budget.id, userEmail = user1Email),
+                    budget = budget,
+                    user = user1
+                )
+            )
+        }
+
+        // When & Then - newest date first, then the older date, then the NULL-date budget last
+        mockMvc.perform(
+            get("/api/budgets")
+                .header("Authorization", "Bearer $user1AuthToken")
+        )
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.length()").value(3))
+            .andExpect(jsonPath("$[0].id").value(newerBudget.id))
+            .andExpect(jsonPath("$[1].id").value(olderBudget.id))
+            .andExpect(jsonPath("$[2].id").value(datelessBudget.id))
     }
 
     // Collaborator Tests
@@ -322,6 +413,172 @@ class BudgetManagementIntegrationTest {
             .andExpect(jsonPath("$.amount").value(150.00))
             .andExpect(jsonPath("$.description").value("Groceries"))
             .andExpect(jsonPath("$.createdByEmail").value(user1Email))
+    }
+
+    @Test
+    fun `should create budget entry with the supplied date formatted as yyyy-MM-dd`() {
+        // Given - Create a budget
+        val createBudgetRequest = CreateBudgetRequest(name = "Expense Budget", amount = BigDecimal("1000.00"))
+
+        val budgetResult = mockMvc.perform(
+            post("/api/budgets")
+                .header("Authorization", "Bearer $user1AuthToken")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(createBudgetRequest))
+        ).andReturn()
+
+        val budget = objectMapper.readValue(budgetResult.response.contentAsString, BudgetResponse::class.java)
+
+        // When - Create entry with an explicit date
+        val entryRequest = CreateBudgetEntryRequest(
+            amount = BigDecimal("150.00"),
+            description = "Groceries",
+            category = "Food",
+            type = EntryType.OUTCOME,
+            date = LocalDate.of(2026, 5, 4)
+        )
+
+        mockMvc.perform(
+            post("/api/budgets/${budget.id}/entries")
+                .header("Authorization", "Bearer $user1AuthToken")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(entryRequest))
+        )
+            .andExpect(status().isCreated)
+            .andExpect(jsonPath("$.date").value("2026-05-04"))
+    }
+
+    @Test
+    fun `should default budget entry date to today when the request omits it`() {
+        // Given - Create a budget
+        val createBudgetRequest = CreateBudgetRequest(name = "Expense Budget", amount = BigDecimal("1000.00"))
+
+        val budgetResult = mockMvc.perform(
+            post("/api/budgets")
+                .header("Authorization", "Bearer $user1AuthToken")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(createBudgetRequest))
+        ).andReturn()
+
+        val budget = objectMapper.readValue(budgetResult.response.contentAsString, BudgetResponse::class.java)
+
+        // When - Create entry without a date (older app builds)
+        val entryRequest = CreateBudgetEntryRequest(
+            amount = BigDecimal("150.00"),
+            description = "Groceries",
+            category = "Food",
+            type = EntryType.OUTCOME
+        )
+
+        mockMvc.perform(
+            post("/api/budgets/${budget.id}/entries")
+                .header("Authorization", "Bearer $user1AuthToken")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(entryRequest))
+        )
+            .andExpect(status().isCreated)
+            .andExpect(jsonPath("$.date").value(LocalDate.now().toString()))
+    }
+
+    @Test
+    fun `should keep the entry's stored date when an update omits it`() {
+        // Given - Create budget and a dated entry
+        val createBudgetRequest = CreateBudgetRequest(name = "Test Budget", amount = BigDecimal("1000.00"))
+
+        val budgetResult = mockMvc.perform(
+            post("/api/budgets")
+                .header("Authorization", "Bearer $user1AuthToken")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(createBudgetRequest))
+        ).andReturn()
+
+        val budget = objectMapper.readValue(budgetResult.response.contentAsString, BudgetResponse::class.java)
+
+        val createEntryRequest = CreateBudgetEntryRequest(
+            amount = BigDecimal("100.00"),
+            description = "Original",
+            category = "Test",
+            type = EntryType.OUTCOME,
+            date = LocalDate.of(2026, 1, 1)
+        )
+
+        val entryResult = mockMvc.perform(
+            post("/api/budgets/${budget.id}/entries")
+                .header("Authorization", "Bearer $user1AuthToken")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(createEntryRequest))
+        ).andReturn()
+
+        val entry = objectMapper.readValue(entryResult.response.contentAsString, BudgetEntryResponse::class.java)
+        assertEquals(LocalDate.of(2026, 1, 1), entry.date)
+
+        // When - Update without sending a date
+        val updateEntryRequest = UpdateBudgetEntryRequest(
+            amount = BigDecimal("200.00"),
+            description = "Updated",
+            category = "Updated Category",
+            type = EntryType.INCOME
+        )
+
+        // Then - the originally stored date survives untouched
+        mockMvc.perform(
+            put("/api/budgets/${budget.id}/entries/${entry.id}")
+                .header("Authorization", "Bearer $user1AuthToken")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(updateEntryRequest))
+        )
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.date").value("2026-01-01"))
+    }
+
+    @Test
+    fun `should overwrite the entry's stored date when an update supplies one`() {
+        // Given - Create budget and a dated entry
+        val createBudgetRequest = CreateBudgetRequest(name = "Test Budget", amount = BigDecimal("1000.00"))
+
+        val budgetResult = mockMvc.perform(
+            post("/api/budgets")
+                .header("Authorization", "Bearer $user1AuthToken")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(createBudgetRequest))
+        ).andReturn()
+
+        val budget = objectMapper.readValue(budgetResult.response.contentAsString, BudgetResponse::class.java)
+
+        val createEntryRequest = CreateBudgetEntryRequest(
+            amount = BigDecimal("100.00"),
+            description = "Original",
+            category = "Test",
+            type = EntryType.OUTCOME,
+            date = LocalDate.of(2026, 1, 1)
+        )
+
+        val entryResult = mockMvc.perform(
+            post("/api/budgets/${budget.id}/entries")
+                .header("Authorization", "Bearer $user1AuthToken")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(createEntryRequest))
+        ).andReturn()
+
+        val entry = objectMapper.readValue(entryResult.response.contentAsString, BudgetEntryResponse::class.java)
+
+        // When - Update with a new date
+        val updateEntryRequest = UpdateBudgetEntryRequest(
+            amount = BigDecimal("200.00"),
+            description = "Updated",
+            category = "Updated Category",
+            type = EntryType.INCOME,
+            date = LocalDate.of(2026, 2, 2)
+        )
+
+        mockMvc.perform(
+            put("/api/budgets/${budget.id}/entries/${entry.id}")
+                .header("Authorization", "Bearer $user1AuthToken")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(updateEntryRequest))
+        )
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.date").value("2026-02-02"))
     }
 
     @Test
