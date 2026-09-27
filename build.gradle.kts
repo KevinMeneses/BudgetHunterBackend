@@ -77,6 +77,12 @@ dependencies {
     runtimeOnly("com.h2database:h2")
     runtimeOnly("org.postgresql:postgresql")
 
+    // Schema migrations, applied by the app itself on startup under the production profile.
+    // flyway-database-postgresql is not optional: since Flyway 10 the Postgres support lives
+    // outside flyway-core, and Flyway refuses to run against Postgres without it.
+    implementation("org.flywaydb:flyway-core")
+    implementation("org.flywaydb:flyway-database-postgresql")
+
     // Testing
     testImplementation("org.springframework.boot:spring-boot-starter-test")
     testImplementation("org.springframework.security:spring-security-test")
