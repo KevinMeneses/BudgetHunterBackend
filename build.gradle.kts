@@ -42,7 +42,7 @@ repositories {
 
 dependencies {
     // Security: Force commons-lang3 to secure version (fixes CVE - Uncontrolled Recursion vulnerability)
-    implementation("org.apache.commons:commons-lang3:3.18.0")
+    implementation("org.apache.commons:commons-lang3:3.20.0")
 
     // Spring Boot Starters
     implementation("org.springframework.boot:spring-boot-starter-web")
