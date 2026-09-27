@@ -66,7 +66,11 @@ jobs:
       - uses: gradle/actions/setup-gradle@v6
 
       - name: Test, coverage floor and boot JAR
-        run: ./gradlew test koverVerify koverXmlReport koverHtmlReport bootJar
+        # `clean` is deliberate on a runner with nothing to clean: it makes CI run the same
+        # invocation shape a developer does. Without it, Gradle 9 + Kover 0.8.3 broke
+        # `./gradlew clean check` - clean raced the task writing kover-agent.args - and CI was
+        # blind to it, because a fresh checkout plus no clean never hits that ordering.
+        run: ./gradlew clean test koverVerify koverXmlReport koverHtmlReport bootJar
 
       - name: Publish test results
         if: always()
