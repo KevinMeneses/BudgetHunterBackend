@@ -63,6 +63,13 @@ updates:
         update-types: ["version-update:semver-major", "version-update:semver-minor"]
       - dependency-name: "org.jetbrains.kotlin*"
         update-types: ["version-update:semver-major", "version-update:semver-minor"]
+      # springdoc 3.x follows Spring Boot 4, so it is unreachable until that migration happens:
+      # its starter depends on spring-boot-validation and spring-boot-jackson, modules that only
+      # exist in Boot 4, and it ships Kotlin 2.3 metadata this project cannot read - "The binary
+      # version of its metadata is 2.3.0, expected version is 2.0.0" is how PR #18 failed.
+      # 2.8.17 is the head of the 2.x line, so holding majors back costs no updates at all.
+      - dependency-name: "org.springdoc*"
+        update-types: ["version-update:semver-major"]
 
   - package-ecosystem: github-actions
     directory: /
