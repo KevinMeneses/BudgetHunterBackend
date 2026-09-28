@@ -17,8 +17,8 @@ data class PutEntryRequest(
     @field:NotNull(message = "Amount is required")
     val amount: BigDecimal,
 
-    @field:NotBlank(message = "Description is required")
-    val description: String,
+    // Optional: the app lets users save entries without one and sends an empty string.
+    val description: String = "",
 
     @field:NotBlank(message = "Category is required")
     val category: String,

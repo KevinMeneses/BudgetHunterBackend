@@ -33,7 +33,7 @@ data class BudgetEntry(
     @field:Column(nullable = false, precision = 19, scale = 2)
     val amount: BigDecimal,
 
-    @field:NotBlank
+    // May be empty: description is optional in the app.
     @field:Column(nullable = false)
     val description: String,
 
