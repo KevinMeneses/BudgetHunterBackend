@@ -416,6 +416,45 @@ class BudgetManagementIntegrationTest {
     }
 
     @Test
+    fun `should create and update budget entry with an empty description`() {
+        // Given - Create a budget
+        val createBudgetRequest = CreateBudgetRequest(name = "Expense Budget", amount = BigDecimal("1000.00"))
+
+        val budgetResult = mockMvc.perform(
+            post("/api/budgets")
+                .header("Authorization", "Bearer $user1AuthToken")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(createBudgetRequest))
+        ).andReturn()
+
+        val budget = objectMapper.readValue(budgetResult.response.contentAsString, BudgetResponse::class.java)
+
+        // When - Create entry without description, as the app sends it
+        val entryResult = mockMvc.perform(
+            post("/api/budgets/${budget.id}/entries")
+                .header("Authorization", "Bearer $user1AuthToken")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""{"amount":150.00,"description":"","category":"Food","type":"OUTCOME"}""")
+        )
+            .andExpect(status().isCreated)
+            .andExpect(jsonPath("$.description").value(""))
+            .andReturn()
+
+        val entry = objectMapper.readValue(entryResult.response.contentAsString, BudgetEntryResponse::class.java)
+
+        // Then - Update it omitting the description field entirely
+        mockMvc.perform(
+            put("/api/budgets/${budget.id}/entries/${entry.id}")
+                .header("Authorization", "Bearer $user1AuthToken")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""{"amount":200.00,"category":"Food","type":"OUTCOME"}""")
+        )
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.amount").value(200.00))
+            .andExpect(jsonPath("$.description").value(""))
+    }
+
+    @Test
     fun `should create budget entry with the supplied date formatted as yyyy-MM-dd`() {
         // Given - Create a budget
         val createBudgetRequest = CreateBudgetRequest(name = "Expense Budget", amount = BigDecimal("1000.00"))
