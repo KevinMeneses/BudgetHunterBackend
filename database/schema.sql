@@ -1,6 +1,11 @@
 -- BudgetHunter Database Schema for PostgreSQL
 -- This script creates the database schema for production deployment
 -- Generated based on JPA entities in the application
+--
+-- This is the BASELINE, and docker-entrypoint-initdb.d only runs it on an empty volume. Every
+-- change after version 2 belongs in src/main/resources/db/migration as V3__, V4__ ... - Flyway
+-- applies those on startup (see application-production.properties). Keep this file in step with
+-- them, because a fresh database is built from here and then baselined, not migrated up from V1.
 
 -- ============================================
 -- DATABASE CREATION

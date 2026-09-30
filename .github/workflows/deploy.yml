@@ -1,6 +1,9 @@
 name: Deploy
 
 # Manual deploy of any branch to the production droplet, reusing deploy.sh.
+#
+# Schema migrations need no step here: Flyway applies whatever is new in
+# src/main/resources/db/migration when the deployed jar starts, and refuses to start if one fails.
 # Actions → Deploy → Run workflow. Either pick the branch in "Use workflow from", or type
 # any branch/tag/SHA in "ref" (needed for branches that predate this workflow file).
 #
