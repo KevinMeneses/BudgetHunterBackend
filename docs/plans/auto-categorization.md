@@ -21,6 +21,14 @@ interface, so it can be swapped (Jev, Ollama, ...) without touching the rest.
 - **Never override the user.** Add `category_source` (`USER` | `AUTO`) to `budget_entries`.
 - **Never block or fail a write because of the AI.** Classification runs after the transaction
   commits, asynchronously. On any failure the entry keeps its category (`OTHER` if none).
+- **The app's "AI processing" toggle controls this too.** The setting screen already has a toggle
+  (`ai_processing_enabled`, default on) that today only gates the on-device receipt processing.
+  It also becomes the on/off switch for server-side categorization. The server keeps the value
+  **per user account** (`users.ai_processing_enabled`, default `true`, matching the app) and checks it
+  at classification time, so turning it off stops classification of entries that are still pending,
+  not only future ones. When off, no description of that user is ever sent to Gemini.
+  Note the server never receives the receipt/invoice file (the app keeps `invoice` local), so the
+  server-side processing this toggle controls is categorization from the description only.
 - **Privacy:** only the description text is sent to Gemini, never amounts, emails or budget names.
   Note that the free tier may use submitted data for model improvement; mention it in docs.
 
@@ -29,10 +37,12 @@ interface, so it can be swapped (Jev, Ollama, ...) without touching the rest.
 ```
 POST/PUT entry ──► BudgetService saves entry
                      category present  -> category_source = USER (no AI)
-                     category absent   -> category = OTHER, source = AUTO, publish event
+                     category absent + user's AI setting on  -> OTHER, source = AUTO, publish event
+                     category absent + AI setting off        -> OTHER, source = USER, nothing else
                                              │ after commit
                                              ▼
                           EntryCategorizationService (@Async)
+                            0. re-check creator's ai_processing_enabled (skip if off)
                             1. normalize description
                             2. cache / rules lookup  ── hit ──┐
                             3. CategoryClassifier (Gemini) ───┤
@@ -60,6 +70,21 @@ are unaffected (they just never get auto-categorization).
   `AUTO` -> keep the current category and mark for re-classification only when the description
   changed.
 - Tests: service + controller for each branch; sort by `category` still works.
+
+### Part 1b - Per-user AI processing setting
+- Same `V3` migration (or `V4`): `users.ai_processing_enabled BOOLEAN NOT NULL DEFAULT TRUE`.
+- Expose it on `CurrentUserResponse` (`aiProcessingEnabled`, additive) and add
+  `PUT /api/users/me/settings` with `{ "aiProcessingEnabled": bool }` (idempotent, authenticated,
+  covered by the rate limiter). Document in OpenAPI/Postman.
+- Whose setting applies in a shared budget? The user who **created or last edited** the entry
+  (`createdBy`/the acting user on the request), never the other collaborators'. An entry with
+  `createdBy == null` is never auto-categorized.
+- Enforce in two places (defense in depth): (1) when saving, an absent category from a user with
+  the setting off is stored as `OTHER`/`USER` (no `AUTO`, no event); (2) the categorization service
+  and the backfill job re-read the setting right before calling Gemini and skip if off.
+- Tests: setting off -> no classifier call even for `AUTO` entries; toggled off while an entry is
+  pending -> skipped; collaborator with it on does not trigger classification of another user's
+  entry; GET `/me` returns the flag; unauthenticated/invalid body cases.
 
 ### Part 2 - Classifier abstraction and rules/cache layer
 - `CategoryClassifier { suspend/fun classify(descriptions: List<String>): List<Category?> }`.
@@ -107,6 +132,8 @@ are unaffected (they just never get auto-categorization).
   `postman_requests.md`, and the OpenAPI annotations (`category` optional, new response field).
 
 ## Acceptance criteria
+- With the app's AI toggle off, no entry of that user is categorized and none of their
+  descriptions reaches Gemini; turning it on resumes it for new entries.
 - Creating an entry without `category` returns immediately with `OTHER`/`AUTO`; within seconds an
   SSE `UPDATED` event carries the AI category.
 - Entries with a user-chosen category are never modified by the AI.
@@ -117,4 +144,5 @@ are unaffected (they just never get auto-categorization).
 - Reject unknown `category` strings from clients, or accept free text? (recommended: accept)
 - Should the user be able to ask "re-categorize this entry" explicitly? (small follow-up endpoint
   or just send `category` omitted on update)
+- Should turning the toggle on offer to categorize existing `OTHER` entries (backfill on demand)?
 - Persistent cache table vs. in-memory only (in-memory is fine to start).
