@@ -45,6 +45,22 @@ data class User(
     @field:Column
     var refreshTokenExpiry: Instant? = null,
 
+    // App preferences. Null means the account never saved one, which is how a client tells a
+    // fresh account (upload the device's values) from a chosen setting (adopt it).
+    @field:Column(name = "sms_reading_enabled")
+    var smsReadingEnabled: Boolean? = null,
+
+    @field:Column(name = "ai_processing_enabled")
+    var aiProcessingEnabled: Boolean? = null,
+
+    // A plain id, not a relation: see V3__add_user_preferences.sql.
+    @field:Column(name = "default_budget_id")
+    var defaultBudgetId: Long? = null,
+
+    // Comma-separated bank ids. Null is "never saved"; an empty string is "saved: none selected".
+    @field:Column(name = "selected_bank_ids", length = 1000)
+    var selectedBankIds: String? = null,
+
     @field:OneToMany(mappedBy = "user", cascade = [CascadeType.ALL], orphanRemoval = true)
     val userBudgets: MutableList<UserBudget> = mutableListOf()
 )
