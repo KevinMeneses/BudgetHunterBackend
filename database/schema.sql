@@ -31,7 +31,12 @@ CREATE TABLE IF NOT EXISTS users (
     google_subject VARCHAR(255) UNIQUE,
     auth_provider VARCHAR(32) NOT NULL DEFAULT 'PASSWORD',
     refresh_token VARCHAR(500) UNIQUE,
-    refresh_token_expiry TIMESTAMP
+    refresh_token_expiry TIMESTAMP,
+    -- App preferences. NULL = never saved, so a client can tell a fresh account from a chosen value.
+    sms_reading_enabled BOOLEAN,
+    ai_processing_enabled BOOLEAN,
+    default_budget_id BIGINT,
+    selected_bank_ids VARCHAR(1000)
 );
 
 -- Budgets table

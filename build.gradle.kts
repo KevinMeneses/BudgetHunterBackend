@@ -9,7 +9,7 @@ plugins {
     kotlin("plugin.jpa") version "2.0.21"
     id("org.jlleitschuh.gradle.ktlint") version "14.2.0"
     id("io.gitlab.arturbosch.detekt") version "1.23.8"
-    id("org.jetbrains.kotlinx.kover") version "0.9.9"
+    id("org.jetbrains.kotlinx.kover") version "0.9.11"
 }
 
 group = "com.budgethunter"
@@ -42,7 +42,7 @@ repositories {
 
 dependencies {
     // Security: Force commons-lang3 to secure version (fixes CVE - Uncontrolled Recursion vulnerability)
-    implementation("org.apache.commons:commons-lang3:3.20.0")
+    implementation("org.apache.commons:commons-lang3:3.21.0")
 
     // Spring Boot Starters
     implementation("org.springframework.boot:spring-boot-starter-web")
