@@ -41,6 +41,12 @@ data class BudgetEntry(
     @field:Column(nullable = false)
     val category: String,
 
+    // Whether a person or the server chose [category]. Automatic categorisation only ever touches AUTO.
+    @field:NotNull
+    @field:Column(name = "category_source", nullable = false)
+    @field:Enumerated(EnumType.STRING)
+    val categorySource: CategorySource = CategorySource.USER,
+
     @field:NotNull
     @field:Column(nullable = false)
     @field:Enumerated(EnumType.STRING)
@@ -70,4 +76,17 @@ data class BudgetEntry(
 enum class EntryType {
     INCOME,
     OUTCOME
+}
+
+enum class CategorySource {
+    /** Chosen by a person, or taken from a receipt they scanned. Never overwritten automatically. */
+    USER,
+
+    /** Assigned by the server from the description, and still eligible for re-categorisation. */
+    AUTO
+}
+
+object EntryCategory {
+    /** The fallback category: what an entry holds while it waits for, or lacks, a better one. */
+    const val OTHER = "OTHER"
 }
