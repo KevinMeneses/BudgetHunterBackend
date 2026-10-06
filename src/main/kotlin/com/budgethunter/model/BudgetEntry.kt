@@ -89,4 +89,25 @@ enum class CategorySource {
 object EntryCategory {
     /** The fallback category: what an entry holds while it waits for, or lacks, a better one. */
     const val OTHER = "OTHER"
+
+    /**
+     * The closed list automatic categorisation chooses from. It mirrors the app's
+     * `BudgetEntry.Category`; change one side and the other has to follow. Stored categories are
+     * still free text (a person may type anything), this list only bounds what the server assigns.
+     */
+    val ALL: List<String> = listOf(
+        "FOOD",
+        "GROCERIES",
+        "SELF_CARE",
+        "TRANSPORTATION",
+        "HOUSEHOLD_ITEMS",
+        "SERVICES",
+        "EDUCATION",
+        "HEALTH",
+        "LEISURE",
+        "TAXES",
+        OTHER
+    )
+
+    fun isKnown(category: String): Boolean = category in ALL
 }
