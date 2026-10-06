@@ -94,13 +94,20 @@ category, so they are unaffected.
 - Unknown category strings: accept (old rows may hold anything).
 - Tests: service + controller per branch (flag true/false/null); sort by `category` still works.
 
-### Part 2 - Classifier abstraction and rules/cache layer
-- `CategoryClassifier { fun classify(descriptions: List<String>): List<Category?> }`.
-- `RuleBasedClassifier` (keyword map, ES/EN - the app is now English by default with Spanish
-  strings, users' descriptions are in both - accent/case-insensitive) as the first layer.
-- `CategoryCache`: normalized description -> category (Caffeine, bounded). Normalization: lowercase,
-  strip accents, drop digits/reference codes (`"RAPPI 8841"` and `"rappi 9921"` share a key).
-- `FakeCategoryClassifier` for tests. Unit tests for normalization and rules.
+### Part 2 - Classifier abstraction and rules/cache layer (done)
+- `CategoryClassifier` (`fun interface`): `classify(List<String>): List<String?>`, one answer per
+  description, `null` = no opinion (distinct from `OTHER`, which is an answer). Plain strings from
+  `EntryCategory.ALL`, the closed list that mirrors the app's enum.
+- `DescriptionNormalizer`: lower-case, strip accents, punctuation as separator, drop tokens with
+  digits (`"RAPPI 8841"` and `"rappi 9921"` share a key).
+- `RuleBasedClassifier`: whole-word ES/EN keywords for well-known merchants, tuned for precision
+  (ambiguous words like `metro`, `club`, `rappi` are left out), longest keyword wins, never `OTHER`.
+- `CategoryCache`: bounded, thread-safe in-memory LRU keyed by the normalised description. Own
+  ~15-line LRU instead of Caffeine, to avoid a new dependency; swap it if hit-rate metrics ever
+  justify one.
+- None of these is a Spring bean yet: Part 3 adds a second `CategoryClassifier`, and Part 4 wires
+  the layers explicitly (rules -> cache -> Gemini), so registering one now would only create an
+  ambiguous injection. Tests use lambdas as fake classifiers (`CategoryClassifier` is a `fun interface`).
 
 ### Part 3 - Gemini classifier
 - `GeminiCategoryClassifier` using Spring `RestClient`: `generateContent` with the `x-goog-api-key`
