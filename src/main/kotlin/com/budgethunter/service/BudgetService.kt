@@ -350,8 +350,9 @@ class BudgetService(
     /**
      * Decides which category an entry is stored with and who gets credit for it.
      *
-     * A category in the request is the user's choice. Without one, nobody has chosen: the entry holds the
-     * [EntryCategory.OTHER] placeholder as `AUTO`, waiting for an automatic category if the user ever asks for
+     * A category in the request is the user's choice, except [EntryCategory.UNCATEGORIZED] ("Sin categoría"),
+     * which is the absence of one. Without a choice the entry holds [EntryCategory.UNCATEGORIZED] as `AUTO`,
+     * waiting for an automatic category if the user ever asks for
      * one. That does not depend on their AI preference, which only decides whether a categorisation may run
      * (and is checked then): an entry saved while it was off must still be offered once it is on.
      *
@@ -364,12 +365,14 @@ class BudgetService(
         description: String,
         existing: BudgetEntry? = null
     ): Pair<String, CategorySource> {
-        val explicit = requested?.trim()?.takeIf { it.isNotEmpty() }
+        val explicit = requested?.trim()?.takeIf { it.isNotEmpty() && !it.equals(EntryCategory.UNCATEGORIZED, true) }
         return when {
             explicit != null -> explicit to CategorySource.USER
-            existing == null -> EntryCategory.OTHER to CategorySource.AUTO
+            // Nothing chosen, or "Sin categoría" picked on purpose, which comes to the same.
+            existing == null || !requested.isNullOrBlank() ->
+                EntryCategory.UNCATEGORIZED to CategorySource.AUTO
             existing.categorySource == CategorySource.AUTO && existing.description != description ->
-                EntryCategory.OTHER to CategorySource.AUTO
+                EntryCategory.UNCATEGORIZED to CategorySource.AUTO
             else -> existing.category to existing.categorySource
         }
     }

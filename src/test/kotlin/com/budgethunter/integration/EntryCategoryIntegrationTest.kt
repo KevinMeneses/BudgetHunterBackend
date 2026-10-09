@@ -86,7 +86,7 @@ class EntryCategoryIntegrationTest {
 
         postEntry("""{"amount":5.00,"description":"cab","type":"OUTCOME"}""")
             .andExpect(status().isCreated)
-            .andExpect(jsonPath("$.category").value("OTHER"))
+            .andExpect(jsonPath("$.category").value("UNCATEGORIZED"))
             .andExpect(jsonPath("$.categorySource").value("AUTO"))
     }
 
@@ -96,7 +96,7 @@ class EntryCategoryIntegrationTest {
 
         postEntry("""{"amount":5.00,"description":"cab","type":"OUTCOME"}""")
             .andExpect(status().isCreated)
-            .andExpect(jsonPath("$.category").value("OTHER"))
+            .andExpect(jsonPath("$.category").value("UNCATEGORIZED"))
             .andExpect(jsonPath("$.categorySource").value("AUTO"))
     }
 

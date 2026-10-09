@@ -22,8 +22,9 @@ import java.util.concurrent.ConcurrentHashMap
  * match only while an entry is still automatic and still has the description it was classified from, so a
  * person's concurrent edit always wins and nothing else on the entry is touched.
  *
- * Only entries that are `AUTO` and still at the `OTHER` placeholder are looked at, which is what keeps a
- * second run from redoing the first one and what keeps it away from everything a person categorised.
+ * Only entries that are `AUTO` and still `UNCATEGORIZED` are looked at. That keeps a second run from redoing
+ * the first (an entry the AI placed, even in OTHER, is settled) and keeps it away from everything a person
+ * categorised.
  */
 class BudgetCategorizationService(
     private val resolver: CategoryResolver,
@@ -55,26 +56,31 @@ class BudgetCategorizationService(
     private fun run(budgetId: Long): CategorizeEntriesResponse {
         val waiting = budgetEntryRepository.findPendingCategorization(
             budgetId,
-            EntryCategory.OTHER,
+            EntryCategory.UNCATEGORIZED,
             PageRequest.of(0, MAX_ENTRIES_PER_RUN)
         )
         val answers = resolver.resolve(waiting.map { it.description })
 
         val categorized = waiting.indices.count { index ->
-            val category = answers[index]
-            // OTHER is what is already stored: writing it would only bump the modification date.
-            category != null && category != EntryCategory.OTHER && store(waiting[index], category)
+            // OTHER is an answer too ("looked at it, none fits"): storing it settles the entry.
+            answers[index]?.let { store(waiting[index], it) } == true
         }
         log.info("Categorized {} of {} waiting entries of budget {}", categorized, waiting.size, budgetId)
 
         return CategorizeEntriesResponse(
             categorized = categorized,
-            pending = budgetEntryRepository.countPendingCategorization(budgetId, EntryCategory.OTHER)
+            pending = budgetEntryRepository.countPendingCategorization(budgetId, EntryCategory.UNCATEGORIZED)
         )
     }
 
     private fun store(entry: PendingCategorization, category: String): Boolean =
-        budgetEntryRepository.applyAutoCategory(entry.id, entry.description, category, LocalDateTime.now()) > 0
+        budgetEntryRepository.applyAutoCategory(
+            entry.id,
+            entry.description,
+            category,
+            EntryCategory.UNCATEGORIZED,
+            LocalDateTime.now()
+        ) > 0
 
     private fun userAllowsAi(email: String): Boolean =
         userRepository.findById(email).map { it.aiProcessingEnabled == true }.orElse(false)
@@ -82,6 +88,8 @@ class BudgetCategorizationService(
     private companion object {
         // Bounds memory and work per request. Rules and the cache answer most instantly; Gemini's own
         // per-minute budget bounds what can be asked remotely, so a bigger backlog just takes a few runs.
+        // Entries the classifier placed leave the waiting set, so only ones it could not be asked about
+        // (no key, quota) can pile up at the front.
         const val MAX_ENTRIES_PER_RUN = 500
     }
 }

@@ -115,7 +115,7 @@ class BudgetCategorizationIntegrationTest {
         assertEquals("LEISURE", after.getValue(netflix)["category"].asText())
         assertEquals("HEALTH", after.getValue(pharmacy)["category"].asText())
         assertEquals("AUTO", after.getValue(netflix)["categorySource"].asText())
-        assertEquals("OTHER", after.getValue(unknown)["category"].asText())
+        assertEquals("UNCATEGORIZED", after.getValue(unknown)["category"].asText())
         assertEquals("Food", after.getValue(chosen)["category"].asText())
         assertEquals("USER", after.getValue(chosen)["categorySource"].asText())
         // Compared by value: JSON drops the trailing zero of 5.00.
@@ -159,7 +159,7 @@ class BudgetCategorizationIntegrationTest {
             categorize(ownerToken).andExpect(status().isForbidden)
         }
 
-        assertEquals("OTHER", entries().getValue(entryId)["category"].asText())
+        assertEquals("UNCATEGORIZED", entries().getValue(entryId)["category"].asText())
     }
 
     @Test
@@ -205,6 +205,6 @@ class BudgetCategorizationIntegrationTest {
 
         val after = entries()
         assertEquals("LEISURE", after.getValue(ownersEntry)["category"].asText())
-        assertEquals("OTHER", after.getValue(partnersEntry)["category"].asText())
+        assertEquals("UNCATEGORIZED", after.getValue(partnersEntry)["category"].asText())
     }
 }

@@ -42,8 +42,8 @@ class BudgetCategorizationServiceTest {
         users = mockk()
         every { budgets.existsById(budgetId) } returns true
         every { users.findById(email) } returns Optional.of(User(email = email, name = "A", aiProcessingEnabled = true))
-        every { entries.applyAutoCategory(any(), any(), any(), any()) } returns 1
-        every { entries.countPendingCategorization(budgetId, "OTHER") } returns 0
+        every { entries.applyAutoCategory(any(), any(), any(), any(), any()) } returns 1
+        every { entries.countPendingCategorization(budgetId, "UNCATEGORIZED") } returns 0
         waiting()
         service = serviceWith(RuleBasedClassifier())
     }
@@ -64,7 +64,7 @@ class BudgetCategorizationServiceTest {
     )
 
     private fun waiting(vararg descriptions: String) {
-        every { entries.findPendingCategorization(budgetId, "OTHER", any()) } returns
+        every { entries.findPendingCategorization(budgetId, "UNCATEGORIZED", any()) } returns
             descriptions.mapIndexed { index, text -> Pending(index + 1L, text) }
     }
 
@@ -75,9 +75,9 @@ class BudgetCategorizationServiceTest {
         val result = service.categorize(budgetId, email)
 
         assertEquals(3, result.categorized)
-        verify { entries.applyAutoCategory(1L, "Netflix", "LEISURE", any<LocalDateTime>()) }
-        verify { entries.applyAutoCategory(2L, "Rappi 8841", "GROCERIES", any<LocalDateTime>()) }
-        verify { entries.applyAutoCategory(3L, "Dr Smith", "HEALTH", any<LocalDateTime>()) }
+        verify { entries.applyAutoCategory(1L, "Netflix", "LEISURE", "UNCATEGORIZED", any<LocalDateTime>()) }
+        verify { entries.applyAutoCategory(2L, "Rappi 8841", "GROCERIES", "UNCATEGORIZED", any<LocalDateTime>()) }
+        verify { entries.applyAutoCategory(3L, "Dr Smith", "HEALTH", "UNCATEGORIZED", any<LocalDateTime>()) }
     }
 
     @Test
@@ -92,25 +92,35 @@ class BudgetCategorizationServiceTest {
     @Test
     fun `reports what is still waiting afterwards`() {
         waiting("Netflix")
-        every { entries.countPendingCategorization(budgetId, "OTHER") } returns 7
+        every { entries.countPendingCategorization(budgetId, "UNCATEGORIZED") } returns 7
 
         assertEquals(7, service.categorize(budgetId, email).pending)
     }
 
     @Test
-    fun `writes nothing for entries nobody could place`() {
-        waiting("zzz unknown", "mystery")
+    fun `writes nothing for entries nobody had an answer for`() {
+        waiting("zzz unknown")
 
         val result = service.categorize(budgetId, email)
 
         assertEquals(0, result.categorized)
-        verify(exactly = 0) { entries.applyAutoCategory(any(), any(), any(), any()) }
+        verify(exactly = 0) { entries.applyAutoCategory(any(), any(), any(), any(), any()) }
+    }
+
+    @Test
+    fun `an answer of OTHER is stored, which settles the entry so it is not asked about again`() {
+        waiting("mystery")
+
+        val result = service.categorize(budgetId, email)
+
+        assertEquals(1, result.categorized)
+        verify { entries.applyAutoCategory(1L, "mystery", "OTHER", "UNCATEGORIZED", any<LocalDateTime>()) }
     }
 
     @Test
     fun `an entry a person edited meanwhile is not counted`() {
         waiting("Netflix", "Rappi")
-        every { entries.applyAutoCategory(1L, any(), any(), any()) } returns 0
+        every { entries.applyAutoCategory(1L, any(), any(), any(), any()) } returns 0
 
         assertEquals(1, service.categorize(budgetId, email).categorized)
     }

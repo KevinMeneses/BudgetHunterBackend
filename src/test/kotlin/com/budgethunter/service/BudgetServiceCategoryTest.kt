@@ -120,7 +120,7 @@ class BudgetServiceCategoryTest {
 
             val response = create(null)
 
-            assertEquals("OTHER", response.category)
+            assertEquals("UNCATEGORIZED", response.category)
             assertEquals(CategorySource.AUTO, response.categorySource)
         }
     }
@@ -131,7 +131,7 @@ class BudgetServiceCategoryTest {
 
         val response = create("   ")
 
-        assertEquals("OTHER", response.category)
+        assertEquals("UNCATEGORIZED", response.category)
         assertEquals(CategorySource.AUTO, response.categorySource)
     }
 
@@ -140,7 +140,7 @@ class BudgetServiceCategoryTest {
     @Test
     fun `update with a category makes it the users choice even on an automatic entry`() {
         userWith(true)
-        existingEntry("OTHER", CategorySource.AUTO)
+        existingEntry("UNCATEGORIZED", CategorySource.AUTO)
 
         val response = update("Health")
 
@@ -153,7 +153,7 @@ class BudgetServiceCategoryTest {
         listOf(
             "Groceries" to CategorySource.USER,
             "FOOD" to CategorySource.AUTO,
-            "OTHER" to CategorySource.AUTO
+            "UNCATEGORIZED" to CategorySource.AUTO
         ).forEach { (category, source) ->
             userWith(false)
             existingEntry(category, source)
@@ -182,7 +182,7 @@ class BudgetServiceCategoryTest {
             email
         )
 
-        assertEquals("OTHER", response.category)
+        assertEquals("UNCATEGORIZED", response.category)
         assertEquals(CategorySource.AUTO, response.categorySource)
     }
 
@@ -218,7 +218,7 @@ class BudgetServiceCategoryTest {
             email
         )
 
-        assertEquals("OTHER", response.category)
+        assertEquals("UNCATEGORIZED", response.category)
         assertEquals(CategorySource.AUTO, response.categorySource)
     }
 
@@ -234,5 +234,31 @@ class BudgetServiceCategoryTest {
 
         assertEquals("FOOD", response.category)
         assertEquals(CategorySource.AUTO, response.categorySource)
+    }
+
+    @Test
+    fun `picking Sin categoria on purpose is the same as not choosing`() {
+        listOf("UNCATEGORIZED", "uncategorized", "  Uncategorized ").forEach { requested ->
+            userWith(true)
+            existingEntry("Groceries", CategorySource.USER)
+
+            val created = create(requested)
+            val updated = update(requested)
+
+            assertEquals("UNCATEGORIZED", created.category)
+            assertEquals(CategorySource.AUTO, created.categorySource)
+            assertEquals("UNCATEGORIZED", updated.category)
+            assertEquals(CategorySource.AUTO, updated.categorySource)
+        }
+    }
+
+    @Test
+    fun `OTHER is a real choice and stays the users`() {
+        userWith(true)
+
+        val response = create("OTHER")
+
+        assertEquals("OTHER", response.category)
+        assertEquals(CategorySource.USER, response.categorySource)
     }
 }

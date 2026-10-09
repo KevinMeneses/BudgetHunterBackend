@@ -30,7 +30,7 @@ interface BudgetEntryRepository : JpaRepository<BudgetEntry, Long> {
 
     /**
      * The entries of a budget still waiting for an automatic category: automatic, still holding the
-     * [placeholder], and created by someone whose AI processing is on **right now**, so turning it off
+     * [placeholder] (`UNCATEGORIZED`), and created by someone whose AI processing is on **right now**, so turning it off
      * keeps their descriptions away from the classifier even in a budget they share. Oldest first.
      * An entry with no creator (their account was deleted) is never included.
      */
@@ -58,8 +58,8 @@ interface BudgetEntryRepository : JpaRepository<BudgetEntry, Long> {
     ): Long
 
     /**
-     * Stores an automatic category, but only if the entry is still automatic and still has the
-     * [description] the category was worked out from. Returns the rows changed: 0 means a person edited
+     * Stores an automatic category, but only if the entry is still waiting (automatic, still holding the
+     * [placeholder]) and still has the [description] the category was worked out from. Returns the rows changed: 0 means a person edited
      * (or deleted) the entry while the classifier was working and the category must be dropped.
      *
      * One conditional statement rather than load-modify-save, because the entry is immutable and saving a
@@ -69,13 +69,14 @@ interface BudgetEntryRepository : JpaRepository<BudgetEntry, Long> {
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query(
         "UPDATE BudgetEntry e SET e.category = :category, e.modificationDate = :now " +
-            "WHERE e.id = :id AND e.description = :description " +
+            "WHERE e.id = :id AND e.description = :description AND e.category = :placeholder " +
             "AND e.categorySource = com.budgethunter.model.CategorySource.AUTO"
     )
     fun applyAutoCategory(
         @Param("id") id: Long,
         @Param("description") description: String,
         @Param("category") category: String,
+        @Param("placeholder") placeholder: String,
         @Param("now") now: LocalDateTime
     ): Int
 }

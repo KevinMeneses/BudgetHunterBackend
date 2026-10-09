@@ -87,11 +87,19 @@ enum class CategorySource {
 }
 
 object EntryCategory {
-    /** The fallback category: what an entry holds while it waits for, or lacks, a better one. */
+    /** A real category: "none of the others fits". Something the AI may answer. */
     const val OTHER = "OTHER"
 
     /**
-     * The closed list automatic categorisation chooses from. It mirrors the app's
+     * Not a category but its absence: what an entry holds while nobody has chosen one ("Sin categoría" in the
+     * app). It is a different thing from [OTHER], which is an answer: the AI says "other" about an entry it
+     * looked at and could not place, and that entry is settled, whereas an uncategorized one is still waiting.
+     * Never part of [ALL], so it can never be assigned automatically.
+     */
+    const val UNCATEGORIZED = "UNCATEGORIZED"
+
+    /**
+     * The closed list automatic categorisation chooses from (so, without [UNCATEGORIZED]). It mirrors the app's
      * `BudgetEntry.Category`; change one side and the other has to follow. Stored categories are
      * still free text (a person may type anything), this list only bounds what the server assigns.
      */
