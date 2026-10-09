@@ -71,8 +71,8 @@ only when the user wants the result, and the user is waiting for the answer anyw
 ```
 POST/PUT entry ──► BudgetService saves entry (no AI involved)
                      category present                          -> source = USER
-                     category absent + creator's flag == true  -> OTHER, source = AUTO   ("waiting")
-                     category absent + flag false/null         -> OTHER, source = USER
+                     category absent                           -> OTHER, source = AUTO   ("waiting")
+                       (whatever the AI preference: nobody chose, and the preference may be turned on later)
 
 app, metrics screen, AI toggle on, user confirms the dialog
 POST /api/budgets/{id}/entries/categorize ──► BudgetCategorizationService  (synchronous)
@@ -95,13 +95,15 @@ category, so they are unaffected.
   (check how it handles V3 first).
 - `CategorySource` enum + field on `BudgetEntry` and `BudgetEntryResponse` (additive JSON).
 - Make `category` optional in the three request DTOs (drop `@NotBlank`).
-- `BudgetService`: apply the table above. Reading the flag: `userRepository` already loads the
-  acting user in `createEntry`/`updateEntry`/`putEntry`.
-- Update path: a request with a category -> `USER`. Omitted on an `AUTO` entry -> keep the current
-  category and re-classify only if the description changed. Omitted on a `USER` entry -> treat as
-  "re-categorize" only if the flag is on (this is the app's future explicit re-categorize action).
+- `BudgetService.resolveCategory`: a category in the request -> `USER`; none on create -> `OTHER`/`AUTO`.
+  **Saving never consults the AI preference**: `AUTO` records that nobody chose, not that the AI may act. The
+  preference is checked when a categorisation runs (Part 4), which is what lets entries saved while it was
+  off be offered once it is on.
+- Update path: omitting the category leaves the stored category and its source alone. The one exception is an
+  `AUTO` entry whose description changed: its category was worked out from the old text, so it goes back to
+  `OTHER`/`AUTO` (waiting). A manual entry keeps the person's category whatever happens to the description.
 - Unknown category strings: accept (old rows may hold anything).
-- Tests: service + controller per branch (flag true/false/null); sort by `category` still works.
+- Tests: service + controller per branch (preference true/false/null makes no difference); sort by `category` still works.
 
 ### Part 2 - Classifier abstraction and rules/cache layer (done)
 - `CategoryClassifier` (`fun interface`): `classify(List<String>): List<String?>`, one answer per
@@ -187,7 +189,7 @@ category, so they are unaffected.
 - `./gradlew check` (ktlint, detekt, tests, Kover >= 80%) passes with no baseline changes.
 
 ## Open questions
-- Entries saved while the toggle was off are `USER`/`OTHER` and cannot be told apart from "the user chose
-  Other", so turning the toggle on later does not categorise them. Acceptable, or offer "treat my Other
-  entries as waiting" as a separate, explicit action?
+- Entries that existed before this feature were migrated to `USER` (their `OTHER` may be a default or a
+  choice; there is no way to tell), so they are not offered. Offer them anyway through a separate, explicit
+  "treat my Other entries as waiting" action, or leave them?
 - Persistent cache table vs. in-memory only (in-memory is fine to start).

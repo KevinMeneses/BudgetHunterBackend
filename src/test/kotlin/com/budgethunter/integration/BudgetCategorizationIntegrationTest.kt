@@ -163,6 +163,21 @@ class BudgetCategorizationIntegrationTest {
     }
 
     @Test
+    fun `entries saved before the user turned AI processing on are offered once it is on`() {
+        // The toggle is off (never saved) when the entries are saved, as for anyone who enables it later.
+        val netflix = createEntry(ownerToken, "Netflix")
+        val chosen = createEntry(ownerToken, "Netflix", category = "Food")
+        categorize(ownerToken).andExpect(status().isForbidden)
+
+        setAiProcessing(owner, true)
+
+        categorize(ownerToken).andExpect(status().isOk).andExpect(jsonPath("$.categorized").value(1))
+        val after = entries()
+        assertEquals("LEISURE", after.getValue(netflix)["category"].asText())
+        assertEquals("Food", after.getValue(chosen)["category"].asText())
+    }
+
+    @Test
     fun `needs access to the budget`() {
         setAiProcessing(stranger, true)
         categorize(strangerToken).andExpect(status().isForbidden)

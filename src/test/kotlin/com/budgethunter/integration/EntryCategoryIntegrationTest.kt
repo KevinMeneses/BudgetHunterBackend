@@ -81,7 +81,7 @@ class EntryCategoryIntegrationTest {
     }
 
     @Test
-    fun `an entry created without a category is automatic when AI processing is on`() {
+    fun `an entry created without a category is waiting for one`() {
         setAiProcessing(true)
 
         postEntry("""{"amount":5.00,"description":"cab","type":"OUTCOME"}""")
@@ -91,13 +91,13 @@ class EntryCategoryIntegrationTest {
     }
 
     @Test
-    fun `an entry created without a category stays manual when AI processing was never saved`() {
+    fun `an entry created without a category is waiting even when AI processing was never saved`() {
         setAiProcessing(null)
 
         postEntry("""{"amount":5.00,"description":"cab","type":"OUTCOME"}""")
             .andExpect(status().isCreated)
             .andExpect(jsonPath("$.category").value("OTHER"))
-            .andExpect(jsonPath("$.categorySource").value("USER"))
+            .andExpect(jsonPath("$.categorySource").value("AUTO"))
     }
 
     @Test
