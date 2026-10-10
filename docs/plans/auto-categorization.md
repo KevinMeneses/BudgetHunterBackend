@@ -8,9 +8,16 @@ Flyway migrations up to V3)._
 
 ## Goal
 
-The backend reads an entry's `description` and assigns it one of the app's categories, then
-stores it and notifies clients over SSE. Provider: **Gemini Flash-Lite** (free tier) behind an
+Entries saved without a category are categorised **on demand**: when the user asks from the app (the
+metrics screen), the backend reads the descriptions of the waiting entries of that budget, assigns each
+one of the app's categories, and stores the result. Provider: **Gemini Flash-Lite** (free tier) behind an
 interface, so it can be swapped (Jev, Ollama, ...) without touching the rest.
+
+_Design change (after Part 3):_ the first design categorised every entry in the background right after it
+was saved and announced the result over SSE. It was dropped: people rarely look at an entry's category
+unless they open it or open the metrics screen, so live updates add a thread pool, an event, an SSE
+sender and a client change for something nobody watches. On demand needs none of that, spends the quota
+only when the user wants the result, and the user is waiting for the answer anyway.
 
 ## What already exists (and changes this plan)
 
@@ -23,17 +30,17 @@ interface, so it can be swapped (Jev, Ollama, ...) without touching the rest.
   no description leaves the server until the app has explicitly saved `true`. The app uploads its
   device value the first time it syncs on an account that has none (`SyncUserPreferencesUseCase.pull`),
   and the app's default is on, so this only delays categorization until that first sync.
-- Next Flyway migration is **V4** (prod baseline is 2, V3 already applied). Mirror every schema
-  change in `database/schema.sql` too (V3 did).
-- `category` is still a required, non-blank `String` in `CreateBudgetEntryRequest`,
-  `UpdateBudgetEntryRequest` and `PutEntryRequest`, and `BudgetEntry` has no source marker.
+- This feature needs **no schema change**: `category` is a free `String` column and `UNCATEGORIZED` is just
+  one more value. (Next Flyway migration would be V4 if one is ever needed; mirror it in `database/schema.sql`.)
+- `category` was a required, non-blank `String` in `CreateBudgetEntryRequest`, `UpdateBudgetEntryRequest`
+  and `PutEntryRequest`; Part 1 makes it optional.
 
 ## Decisions
 
 - **Provider:** Gemini Flash-Lite via the REST API. Confirm the current model id and free-tier
   limits in Google's docs before Part 3. Model id and key are config, not constants.
 - **Categories (closed list, shared with the app):** `FOOD, GROCERIES, SELF_CARE,
-  TRANSPORTATION, HOUSEHOLD_ITEMS, SERVICES, EDUCATION, HEALTH, LEISURE, TAXES, OTHER`.
+  TRANSPORTATION, HOUSEHOLD_ITEMS, SERVICES, EDUCATION, HEALTH, LEISURE, TAXES, OTHER`. A twelfth value, **`UNCATEGORIZED`** ("Sin categoría" in the app), is *not* a category but the absence of one (see below); it is never part of the list the AI chooses from.
   `category` stays a `String` column; the backend validates against the list in code, so old rows
   and old clients keep working.
 - **Reuse the app's category definitions.** The app's receipt prompt now carries a one-line meaning
@@ -45,9 +52,21 @@ interface, so it can be swapped (Jev, Ollama, ...) without touching the rest.
   categories), bounded retries and a deadline. The app moved to a 30s deadline with limited retries
   after real-world timeouts; for a background job use a shorter one (~10s) with at most one retry,
   since nobody waits on it.
-- **Never override the user.** Add `category_source` (`USER` | `AUTO`) to `budget_entries`.
-- **Never block or fail a write because of the AI.** Classification runs after the transaction
-  commits, asynchronously. On any failure the entry keeps its category (`OTHER` if none).
+- **There is no "who chose it" marker** (an earlier revision had `category_source` = `USER`/`AUTO`; it was
+  dropped as redundant). Two facts are enough: the entry has no category yet, and the account has AI
+  processing on. Everything that has a category, whoever chose it and including `OTHER`, is never touched.
+- **Saving never depends on the AI.** `POST/PUT` entry only records the entry (`UNCATEGORIZED` when no
+  category was chosen); nothing is classified at save time. Categorising is a separate, explicit request. On any failure an entry
+  keeps its placeholder.
+- **`UNCATEGORIZED` is its own value, not `null` and not `OTHER`.** `null` would crash older app builds (the
+  app's `BudgetEntryResponse.category` is a non-null `String`) and the column is `NOT NULL`. `OTHER` already
+  means "looked at it, none fits": reusing it as the placeholder made "never asked" and "asked, settled"
+  indistinguishable, so the second kind was retried and counted as pending forever. Older apps map any
+  unknown value to "Other" (`toBudgetEntryCategory`), so they just show "Otros".
+- **Picking "Sin categoría" on purpose is the same as picking nothing**: stored `UNCATEGORIZED`. A person who
+  wants an entry left alone for good picks "Otros", a real choice.
+- **`UNCATEGORIZED` means "waiting".** It is the only thing a run looks at, which is what stops a second run
+  from redoing the first and keeps it away from everything that already has a category.
 - **The app's AI toggle controls this** (see above). Whose setting applies in a shared budget: the
   user who created or last edited the entry, never other collaborators. `createdBy == null` ->
   never auto-categorized.
@@ -59,40 +78,38 @@ interface, so it can be swapped (Jev, Ollama, ...) without touching the rest.
 ## How the pieces fit
 
 ```
-POST/PUT entry ──► BudgetService saves entry
-                     category present                          -> source = USER (no AI)
-                     category absent + creator's flag == true  -> OTHER, source = AUTO, publish event
-                     category absent + flag false/null         -> OTHER, source = USER, nothing else
-                                             │ after commit
-                                             ▼
-                          EntryCategorizationService (@Async)
-                            0. re-read creator's ai_processing_enabled (skip unless true)
-                            1. normalize description
-                            2. cache / rules lookup  ── hit ──┐
-                            3. CategoryClassifier (Gemini) ───┤
-                            4. update entry if source still AUTO and description unchanged
-                            5. broadcast UPDATED over SSE ◄───┘
+POST/PUT entry ──► BudgetService saves entry (no AI involved)
+                     category present                          -> stored as given
+                     category absent (or UNCATEGORIZED)        -> UNCATEGORIZED   ("waiting")
+                       (whatever the AI preference: nobody chose, and the preference may be turned on later)
+
+app, metrics screen, AI toggle on, user confirms the dialog
+POST /api/budgets/{id}/entries/categorize ──► BudgetCategorizationService  (synchronous)
+   0. access to the budget; the caller's ai_processing_enabled must be true (else 403)
+   1. waiting entries of the budget: UNCATEGORIZED + creator's flag true *now*   (max 500, oldest first)
+   2. CategoryResolver: rules -> cache -> Gemini (one deduplicated, batched call)
+   3. per entry, one conditional UPDATE (still UNCATEGORIZED, same description)  -> a person's edit always wins
+   4. { categorized, pending }  -> the app refreshes the budget's entries
 ```
 
-Client contract: `category` becomes **optional** in create/update/put requests. Present = the
-user's (or the receipt's) choice. Absent/blank = "please categorize". Old app builds always send a
+Client contract: `category` is **optional** in create/update/put requests. Present = the user's (or the
+receipt's) choice. Absent/blank = "waiting for an automatic category". Old app builds always send a
 category, so they are unaffected.
 
 ## Parts
 
 ### Part 1 - Schema and API contract
-- Flyway `V4__add_category_source.sql`: `category_source VARCHAR(10) NOT NULL DEFAULT 'USER'`
-  (existing rows are user-chosen). Mirror in `database/schema.sql`; extend `MigrationFilesTest`
-  (check how it handles V3 first).
-- `CategorySource` enum + field on `BudgetEntry` and `BudgetEntryResponse` (additive JSON).
+- No migration and no new column (see "Decisions").
 - Make `category` optional in the three request DTOs (drop `@NotBlank`).
-- `BudgetService`: apply the table above. Reading the flag: `userRepository` already loads the
-  acting user in `createEntry`/`updateEntry`/`putEntry`.
-- Update path: a request with a category -> `USER`. Omitted on an `AUTO` entry -> keep the current
-  category and re-classify only if the description changed. Omitted on a `USER` entry -> treat as
-  "re-categorize" only if the flag is on (this is the app's future explicit re-categorize action).
+- `BudgetService.resolveCategory`: a category in the request is stored as given; none (or blank, or an explicit
+  `UNCATEGORIZED`) on create -> `UNCATEGORIZED`. **Saving never consults the AI preference**: it is checked
+  when a categorisation runs (Part 4), which is what lets entries saved while it was off be offered once it
+  is on.
+- Update path: omitting the category leaves the stored one alone, even if the description changed (an
+  automatically assigned category is not revisited; the user can correct it). Sending `UNCATEGORIZED` puts
+  the entry back to waiting.
 - Unknown category strings: accept (old rows may hold anything).
-- Tests: service + controller per branch (flag true/false/null); sort by `category` still works.
+- Tests: service + controller per branch (preference true/false/null makes no difference); sort by `category` still works.
 
 ### Part 2 - Classifier abstraction and rules/cache layer (done)
 - `CategoryClassifier` (`fun interface`): `classify(List<String>): List<String?>`, one answer per
@@ -133,36 +150,54 @@ category, so they are unaffected.
   batching and dedupe, out-of-list value, malformed/blocked replies, retry on 5xx and IO errors,
   no retry on 4xx, 429 cool-down (with and without `Retry-After`), blank key, request budget.
 
-### Part 4 - Async categorization flow
-- `@EnableAsync` with a small bounded executor (full queue -> leave for the backfill).
-- Publish an event on save when `source == AUTO`; handle with
-  `@TransactionalEventListener(phase = AFTER_COMMIT)` + `@Async`.
-- `EntryCategorizationService`: check flag -> rules -> cache -> Gemini; re-load the entry and update
-  **only if** `category_source == AUTO` and the description is unchanged (guards races with a user
-  edit); bump `modificationDate`, leave `updatedBy` null, broadcast `UPDATED` via the existing SSE
-  path. Empty description -> stay `OTHER`, no call.
-- Preserve `spring.jpa.open-in-view=false`: no lazy loading outside the transaction.
-- Tests: user edit during classification wins; AI failure leaves the entry intact; flag turned off
-  while pending -> skipped; collaborator's flag does not trigger another user's entry; SSE receives
-  the update; concurrency case next to `ConcurrentBudgetEntryTest`.
+### Part 4 - On-demand categorization endpoint (done)
+- `POST /api/budgets/{budgetId}/entries/categorize` -> `{ categorized, pending }`. 200 ok; 400 unknown
+  budget; 401; 403 no access to the budget **or the caller's AI processing is off/never saved**; 409 a run
+  for this budget is already in flight (a second tap or a collaborator's would only spend the quota twice).
+  Switched by `categorization.enabled` (when off the endpoint does not exist).
+- `BudgetCategorizationService` (not transactional: an HTTP call must not hold a DB connection). Looks at
+  entries still `UNCATEGORIZED` and **whose creator has AI processing on right now**, so a
+  collaborator who turned it off keeps their descriptions away from the classifier even in a shared budget.
+  Entries with no creator are never included. At most 500 per run, oldest first.
+- `CategoryResolver`: rules -> cache -> Gemini, answers cached; one batched, deduplicated remote call for
+  whatever the first two could not place. Rules and cache are free, so a run on a budget of known
+  merchants sends nothing anywhere, and works with no Gemini key.
+- Each result is one conditional `UPDATE` (`applyAutoCategory`): it matches only while the entry is still
+  `UNCATEGORIZED` and still has the description it was classified from, and touches only `category` and
+  `modificationDate`. A person's edit during the run can neither be reverted by a stale copy nor overridden.
+- An answer of `OTHER` is stored like any other: the AI looked and none fits, so the entry is **settled** and
+  never asked about again. No answer (no key, quota used up, provider down) writes nothing; those entries
+  are reported in `pending` and a later run retries them. Answers are cached, so retrying costs little.
+- **No SSE, no background thread, no events.** Collaborators see the new categories on their next sync,
+  like any other change made while they were away. `modificationDate` is bumped so that sync picks them up.
+- Known limit: with no Gemini key, or a quota that stays exhausted, more than 500 waiting entries that the rules
+  cannot place would hide the ones after them. Entries the classifier placed leave the waiting set, so this
+  only affects ones it could not be asked about. Not worth a cursor until it shows up.
+- Tests: service (layers, one remote call, nothing written for unplaceable entries, a concurrent edit is
+  not counted, access, unknown budget, opt-out sends nothing, in-flight guard released afterwards) and a
+  full-stack integration test (only waiting entries change, user-chosen untouched, second run is a no-op,
+  an edited entry keeps the person's category, refused when AI is off/never saved, access, token, a
+  collaborator who turned AI off is skipped).
 
-### Part 5 - Backfill and operations
-- Scheduled job (`@Scheduled`, off by default) classifying `AUTO` entries still at `OTHER`, in
-  batches, only for creators whose flag is `true`, stopping on 429.
-- Micrometer counters (classified, rule/cache hit, API error, skipped) via Actuator.
-- Docs: `GEMINI_API_KEY` / `CATEGORIZATION_*` in `.env.example`, `docker-compose.yml`, the
-  `deploy.yml` secrets list, `DEPLOYMENT.md`; update `CLAUDE.md`, `PROGRESS.md`,
-  `postman_requests.md` and the OpenAPI annotations (`category` optional, new response field).
+### Part 5 - Operations and docs
+- Micrometer counters via Actuator (runs, categorised, rule/cache hit, provider error, throttled).
+- Docs: `GEMINI_API_KEY` / `CATEGORIZATION_*` in the `deploy.yml` secrets list and `DEPLOYMENT.md`; update
+  `CLAUDE.md`, `PROGRESS.md`, `postman_requests.md` and the OpenAPI notes on the entry endpoints (`category`
+  optional, `UNCATEGORIZED`).
+- The scheduled backfill that was planned is dropped: nothing runs without the user asking.
 
 ## Acceptance criteria
-- With the AI toggle off (or never saved), no entry of that user is categorized and none of their
-  descriptions reaches Gemini; turning it on resumes it for new entries.
-- Creating an entry without `category` returns immediately with `OTHER`/`AUTO`; within seconds an
-  SSE `UPDATED` event carries the AI category.
-- Entries with a user-chosen category are never modified by the AI.
-- With no API key, or with Gemini down, every endpoint behaves exactly as today.
+- With the app's AI toggle off (or never saved), the endpoint answers 403 and no description of that user
+  reaches Gemini, even for entries in a budget someone else triggers.
+- Saving an entry without `category` is instant and calls nothing; it is stored `UNCATEGORIZED`.
+- Calling the endpoint categorises the waiting entries before it returns; calling it again changes nothing.
+- Entries that already have a category, whoever chose it, are never modified by the AI.
+- With no API key, or with Gemini down, the endpoint still categorises what the rules know and reports the
+  rest as `pending`; nothing else changes.
 - `./gradlew check` (ktlint, detekt, tests, Kover >= 80%) passes with no baseline changes.
 
 ## Open questions
-- Should turning the toggle on offer to categorize existing `OTHER` entries (on-demand backfill)?
+- Entries that existed before this feature keep their category (their `OTHER` may be a default or a choice;
+  there is no way to tell), so they are not offered. Offer them anyway through a separate, explicit "treat
+  my Other entries as uncategorized" action, or leave them?
 - Persistent cache table vs. in-memory only (in-memory is fine to start).

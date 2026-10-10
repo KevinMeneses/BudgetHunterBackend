@@ -1,5 +1,9 @@
 package com.budgethunter.categorization
 
+import com.budgethunter.repository.BudgetEntryRepository
+import com.budgethunter.repository.BudgetRepository
+import com.budgethunter.repository.UserRepository
+import com.budgethunter.service.BudgetService
 import com.fasterxml.jackson.databind.ObjectMapper
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Value
@@ -51,6 +55,23 @@ class CategorizationConfig {
             objectMapper
         )
     }
+
+    @Bean
+    fun categoryCache() = CategoryCache()
+
+    /** Rules first, then the cache, then Gemini (which stays idle without a key). */
+    @Bean
+    fun categoryResolver(cache: CategoryCache, gemini: GeminiCategoryClassifier) =
+        CategoryResolver(RuleBasedClassifier(), cache, gemini)
+
+    @Bean
+    fun budgetCategorizationService(
+        resolver: CategoryResolver,
+        budgetService: BudgetService,
+        budgetRepository: BudgetRepository,
+        budgetEntryRepository: BudgetEntryRepository,
+        userRepository: UserRepository
+    ) = BudgetCategorizationService(resolver, budgetService, budgetRepository, budgetEntryRepository, userRepository)
 
     private companion object {
         // Model ids come and go (the 2.5 family is being retired), so this is only a default.

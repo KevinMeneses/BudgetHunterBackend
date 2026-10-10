@@ -5,7 +5,6 @@ import com.budgethunter.dto.PutEntryRequest
 import com.budgethunter.dto.UpdateBudgetEntryRequest
 import com.budgethunter.model.Budget
 import com.budgethunter.model.BudgetEntry
-import com.budgethunter.model.CategorySource
 import com.budgethunter.model.EntryType
 import com.budgethunter.model.User
 import com.budgethunter.model.UserBudgetId
@@ -25,10 +24,9 @@ import java.math.BigDecimal
 import java.util.Optional
 
 /**
- * Covers who a stored category is credited to (USER or AUTO) and the placeholder an entry holds
- * while it waits for the AI. The rule depends on the acting user's AI processing preference, where
- * `null` (never saved) must behave like off. Kept apart from [BudgetServiceTest] for detekt's
- * LargeClass threshold.
+ * Which category an entry is stored with. An entry nobody categorised holds UNCATEGORIZED, and that is the
+ * only thing that makes it eligible for automatic categorisation later; the account's AI preference plays no
+ * part when saving. Kept apart from [BudgetServiceTest] for detekt's LargeClass threshold.
  */
 class BudgetServiceCategoryTest {
 
@@ -59,6 +57,7 @@ class BudgetServiceCategoryTest {
         every { userBudgetRepository.existsById(UserBudgetId(1L, email)) } returns true
         every { budgetRepository.findById(1L) } returns Optional.of(budget)
         every { budgetEntryRepository.save(capture(saved)) } answers { saved.captured.copy(id = saved.captured.id ?: 10L) }
+        every { userRepository.findById(email) } returns Optional.of(User(email = email, name = "Test User", password = "encoded"))
     }
 
     @AfterEach
@@ -66,19 +65,12 @@ class BudgetServiceCategoryTest {
         clearAllMocks()
     }
 
-    private fun userWith(aiProcessingEnabled: Boolean?): User {
-        val user = User(email = email, name = "Test User", password = "encoded", aiProcessingEnabled = aiProcessingEnabled)
-        every { userRepository.findById(email) } returns Optional.of(user)
-        return user
-    }
-
-    private fun existingEntry(category: String, source: CategorySource) = BudgetEntry(
+    private fun existingEntry(category: String) = BudgetEntry(
         id = 5L,
         budget = budget,
         amount = BigDecimal("10.00"),
         description = "coffee",
         category = category,
-        categorySource = source,
         type = EntryType.OUTCOME
     ).also { every { budgetEntryRepository.findById(5L) } returns Optional.of(it) }
 
@@ -89,128 +81,92 @@ class BudgetServiceCategoryTest {
             email
         )
 
-    private fun update(category: String?) =
+    private fun update(category: String?, description: String = "coffee") =
         budgetService.updateEntry(
             1L,
             5L,
-            UpdateBudgetEntryRequest(amount = BigDecimal("10.00"), description = "coffee", category = category, type = EntryType.OUTCOME),
+            UpdateBudgetEntryRequest(
+                amount = BigDecimal("10.00"),
+                description = description,
+                category = category,
+                type = EntryType.OUTCOME
+            ),
             email
         )
 
     // Create
 
     @Test
-    fun `create with a category is the users choice whatever the AI preference`() {
-        listOf(true, false, null).forEach { preference ->
-            userWith(preference)
+    fun `create with a category stores it, trimmed`() {
+        val response = create("  Food  ")
 
-            val response = create("  Food  ")
-
-            assertEquals("Food", response.category)
-            assertEquals(CategorySource.USER, response.categorySource)
-            assertEquals(CategorySource.USER, saved.captured.categorySource)
-        }
+        assertEquals("Food", response.category)
+        assertEquals("Food", saved.captured.category)
     }
 
     @Test
-    fun `create without a category is left to the AI when the user turned it on`() {
-        userWith(true)
-
-        val response = create(null)
-
-        assertEquals("OTHER", response.category)
-        assertEquals(CategorySource.AUTO, response.categorySource)
+    fun `create without a category is uncategorized`() {
+        assertEquals("UNCATEGORIZED", create(null).category)
     }
 
     @Test
     fun `create with a blank category counts as no category`() {
-        userWith(true)
-
-        val response = create("   ")
-
-        assertEquals("OTHER", response.category)
-        assertEquals(CategorySource.AUTO, response.categorySource)
+        assertEquals("UNCATEGORIZED", create("   ").category)
     }
 
     @Test
-    fun `create without a category is not automatic when AI is off or never saved`() {
-        listOf(false, null).forEach { preference ->
-            userWith(preference)
-
-            val response = create(null)
-
-            assertEquals("OTHER", response.category)
-            assertEquals(CategorySource.USER, response.categorySource)
+    fun `picking Sin categoria on purpose is the same as not choosing`() {
+        listOf("UNCATEGORIZED", "uncategorized", "  Uncategorized ").forEach { requested ->
+            assertEquals("UNCATEGORIZED", create(requested).category)
         }
+    }
+
+    @Test
+    fun `OTHER is a real choice`() {
+        assertEquals("OTHER", create("OTHER").category)
     }
 
     // Update
 
     @Test
-    fun `update with a category makes it the users choice even on an automatic entry`() {
-        userWith(true)
-        existingEntry("OTHER", CategorySource.AUTO)
+    fun `update with a category stores it`() {
+        existingEntry("UNCATEGORIZED")
 
-        val response = update("Health")
-
-        assertEquals("Health", response.category)
-        assertEquals(CategorySource.USER, response.categorySource)
+        assertEquals("Health", update("Health").category)
     }
 
     @Test
-    fun `update without a category keeps an automatic entry waiting for the AI`() {
-        userWith(false)
-        existingEntry("FOOD", CategorySource.AUTO)
+    fun `update without a category leaves whatever is stored alone, even if the description changed`() {
+        listOf("Groceries", "FOOD", "OTHER", "UNCATEGORIZED").forEach { stored ->
+            existingEntry(stored)
 
-        val response = update(null)
-
-        assertEquals("FOOD", response.category)
-        assertEquals(CategorySource.AUTO, response.categorySource)
-    }
-
-    @Test
-    fun `update without a category hands a manual entry back to the AI when it is on`() {
-        userWith(true)
-        existingEntry("Groceries", CategorySource.USER)
-
-        val response = update(null)
-
-        assertEquals("Groceries", response.category)
-        assertEquals(CategorySource.AUTO, response.categorySource)
-    }
-
-    @Test
-    fun `update without a category leaves a manual entry alone when AI is off or never saved`() {
-        listOf(false, null).forEach { preference ->
-            userWith(preference)
-            existingEntry("Groceries", CategorySource.USER)
-
-            val response = update(null)
-
-            assertEquals("Groceries", response.category)
-            assertEquals(CategorySource.USER, response.categorySource)
+            assertEquals(stored, update(null).category)
+            assertEquals(stored, update(null, description = "something else").category)
         }
+    }
+
+    @Test
+    fun `update back to Sin categoria makes the entry waiting again`() {
+        existingEntry("Groceries")
+
+        assertEquals("UNCATEGORIZED", update("UNCATEGORIZED").category)
     }
 
     // Put (upsert)
 
     @Test
     fun `put without an id and a category behaves like create`() {
-        userWith(true)
-
         val response = budgetService.putEntry(
             PutEntryRequest(budgetId = 1L, amount = BigDecimal("10.00"), description = "coffee", type = EntryType.OUTCOME),
             email
         )
 
-        assertEquals("OTHER", response.category)
-        assertEquals(CategorySource.AUTO, response.categorySource)
+        assertEquals("UNCATEGORIZED", response.category)
     }
 
     @Test
     fun `put with an id and no category behaves like update`() {
-        userWith(false)
-        existingEntry("FOOD", CategorySource.AUTO)
+        existingEntry("FOOD")
 
         val response = budgetService.putEntry(
             PutEntryRequest(id = 5L, budgetId = 1L, amount = BigDecimal("10.00"), description = "coffee", type = EntryType.OUTCOME),
@@ -218,6 +174,5 @@ class BudgetServiceCategoryTest {
         )
 
         assertEquals("FOOD", response.category)
-        assertEquals(CategorySource.AUTO, response.categorySource)
     }
 }
