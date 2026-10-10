@@ -118,7 +118,9 @@ category, so they are unaffected.
 - `DescriptionNormalizer`: lower-case, strip accents, punctuation as separator, drop tokens with
   digits (`"RAPPI 8841"` and `"rappi 9921"` share a key).
 - `RuleBasedClassifier`: whole-word ES/EN keywords for well-known merchants, tuned for precision
-  (ambiguous words like `metro`, `club`, `rappi` are left out), longest keyword wins, never `OTHER`.
+  (ambiguous words like `metro`, `club`, `rappi` are left out), longest keyword wins, never `OTHER`. `OTHER` is a judgement ("looked at it, nothing fits") only the
+  remote classifier can make, so `CategoryResolver` also discards an `OTHER` coming from the rules, whatever the
+  rules implementation does; the cache only repeats what Gemini said.
 - `CategoryCache`: bounded, thread-safe in-memory LRU keyed by the normalised description. Own
   ~15-line LRU instead of Caffeine, to avoid a new dependency; swap it if hit-rate metrics ever
   justify one.

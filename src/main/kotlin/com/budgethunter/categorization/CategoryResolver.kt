@@ -1,5 +1,7 @@
 package com.budgethunter.categorization
 
+import com.budgethunter.model.EntryCategory
+
 /**
  * Finds a category for descriptions by trying the cheapest source first: keyword rules, then what
  * was already learned (the cache), and only then the remote classifier. Its answers are written
@@ -7,6 +9,11 @@ package com.budgethunter.categorization
  *
  * `null` means "no answer": the description is blank, nothing matched and the remote classifier
  * (if any) had no opinion or was unavailable. Callers leave the entry alone in that case.
+ *
+ * `OTHER` is a judgement ("I looked at it and nothing fits"), which only the remote classifier can
+ * make, and the cache only repeats what it said. The rules cannot: finding no match says nothing
+ * about the description. So an `OTHER` coming from the rules is discarded here, whatever the rules
+ * implementation does, and the description goes on to the next layer instead of being settled.
  */
 class CategoryResolver(
     private val rules: CategoryClassifier,
@@ -18,7 +25,7 @@ class CategoryResolver(
 
     /** One answer per description, in order, asking the remote classifier once for all that remain. */
     fun resolve(descriptions: List<String>): List<String?> {
-        val ruled = rules.classify(descriptions)
+        val ruled = rules.classify(descriptions).map { category -> category?.takeUnless { it == EntryCategory.OTHER } }
         val answers = descriptions.mapIndexed { index, description -> ruled[index] ?: cache.get(description) }
 
         val missing = descriptions.indices.filter { answers[it] == null && hasIdentifyingText(descriptions[it]) }

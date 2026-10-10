@@ -66,4 +66,37 @@ class CategoryResolverTest {
 
         assertEquals(0, cache.size)
     }
+
+    @Test
+    fun `an OTHER from the rules is discarded and the next layer decides`() {
+        val greedyRules = CategoryClassifier { list -> list.map { "OTHER" } }
+        val resolver = CategoryResolver(greedyRules, CategoryCache(), remote())
+
+        assertEquals("GROCERIES", resolver.resolve("Rappi"))
+        assertEquals(listOf(listOf("Rappi")), calls)
+    }
+
+    @Test
+    fun `an OTHER from the rules does not settle the entry when no remote classifier is available`() {
+        val greedyRules = CategoryClassifier { list -> list.map { "OTHER" } }
+
+        assertEquals(null, CategoryResolver(greedyRules, CategoryCache(), remote = null).resolve("Rappi"))
+    }
+
+    @Test
+    fun `an OTHER the remote classifier gives is an answer, and is remembered`() {
+        val cache = CategoryCache()
+        val resolver = CategoryResolver(rules, cache, remote(mapOf("mystery shop" to "OTHER")))
+
+        assertEquals("OTHER", resolver.resolve("Mystery Shop 12"))
+        assertEquals("OTHER", resolver.resolve("mystery shop 99"))
+        assertEquals(1, calls.size, "the second one is a cache hit")
+    }
+
+    @Test
+    fun `the other rules in the real keyword list never answer OTHER`() {
+        val answers = RuleBasedClassifier().classify(listOf("netflix", "xyzzy", "", "farmacia", "uber", "zzz 123"))
+
+        assertEquals(false, answers.contains("OTHER"))
+    }
 }
