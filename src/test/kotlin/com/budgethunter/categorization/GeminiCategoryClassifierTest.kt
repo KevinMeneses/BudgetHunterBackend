@@ -162,6 +162,14 @@ class GeminiCategoryClassifierTest {
     }
 
     @Test
+    fun `the placeholder is never accepted as an answer`() {
+        server.expect(once(), requestTo(url))
+            .andRespond(ok("""[{"id":0,"category":"UNCATEGORIZED"},{"id":1,"category":"OTHER"}]"""))
+
+        assertEquals(listOf<String?>(null, "OTHER"), classifier().classify(listOf("exito", "xyzzy")))
+    }
+
+    @Test
     fun `malformed or empty replies answer null instead of throwing`() {
         listOf(
             reply("not json at all"),

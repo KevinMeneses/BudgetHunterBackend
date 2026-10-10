@@ -1,6 +1,11 @@
 package com.budgethunter.categorization
 
+import com.budgethunter.repository.BudgetEntryRepository
+import com.budgethunter.repository.BudgetRepository
+import com.budgethunter.repository.UserRepository
+import com.budgethunter.service.BudgetService
 import com.fasterxml.jackson.databind.ObjectMapper
+import io.mockk.mockk
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
 import org.springframework.boot.autoconfigure.AutoConfigurations
@@ -12,6 +17,10 @@ class CategorizationConfigTest {
     private val runner = ApplicationContextRunner()
         .withConfiguration(AutoConfigurations.of(RestClientAutoConfiguration::class.java))
         .withBean(ObjectMapper::class.java, { ObjectMapper() })
+        .withBean(BudgetEntryRepository::class.java, { mockk<BudgetEntryRepository>() })
+        .withBean(BudgetRepository::class.java, { mockk<BudgetRepository>() })
+        .withBean(UserRepository::class.java, { mockk<UserRepository>() })
+        .withBean(BudgetService::class.java, { mockk<BudgetService>() })
         .withUserConfiguration(CategorizationConfig::class.java)
 
     @Test
@@ -24,9 +33,18 @@ class CategorizationConfigTest {
     }
 
     @Test
+    fun `wires the resolver and the service`() {
+        runner.run { context ->
+            assertEquals(1, context.getBeansOfType(CategoryResolver::class.java).size)
+            assertEquals(1, context.getBeansOfType(BudgetCategorizationService::class.java).size)
+        }
+    }
+
+    @Test
     fun `can be switched off`() {
         runner.withPropertyValues("categorization.enabled=false").run { context ->
             assertEquals(0, context.getBeansOfType(CategoryClassifier::class.java).size)
+            assertEquals(0, context.getBeansOfType(BudgetCategorizationService::class.java).size)
         }
     }
 

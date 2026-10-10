@@ -65,9 +65,6 @@ CREATE TABLE IF NOT EXISTS budget_entries (
     amount DECIMAL(19, 2) NOT NULL,
     description VARCHAR(255) NOT NULL,
     category VARCHAR(255) NOT NULL,
-    -- Who chose the category: USER (a person, or a scanned receipt) or AUTO (assigned by the server
-    -- from the description). Existing rows are USER; automatic categorisation never overwrites USER.
-    category_source VARCHAR(10) NOT NULL DEFAULT 'USER' CHECK (category_source IN ('USER', 'AUTO')),
     type VARCHAR(50) NOT NULL CHECK (type IN ('INCOME', 'OUTCOME')),
     created_by VARCHAR(255),
     updated_by VARCHAR(255),

@@ -42,6 +42,11 @@ class CategoryCacheTest {
     }
 
     @Test
+    fun `rejects the uncategorized placeholder, which is not an answer`() {
+        assertThrows<IllegalArgumentException> { CategoryCache().put("rappi", "UNCATEGORIZED") }
+    }
+
+    @Test
     fun `can remember OTHER because it is an answer`() {
         val cache = CategoryCache()
 

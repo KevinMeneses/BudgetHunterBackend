@@ -21,7 +21,7 @@ import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
 import org.springframework.transaction.annotation.Transactional
 import java.math.BigDecimal
 
-/** The optional `category` and the `categorySource` it produces, as the app sees them over HTTP. */
+/** The optional `category` and the UNCATEGORIZED placeholder it falls back to, as the app sees them over HTTP. */
 @SpringBootTest
 @AutoConfigureMockMvc
 @Transactional
@@ -71,33 +71,30 @@ class EntryCategoryIntegrationTest {
     )
 
     @Test
-    fun `an entry created with a category is the users and echoes it back`() {
+    fun `an entry created with a category echoes it back`() {
         setAiProcessing(true)
 
         postEntry("""{"amount":5.00,"description":"cab","category":"TRANSPORTATION","type":"OUTCOME"}""")
             .andExpect(status().isCreated)
             .andExpect(jsonPath("$.category").value("TRANSPORTATION"))
-            .andExpect(jsonPath("$.categorySource").value("USER"))
     }
 
     @Test
-    fun `an entry created without a category is automatic when AI processing is on`() {
+    fun `an entry created without a category is uncategorized`() {
         setAiProcessing(true)
 
         postEntry("""{"amount":5.00,"description":"cab","type":"OUTCOME"}""")
             .andExpect(status().isCreated)
-            .andExpect(jsonPath("$.category").value("OTHER"))
-            .andExpect(jsonPath("$.categorySource").value("AUTO"))
+            .andExpect(jsonPath("$.category").value("UNCATEGORIZED"))
     }
 
     @Test
-    fun `an entry created without a category stays manual when AI processing was never saved`() {
+    fun `an entry created without a category is uncategorized even when AI processing was never saved`() {
         setAiProcessing(null)
 
         postEntry("""{"amount":5.00,"description":"cab","type":"OUTCOME"}""")
             .andExpect(status().isCreated)
-            .andExpect(jsonPath("$.category").value("OTHER"))
-            .andExpect(jsonPath("$.categorySource").value("USER"))
+            .andExpect(jsonPath("$.category").value("UNCATEGORIZED"))
     }
 
     @Test
@@ -117,15 +114,15 @@ class EntryCategoryIntegrationTest {
             put("/api/budgets/$budgetId/entries/$entryId").header("Authorization", "Bearer $token")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""{"amount":6.00,"description":"cab","category":"Transport","type":"OUTCOME"}""")
-        ).andExpect(status().isOk).andExpect(jsonPath("$.categorySource").value("USER"))
+        ).andExpect(status().isOk)
 
         mockMvc.perform(get("/api/budgets/$budgetId/entries").header("Authorization", "Bearer $token"))
             .andExpect(status().isOk)
-            .andExpect(jsonPath("$[0].categorySource").value("USER"))
+            .andExpect(jsonPath("$[0].category").value("Transport"))
 
         mockMvc.perform(
             get("/api/budgets/$budgetId/entries").header("Authorization", "Bearer $token")
                 .param("page", "0").param("size", "10").param("sortBy", "category")
-        ).andExpect(status().isOk).andExpect(jsonPath("$.content[0].categorySource").value("USER"))
+        ).andExpect(status().isOk).andExpect(jsonPath("$.content[0].category").value("Transport"))
     }
 }
