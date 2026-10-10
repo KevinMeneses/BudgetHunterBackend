@@ -114,10 +114,8 @@ class BudgetCategorizationIntegrationTest {
         val after = entries()
         assertEquals("LEISURE", after.getValue(netflix)["category"].asText())
         assertEquals("HEALTH", after.getValue(pharmacy)["category"].asText())
-        assertEquals("AUTO", after.getValue(netflix)["categorySource"].asText())
         assertEquals("UNCATEGORIZED", after.getValue(unknown)["category"].asText())
         assertEquals("Food", after.getValue(chosen)["category"].asText())
-        assertEquals("USER", after.getValue(chosen)["categorySource"].asText())
         // Compared by value: JSON drops the trailing zero of 5.00.
         assertEquals(0, BigDecimal("5.00").compareTo(after.getValue(netflix)["amount"].decimalValue()))
     }

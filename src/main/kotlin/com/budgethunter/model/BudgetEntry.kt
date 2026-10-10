@@ -41,12 +41,6 @@ data class BudgetEntry(
     @field:Column(nullable = false)
     val category: String,
 
-    // Whether a person or the server chose [category]. Automatic categorisation only ever touches AUTO.
-    @field:NotNull
-    @field:Column(name = "category_source", nullable = false)
-    @field:Enumerated(EnumType.STRING)
-    val categorySource: CategorySource = CategorySource.USER,
-
     @field:NotNull
     @field:Column(nullable = false)
     @field:Enumerated(EnumType.STRING)
@@ -78,21 +72,14 @@ enum class EntryType {
     OUTCOME
 }
 
-enum class CategorySource {
-    /** Chosen by a person, or taken from a receipt they scanned. Never overwritten automatically. */
-    USER,
-
-    /** Assigned by the server from the description, and still eligible for re-categorisation. */
-    AUTO
-}
-
 object EntryCategory {
     /** A real category: "none of the others fits". Something the AI may answer. */
     const val OTHER = "OTHER"
 
     /**
      * Not a category but its absence: what an entry holds while nobody has chosen one ("Sin categoría" in the
-     * app). It is a different thing from [OTHER], which is an answer: the AI says "other" about an entry it
+     * app). It is the one thing automatic categorisation looks for: an entry is waiting for a category exactly
+     * when it holds this. It is a different thing from [OTHER], which is an answer: the AI says "other" about an entry it
      * looked at and could not place, and that entry is settled, whereas an uncategorized one is still waiting.
      * Never part of [ALL], so it can never be assigned automatically.
      */

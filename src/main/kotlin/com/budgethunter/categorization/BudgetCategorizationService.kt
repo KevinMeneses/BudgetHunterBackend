@@ -22,9 +22,9 @@ import java.util.concurrent.ConcurrentHashMap
  * match only while an entry is still automatic and still has the description it was classified from, so a
  * person's concurrent edit always wins and nothing else on the entry is touched.
  *
- * Only entries that are `AUTO` and still `UNCATEGORIZED` are looked at. That keeps a second run from redoing
- * the first (an entry the AI placed, even in OTHER, is settled) and keeps it away from everything a person
- * categorised.
+ * Only entries that are `UNCATEGORIZED` are looked at: nobody has chosen a category for them. That keeps a
+ * second run from redoing the first (an entry the AI placed, even in OTHER, now has a category) and keeps it
+ * away from everything a person categorised. No other marker is needed.
  */
 class BudgetCategorizationService(
     private val resolver: CategoryResolver,

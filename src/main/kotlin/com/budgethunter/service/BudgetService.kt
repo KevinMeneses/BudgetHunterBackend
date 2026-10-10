@@ -17,7 +17,6 @@ import com.budgethunter.dto.UserResponse
 import com.budgethunter.exception.ForbiddenAccessException
 import com.budgethunter.model.Budget
 import com.budgethunter.model.BudgetEntry
-import com.budgethunter.model.CategorySource
 import com.budgethunter.model.EntryCategory
 import com.budgethunter.model.UserBudget
 import com.budgethunter.model.UserBudgetId
@@ -225,13 +224,12 @@ class BudgetService(
         val user = userRepository.findById(authenticatedUserEmail)
             .orElseThrow { IllegalArgumentException("User not found with email: $authenticatedUserEmail") }
 
-        val (category, categorySource) = resolveCategory(request.category, request.description)
+        val category = resolveCategory(request.category)
         val newEntry = BudgetEntry(
             budget = budget,
             amount = request.amount,
             description = request.description,
             category = category,
-            categorySource = categorySource,
             type = request.type,
             createdBy = user,
             creationDate = LocalDateTime.now(),
@@ -261,12 +259,11 @@ class BudgetService(
             throw IllegalArgumentException("Budget entry $entryId does not belong to budget $budgetId")
         }
 
-        val (category, categorySource) = resolveCategory(request.category, request.description, existingEntry)
+        val category = resolveCategory(request.category, existingEntry)
         val updatedEntry = existingEntry.copy(
             amount = request.amount,
             description = request.description,
             category = category,
-            categorySource = categorySource,
             type = request.type,
             updatedBy = user,
             modificationDate = LocalDateTime.now(),
@@ -307,13 +304,12 @@ class BudgetService(
     }
 
     private fun createNewEntry(request: PutEntryRequest, budget: Budget, user: com.budgethunter.model.User): BudgetEntry {
-        val (category, categorySource) = resolveCategory(request.category, request.description)
+        val category = resolveCategory(request.category)
         val newEntry = BudgetEntry(
             budget = budget,
             amount = request.amount,
             description = request.description,
             category = category,
-            categorySource = categorySource,
             type = request.type,
             createdBy = user,
             creationDate = LocalDateTime.now(),
@@ -332,12 +328,11 @@ class BudgetService(
             throw IllegalArgumentException("Budget entry ${request.id} does not belong to budget ${budget.id}")
         }
 
-        val (category, categorySource) = resolveCategory(request.category, request.description, existingEntry)
+        val category = resolveCategory(request.category, existingEntry)
         val updatedEntry = existingEntry.copy(
             amount = request.amount,
             description = request.description,
             category = category,
-            categorySource = categorySource,
             type = request.type,
             updatedBy = user,
             modificationDate = LocalDateTime.now(),
@@ -348,32 +343,23 @@ class BudgetService(
     }
 
     /**
-     * Decides which category an entry is stored with and who gets credit for it.
+     * Decides which category an entry is stored with.
      *
      * A category in the request is the user's choice, except [EntryCategory.UNCATEGORIZED] ("Sin categoría"),
-     * which is the absence of one. Without a choice the entry holds [EntryCategory.UNCATEGORIZED] as `AUTO`,
-     * waiting for an automatic category if the user ever asks for
-     * one. That does not depend on their AI preference, which only decides whether a categorisation may run
-     * (and is checked then): an entry saved while it was off must still be offered once it is on.
+     * which is the absence of one. Without a choice the entry holds [EntryCategory.UNCATEGORIZED], which is all
+     * that makes it eligible for automatic categorisation if the user ever asks for it. That does not depend on
+     * their AI preference, which only decides whether a categorisation may run (and is checked then): an entry
+     * saved while it was off must still be offered once it is on.
      *
-     * On update, omitting the category leaves the stored one and its source alone. The one exception is an
-     * automatic entry whose description changed, because its category was worked out from the old text: it goes
-     * back to waiting.
+     * On update, omitting the category leaves the stored one alone.
      */
-    private fun resolveCategory(
-        requested: String?,
-        description: String,
-        existing: BudgetEntry? = null
-    ): Pair<String, CategorySource> {
+    private fun resolveCategory(requested: String?, existing: BudgetEntry? = null): String {
         val explicit = requested?.trim()?.takeIf { it.isNotEmpty() && !it.equals(EntryCategory.UNCATEGORIZED, true) }
         return when {
-            explicit != null -> explicit to CategorySource.USER
+            explicit != null -> explicit
             // Nothing chosen, or "Sin categoría" picked on purpose, which comes to the same.
-            existing == null || !requested.isNullOrBlank() ->
-                EntryCategory.UNCATEGORIZED to CategorySource.AUTO
-            existing.categorySource == CategorySource.AUTO && existing.description != description ->
-                EntryCategory.UNCATEGORIZED to CategorySource.AUTO
-            else -> existing.category to existing.categorySource
+            existing == null || !requested.isNullOrBlank() -> EntryCategory.UNCATEGORIZED
+            else -> existing.category
         }
     }
 
@@ -383,7 +369,6 @@ class BudgetService(
         amount = this.amount,
         description = this.description,
         category = this.category,
-        categorySource = this.categorySource,
         type = this.type,
         createdByEmail = this.createdBy?.email,
         updatedByEmail = this.updatedBy?.email,

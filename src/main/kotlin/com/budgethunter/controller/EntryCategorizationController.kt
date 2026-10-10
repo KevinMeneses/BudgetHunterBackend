@@ -29,7 +29,7 @@ class EntryCategorizationController(
     @Operation(
         summary = "Categorize the budget's waiting entries",
         description = "Gives an automatic category to the entries of the budget that were saved without one " +
-            "(category source AUTO, still UNCATEGORIZED) and whose creator has AI processing turned on. The work is done " +
+            "(category UNCATEGORIZED, i.e. nobody chose one) and whose creator has AI processing turned on. The work is done " +
             "before the response returns. Entries a person categorised are never touched, and a second call " +
             "only looks at what is still waiting. Only the entries' descriptions are sent to the AI provider. " +
             "Clients should sync their own unsynced entries first and refresh the budget's entries afterwards."
