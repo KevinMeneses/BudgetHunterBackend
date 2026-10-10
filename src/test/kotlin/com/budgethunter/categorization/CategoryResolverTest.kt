@@ -1,11 +1,17 @@
 package com.budgethunter.categorization
 
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
 
 class CategoryResolverTest {
 
     private val calls = mutableListOf<List<String>>()
+    private val registry = SimpleMeterRegistry()
+    private val metrics = CategorizationMetrics(registry)
+
+    private fun resolved(layer: String) = registry.counter("categorization.resolved", "source", layer).count()
+
     private val rules = CategoryClassifier { list -> list.map { if (it.contains("netflix")) "LEISURE" else null } }
 
     /** A remote classifier that knows two merchants and records what it was asked. */
@@ -16,7 +22,7 @@ class CategoryResolverTest {
         }
 
     private fun resolver(remote: CategoryClassifier? = remote(), cache: CategoryCache = CategoryCache()) =
-        CategoryResolver(rules, cache, remote)
+        CategoryResolver(rules, cache, remote, metrics)
 
     @Test
     fun `rules answer first and the remote classifier is not asked`() {
@@ -98,5 +104,16 @@ class CategoryResolverTest {
         val answers = RuleBasedClassifier().classify(listOf("netflix", "xyzzy", "", "farmacia", "uber", "zzz 123"))
 
         assertEquals(false, answers.contains("OTHER"))
+    }
+
+    @Test
+    fun `counts which layer answered each description`() {
+        val resolver = resolver()
+        resolver.resolve(listOf("netflix", "Rappi", "unknown place")) // rules, remote, nobody
+        resolver.resolve(listOf("rappi 99")) // cache
+
+        assertEquals(1.0, resolved("rules"))
+        assertEquals(1.0, resolved("cache"))
+        assertEquals(1.0, resolved("remote"))
     }
 }

@@ -53,12 +53,13 @@ class GeminiCategoryClassifier(
     private val restClient: RestClient,
     private val settings: GeminiSettings,
     private val objectMapper: ObjectMapper,
-    private val clock: Clock = Clock.systemUTC()
+    private val clock: Clock = Clock.systemUTC(),
+    private val metrics: CategorizationMetrics = CategorizationMetrics()
 ) : CategoryClassifier {
 
     private val log = LoggerFactory.getLogger(GeminiCategoryClassifier::class.java)
 
-    private val replyParser = GeminiReplyParser(objectMapper)
+    private val replyParser = GeminiReplyParser(objectMapper, metrics)
 
     private val requestBudget: Bucket = Bucket.builder()
         .addLimit { limit ->
@@ -79,7 +80,10 @@ class GeminiCategoryClassifier(
 
     override fun classify(descriptions: List<String>): List<String?> {
         val texts = descriptions.map { DescriptionNormalizer.normalize(it).take(MAX_DESCRIPTION_LENGTH).trim() }
-        val answers = if (settings.apiKey.isBlank() || isCoolingDown()) {
+        val answers = if (settings.apiKey.isBlank()) {
+            emptyMap()
+        } else if (isCoolingDown()) {
+            metrics.provider(CategorizationMetrics.Provider.COOLING_DOWN)
             emptyMap()
         } else {
             askInBatches(texts.filter { it.isNotEmpty() }.distinct())
@@ -105,6 +109,7 @@ class GeminiCategoryClassifier(
             post(buildRequest(batch))
         } else {
             log.debug("Gemini request budget used up; leaving the rest for later")
+            metrics.provider(CategorizationMetrics.Provider.BUDGET_EXHAUSTED)
             null
         }
         return body?.let { replyParser.parse(it, batch) }
@@ -146,20 +151,26 @@ class GeminiCategoryClassifier(
                 .retrieve()
                 .body(String::class.java)
                 .orEmpty()
-        )
+        ).also { metrics.provider(CategorizationMetrics.Provider.OK) }
     } catch (e: RestClientResponseException) {
         when {
             e.statusCode.value() == TOO_MANY_REQUESTS -> {
+                metrics.provider(CategorizationMetrics.Provider.RATE_LIMITED)
                 startCoolDown(e.responseHeaders?.getFirst("Retry-After"))
                 Attempt.GiveUp
             }
-            e.statusCode.is5xxServerError -> Attempt.Retry
+            e.statusCode.is5xxServerError -> {
+                metrics.provider(CategorizationMetrics.Provider.HTTP_ERROR)
+                Attempt.Retry
+            }
             else -> {
+                metrics.provider(CategorizationMetrics.Provider.HTTP_ERROR)
                 log.warn("Gemini answered HTTP {}; not classifying this batch", e.statusCode.value())
                 Attempt.GiveUp
             }
         }
     } catch (e: ResourceAccessException) {
+        metrics.provider(CategorizationMetrics.Provider.UNREACHABLE)
         log.debug("Gemini unreachable ({})", e.cause?.javaClass?.simpleName)
         Attempt.Retry
     }

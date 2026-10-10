@@ -5,6 +5,8 @@ import com.budgethunter.repository.BudgetRepository
 import com.budgethunter.repository.UserRepository
 import com.budgethunter.service.BudgetService
 import com.fasterxml.jackson.databind.ObjectMapper
+import io.micrometer.core.instrument.MeterRegistry
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry
 import io.mockk.mockk
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
@@ -17,6 +19,7 @@ class CategorizationConfigTest {
     private val runner = ApplicationContextRunner()
         .withConfiguration(AutoConfigurations.of(RestClientAutoConfiguration::class.java))
         .withBean(ObjectMapper::class.java, { ObjectMapper() })
+        .withBean(MeterRegistry::class.java, { SimpleMeterRegistry() })
         .withBean(BudgetEntryRepository::class.java, { mockk<BudgetEntryRepository>() })
         .withBean(BudgetRepository::class.java, { mockk<BudgetRepository>() })
         .withBean(UserRepository::class.java, { mockk<UserRepository>() })

@@ -2,6 +2,7 @@ package com.budgethunter.categorization
 
 import com.budgethunter.model.EntryCategory
 import com.fasterxml.jackson.databind.ObjectMapper
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry
 import org.hamcrest.Matchers.containsString
 import org.hamcrest.Matchers.not
 import org.junit.jupiter.api.Assertions.assertEquals
@@ -33,6 +34,8 @@ import java.time.ZoneOffset
 class GeminiCategoryClassifierTest {
 
     private val objectMapper = ObjectMapper()
+    private val registry = SimpleMeterRegistry()
+    private val metrics = CategorizationMetrics(registry)
     private val url = "https://gemini.test/v1beta/models/test-model:generateContent"
 
     private lateinit var server: MockRestServiceServer
@@ -59,8 +62,11 @@ class GeminiCategoryClassifierTest {
         restClient,
         GeminiSettings(apiKey, "test-model", maxRequestsPerMinute, maxBatchSize),
         objectMapper,
-        clock
+        clock,
+        metrics
     )
+
+    private fun provider(outcome: String) = registry.counter("categorization.provider.requests", "outcome", outcome).count()
 
     /** What Gemini returns: the model's JSON array travels as a string inside `candidates`. */
     private fun reply(answersJson: String): String =
@@ -291,5 +297,77 @@ class GeminiCategoryClassifierTest {
         assertEquals(EntryCategory.ALL, CategoryGuide.meanings.keys.toList())
         assertTrue(CategoryGuide.meanings.values.none { it.isBlank() })
         assertFalse(CategoryGuide.meanings.isEmpty())
+    }
+
+    // Metrics
+
+    @Test
+    fun `counts a successful request`() {
+        server.expect(once(), requestTo(url)).andRespond(ok("""[{"id":0,"category":"FOOD"}]"""))
+
+        classifier().classify(listOf("pizza"))
+
+        assertEquals(1.0, provider("ok"))
+    }
+
+    @Test
+    fun `counts every failed attempt, retries included`() {
+        server.expect(times(2), requestTo(url)).andRespond(withStatus(HttpStatus.INTERNAL_SERVER_ERROR))
+
+        classifier().classify(listOf("pizza"))
+
+        assertEquals(2.0, provider("http_error"))
+        assertEquals(0.0, provider("ok"))
+    }
+
+    @Test
+    fun `counts a network error and the retry that then works`() {
+        server.expect(once(), requestTo(url)).andRespond { throw IOException("timeout") }
+        server.expect(once(), requestTo(url)).andRespond(ok("""[{"id":0,"category":"FOOD"}]"""))
+
+        classifier().classify(listOf("pizza"))
+
+        assertEquals(1.0, provider("unreachable"))
+        assertEquals(1.0, provider("ok"))
+    }
+
+    @Test
+    fun `counts a rate limit and then the calls skipped while cooling down`() {
+        val classifier = classifier()
+        server.expect(once(), requestTo(url)).andRespond(withStatus(HttpStatus.TOO_MANY_REQUESTS))
+        classifier.classify(listOf("pizza"))
+        server.reset()
+        server.expect(never(), requestTo(url))
+
+        classifier.classify(listOf("pizza"))
+        classifier.classify(listOf("netflix"))
+
+        assertEquals(1.0, provider("rate_limited"))
+        assertEquals(2.0, provider("cooling_down"))
+    }
+
+    @Test
+    fun `counts a reply that is not valid JSON`() {
+        server.expect(once(), requestTo(url)).andRespond(withSuccess("not json", MediaType.APPLICATION_JSON))
+
+        classifier().classify(listOf("pizza"))
+
+        assertEquals(1.0, provider("invalid_reply"))
+    }
+
+    @Test
+    fun `counts the batches the per-minute budget did not allow`() {
+        server.expect(once(), requestTo(url)).andRespond(ok("""[{"id":0,"category":"FOOD"}]"""))
+
+        classifier(maxRequestsPerMinute = 1, maxBatchSize = 1).classify(listOf("pizza", "netflix"))
+
+        assertEquals(1.0, provider("budget_exhausted"))
+    }
+
+    @Test
+    fun `an idle classifier without a key records nothing`() {
+        classifier(apiKey = "").classify(listOf("pizza"))
+
+        assertEquals(0, registry.meters.size)
     }
 }

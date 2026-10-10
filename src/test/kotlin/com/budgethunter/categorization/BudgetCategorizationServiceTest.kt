@@ -7,6 +7,7 @@ import com.budgethunter.repository.BudgetRepository
 import com.budgethunter.repository.PendingCategorization
 import com.budgethunter.repository.UserRepository
 import com.budgethunter.service.BudgetService
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
@@ -29,6 +30,10 @@ class BudgetCategorizationServiceTest {
     private lateinit var entries: BudgetEntryRepository
     private lateinit var users: UserRepository
     private val asked = mutableListOf<List<String>>()
+    private val registry = SimpleMeterRegistry()
+    private val metrics = CategorizationMetrics(registry)
+
+    private fun counted(name: String, tag: String, value: String) = registry.counter(name, tag, value).count()
     private var remoteAnswers = mapOf("rappi" to "GROCERIES", "dr smith" to "HEALTH", "mystery" to "OTHER")
 
     private lateinit var service: BudgetCategorizationService
@@ -60,7 +65,8 @@ class BudgetCategorizationServiceTest {
         budgetService,
         budgets,
         entries,
-        users
+        users,
+        metrics
     )
 
     private fun waiting(vararg descriptions: String) {
@@ -174,7 +180,31 @@ class BudgetCategorizationServiceTest {
         guarded.categorize(budgetId, email)
 
         assertEquals("Categorization is already running for budget $budgetId", inner?.message)
+        assertEquals(1.0, counted("categorization.runs", "outcome", "already_running"))
         // Released afterwards: the same budget can be run again.
         guarded.categorize(budgetId, email)
+    }
+
+    @Test
+    fun `counts the run and what happened to each entry`() {
+        waiting("Netflix", "Rappi", "Dr Smith", "zzz unknown")
+        every { entries.applyAutoCategory(2L, any(), any(), any(), any()) } returns 0 // edited meanwhile
+
+        service.categorize(budgetId, email)
+
+        assertEquals(1.0, counted("categorization.runs", "outcome", "completed"))
+        assertEquals(2.0, counted("categorization.entries", "result", "categorized"))
+        assertEquals(1.0, counted("categorization.entries", "result", "dropped"))
+        assertEquals(1.0, counted("categorization.entries", "result", "unplaced"))
+    }
+
+    @Test
+    fun `counts a refusal because AI processing is off`() {
+        every { users.findById(email) } returns Optional.of(User(email = email, name = "A", aiProcessingEnabled = false))
+
+        assertThrows<ForbiddenAccessException> { service.categorize(budgetId, email) }
+
+        assertEquals(1.0, counted("categorization.runs", "outcome", "ai_off"))
+        assertEquals(0.0, counted("categorization.runs", "outcome", "completed"))
     }
 }
