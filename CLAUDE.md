@@ -140,12 +140,36 @@ export SPRING_PROFILES_ACTIVE=production
 ```
 src/main/kotlin/com/budgethunter/
 ├── BudgetHunterApplication.kt    # Main Spring Boot application
-└── model/                         # JPA entities
-    ├── User.kt
-    ├── Budget.kt
-    ├── UserBudget.kt
-    └── BudgetEntry.kt
+├── model/                         # JPA entities
+│   ├── User.kt
+│   ├── Budget.kt
+│   ├── UserBudget.kt
+│   └── BudgetEntry.kt            # also EntryCategory (the closed category list, OTHER, UNCATEGORIZED)
+└── categorization/                # automatic entry categorization (see below)
 ```
+
+## Automatic categorization
+
+Entries are saved with a `category` that may be absent; none means `UNCATEGORIZED` ("Sin categoría" in the
+app). `POST /api/budgets/{id}/entries/categorize` (the app calls it from a confirmation dialog on the metrics
+screen) categorizes the budget's `UNCATEGORIZED` entries before it returns. Design notes and decisions:
+`docs/plans/auto-categorization.md`. The rules worth remembering:
+
+- **Eligible:** the entry is `UNCATEGORIZED` **and** its creator has `users.ai_processing_enabled = true` right now
+  (`null` counts as off). The caller must have it on too (403 otherwise). There is no "who chose it" marker:
+  anything that already has a category, `OTHER` included, is never touched.
+- **`UNCATEGORIZED` is not `OTHER`, and is not `null`.** `OTHER` is an answer ("looked at it, nothing fits"; only
+  the remote classifier may give it, `CategoryResolver` discards it from the rules); `null` would crash older
+  app builds. `UNCATEGORIZED` is never part of `EntryCategory.ALL`, the list the AI chooses from.
+- **Layers** (`CategoryResolver`): `RuleBasedClassifier` (whole-word ES/EN keywords, precision over recall) ->
+  `CategoryCache` (in-memory LRU) -> `GeminiCategoryClassifier`. Only the normalised description is sent.
+- **Safe by construction:** each result is one conditional `UPDATE` (`BudgetEntryRepository.applyAutoCategory`)
+  that matches only while the entry is still `UNCATEGORIZED` with the same description, so a concurrent edit by
+  a person wins. The service is deliberately not `@Transactional` (it makes an HTTP call).
+- **Config:** `GEMINI_API_KEY` (empty = the server never calls Gemini), `GEMINI_MODEL`,
+  `GEMINI_MAX_REQUESTS_PER_MINUTE`, `CATEGORIZATION_ENABLED`; defaults live in `CategorizationConfig`, so nothing
+  needs mirroring in the test `application.properties`. Counters: `categorization.*` (see MONITORING.md).
+- `CategoryGuide` repeats the one-line category meanings of the app's receipt prompt on purpose; change both.
 
 ## Deployment
 
@@ -177,10 +201,11 @@ docker-compose up -d
 ## Project Status
 
 ✅ **Production-Ready Features:**
-- Complete RESTful API (11 endpoints)
+- Complete RESTful API (12 endpoints)
 - JWT authentication with refresh tokens
 - Budget management and collaboration
 - Real-time updates via Server-Sent Events (SSE, proxy-buffering safe, no self-echo)
+- **Automatic entry categorization** on demand (`POST /api/budgets/{id}/entries/categorize`): keyword rules, cache, Gemini Flash-Lite; see below
 - Rate limiting (Token Bucket algorithm)
 - OpenAPI/Swagger documentation
 - Pagination support
@@ -192,6 +217,6 @@ docker-compose up -d
 - Health check endpoints (Actuator with liveness/readiness probes)
 - Request/response logging with file rotation
 - **Automated deployment scripts** (deploy.sh, setup-ssl.sh)
-- Comprehensive test coverage (132 tests)
+- Comprehensive test coverage (300+ tests)
 
 See **PROGRESS.md** for detailed implementation status and roadmap.

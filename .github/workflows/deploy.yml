@@ -9,7 +9,8 @@ name: Deploy
 #
 # Required, in the "production" environment (Settings → Environments → production):
 #   secrets  SSH_PRIVATE_KEY   private key authorised on the server
-#            ENV_FILE          full contents of the server's .env (see .env.example)
+#            ENV_FILE          full contents of the server's .env (see .env.example); this is also where
+#                              the optional GEMINI_API_KEY for automatic categorization goes (see DEPLOYMENT.md)
 #            SERVER_IP         droplet IP
 #            SSH_KNOWN_HOSTS   output of `ssh-keyscan <SERVER_IP>` (recommended; falls back to a live scan)
 #   vars     SERVER_USER       optional, defaults to root

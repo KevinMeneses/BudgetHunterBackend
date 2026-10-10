@@ -272,7 +272,11 @@ class BudgetController(
     @PostMapping("/{budgetId}/entries")
     @Operation(
         summary = "Create a budget entry",
-        description = "Creates a new income or expense entry within the budget. Type must be either INCOME or EXPENSE. Entry is tracked with creation timestamp and creator information. Triggers SSE notification to all connected clients."
+        description = "Creates a new income or expense entry within the budget. Type must be either INCOME or " +
+            "EXPENSE. Category is optional: without one (or with UNCATEGORIZED) the entry is stored as " +
+            "UNCATEGORIZED and can later be categorized automatically (see POST /{budgetId}/entries/categorize). " +
+            "Entry is tracked with creation timestamp and creator information. Triggers SSE notification to all " +
+            "connected clients."
     )
     @ApiResponses(
         value = [
@@ -283,7 +287,8 @@ class BudgetController(
             ),
             ApiResponse(
                 responseCode = "400",
-                description = "Invalid request - validation errors (e.g., missing amount, invalid type, invalid category)",
+                description = "Invalid request - validation errors " +
+                    "(e.g., missing amount, invalid type, category longer than 255 characters)",
                 content = [Content()]
             ),
             ApiResponse(
@@ -317,7 +322,10 @@ class BudgetController(
     @PutMapping("/{budgetId}/entries/{entryId}")
     @Operation(
         summary = "Update a budget entry",
-        description = "Updates an existing budget entry. Can modify amount, description, category, and type. Update is tracked with modification timestamp and updater information. Triggers SSE notification to all connected clients."
+        description = "Updates an existing budget entry. Can modify amount, description, category, and type. " +
+            "Omitting the category leaves the stored one alone; sending UNCATEGORIZED makes the entry eligible " +
+            "for automatic categorization again. Update is tracked with modification timestamp and updater " +
+            "information. Triggers SSE notification to all connected clients."
     )
     @ApiResponses(
         value = [
@@ -328,7 +336,8 @@ class BudgetController(
             ),
             ApiResponse(
                 responseCode = "400",
-                description = "Invalid request - validation errors (e.g., invalid amount, invalid type, invalid category)",
+                description = "Invalid request - validation errors " +
+                    "(e.g., invalid amount, invalid type, category longer than 255 characters)",
                 content = [Content()]
             ),
             ApiResponse(
