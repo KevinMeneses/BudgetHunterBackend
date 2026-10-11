@@ -191,6 +191,29 @@ curl https://your-api.com/actuator/metrics/http.server.requests
 curl https://your-api.com/actuator/metrics/jdbc.connections.active
 ```
 
+### Automatic categorization counters
+
+Always recorded; readable once `metrics` is exposed. In production set
+`MANAGEMENT_ENDPOINTS_EXPOSED=health,metrics` in the server's `.env` (the default is `health` only).
+`/actuator/metrics/**` is not in the public list in `SecurityConfig`, so it needs a valid token (any signed-in
+user's), which is fine for counts but is a reason to keep it unexposed, or blocked at nginx, if you do not need it.
+
+| Metric | Tag | What it tells you |
+|--------|-----|-------------------|
+| `categorization.runs` | `outcome`: `completed`, `already_running`, `ai_off` | Requests to categorize a budget and how they ended. Many `ai_off` = users hitting the dialog with the toggle off or not yet synced |
+| `categorization.entries` | `result`: `categorized`, `dropped`, `unplaced` | `dropped` = a person edited the entry first; `unplaced` = nobody had an answer (left for the next run) |
+| `categorization.resolved` | `source`: `rules`, `cache`, `remote` | Which layer answered. Only `remote` spends Gemini quota, so a low `remote` share is the goal |
+| `categorization.provider.requests` | `outcome`: `ok`, `rate_limited`, `http_error`, `unreachable`, `invalid_reply`, `budget_exhausted`, `cooling_down` | What Gemini did, or why it was not asked |
+
+```bash
+curl -H "Authorization: Bearer TOKEN" https://your-api.com/actuator/metrics/categorization.provider.requests
+curl -H "Authorization: Bearer TOKEN" "https://your-api.com/actuator/metrics/categorization.provider.requests?tag=outcome:rate_limited"
+```
+
+What to watch: `rate_limited` or `budget_exhausted` growing means the plan's quota is too small for the traffic
+(raise `GEMINI_MAX_REQUESTS_PER_MINUTE` only if the quota allows it); `http_error` right after changing
+`GEMINI_MODEL` usually means the model id was retired. The counters reset when the server restarts.
+
 ### Integrate with Prometheus + Grafana (Free, Self-Hosted)
 
 For visual dashboards:

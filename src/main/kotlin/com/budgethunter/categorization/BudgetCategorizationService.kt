@@ -31,7 +31,8 @@ class BudgetCategorizationService(
     private val budgetService: BudgetService,
     private val budgetRepository: BudgetRepository,
     private val budgetEntryRepository: BudgetEntryRepository,
-    private val userRepository: UserRepository
+    private val userRepository: UserRepository,
+    private val metrics: CategorizationMetrics = CategorizationMetrics()
 ) {
 
     private val log = LoggerFactory.getLogger(BudgetCategorizationService::class.java)
@@ -43,11 +44,15 @@ class BudgetCategorizationService(
         budgetService.verifyUserHasAccessToBudget(budgetId, userEmail)
         require(budgetRepository.existsById(budgetId)) { "Budget not found with id: $budgetId" }
         if (!userAllowsAi(userEmail)) {
+            metrics.run(CategorizationMetrics.Run.AI_OFF)
             throw ForbiddenAccessException("AI processing is turned off for this account")
         }
-        check(running.add(budgetId)) { "Categorization is already running for budget $budgetId" }
+        if (!running.add(budgetId)) {
+            metrics.run(CategorizationMetrics.Run.ALREADY_RUNNING)
+            error("Categorization is already running for budget $budgetId")
+        }
         try {
-            return run(budgetId)
+            return run(budgetId).also { metrics.run(CategorizationMetrics.Run.COMPLETED) }
         } finally {
             running.remove(budgetId)
         }
@@ -61,10 +66,12 @@ class BudgetCategorizationService(
         )
         val answers = resolver.resolve(waiting.map { it.description })
 
-        val categorized = waiting.indices.count { index ->
-            // OTHER is an answer too ("looked at it, none fits"): storing it settles the entry.
-            answers[index]?.let { store(waiting[index], it) } == true
-        }
+        // OTHER is an answer too ("looked at it, none fits"): storing it settles the entry.
+        val stored = waiting.indices.map { index -> answers[index]?.let { store(waiting[index], it) } }
+        val categorized = stored.count { it == true }
+        metrics.entries(CategorizationMetrics.EntryResult.CATEGORIZED, categorized)
+        metrics.entries(CategorizationMetrics.EntryResult.DROPPED, stored.count { it == false })
+        metrics.entries(CategorizationMetrics.EntryResult.UNPLACED, stored.count { it == null })
         log.info("Categorized {} of {} waiting entries of budget {}", categorized, waiting.size, budgetId)
 
         return CategorizeEntriesResponse(

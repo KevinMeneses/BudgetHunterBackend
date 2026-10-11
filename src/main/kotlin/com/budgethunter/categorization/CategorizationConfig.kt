@@ -5,6 +5,7 @@ import com.budgethunter.repository.BudgetRepository
 import com.budgethunter.repository.UserRepository
 import com.budgethunter.service.BudgetService
 import com.fasterxml.jackson.databind.ObjectMapper
+import io.micrometer.core.instrument.MeterRegistry
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
@@ -33,6 +34,7 @@ class CategorizationConfig {
     fun geminiCategoryClassifier(
         restClientBuilder: RestClient.Builder,
         objectMapper: ObjectMapper,
+        metrics: CategorizationMetrics,
         @Value("\${categorization.gemini.api-key:}") apiKey: String,
         @Value("\${categorization.gemini.model:$DEFAULT_MODEL}") model: String,
         @Value("\${categorization.gemini.base-url:$DEFAULT_BASE_URL}") baseUrl: String,
@@ -52,26 +54,39 @@ class CategorizationConfig {
         return GeminiCategoryClassifier(
             restClient,
             GeminiSettings(apiKey.trim(), model, maxRequestsPerMinute, maxBatchSize),
-            objectMapper
+            objectMapper,
+            metrics = metrics
         )
     }
+
+    @Bean
+    fun categorizationMetrics(registry: MeterRegistry) = CategorizationMetrics(registry)
 
     @Bean
     fun categoryCache() = CategoryCache()
 
     /** Rules first, then the cache, then Gemini (which stays idle without a key). */
     @Bean
-    fun categoryResolver(cache: CategoryCache, gemini: GeminiCategoryClassifier) =
-        CategoryResolver(RuleBasedClassifier(), cache, gemini)
+    fun categoryResolver(cache: CategoryCache, gemini: GeminiCategoryClassifier, metrics: CategorizationMetrics) =
+        CategoryResolver(RuleBasedClassifier(), cache, gemini, metrics)
 
     @Bean
+    @Suppress("LongParameterList") // Plain constructor wiring of the service's collaborators.
     fun budgetCategorizationService(
         resolver: CategoryResolver,
         budgetService: BudgetService,
         budgetRepository: BudgetRepository,
         budgetEntryRepository: BudgetEntryRepository,
-        userRepository: UserRepository
-    ) = BudgetCategorizationService(resolver, budgetService, budgetRepository, budgetEntryRepository, userRepository)
+        userRepository: UserRepository,
+        metrics: CategorizationMetrics
+    ) = BudgetCategorizationService(
+        resolver,
+        budgetService,
+        budgetRepository,
+        budgetEntryRepository,
+        userRepository,
+        metrics
+    )
 
     private companion object {
         // Model ids come and go (the 2.5 family is being retired), so this is only a default.

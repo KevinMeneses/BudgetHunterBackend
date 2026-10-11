@@ -8,6 +8,7 @@ import com.budgethunter.dto.SignUpRequest
 import com.budgethunter.repository.UserRepository
 import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.ObjectMapper
+import io.micrometer.core.instrument.MeterRegistry
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -39,6 +40,8 @@ class BudgetCategorizationIntegrationTest {
     @Autowired private lateinit var objectMapper: ObjectMapper
 
     @Autowired private lateinit var userRepository: UserRepository
+
+    @Autowired private lateinit var meterRegistry: MeterRegistry
 
     private val run = UUID.randomUUID().toString().take(8)
     private val owner = "owner-$run@example.com"
@@ -118,6 +121,25 @@ class BudgetCategorizationIntegrationTest {
         assertEquals("Food", after.getValue(chosen)["category"].asText())
         // Compared by value: JSON drops the trailing zero of 5.00.
         assertEquals(0, BigDecimal("5.00").compareTo(after.getValue(netflix)["amount"].decimalValue()))
+    }
+
+    @Test
+    fun `reports what it did to the application's meters`() {
+        setAiProcessing(owner, true)
+        createEntry(ownerToken, "Netflix")
+        createEntry(ownerToken, "zzz unknown shop")
+        fun count(name: String, tag: String, value: String) = meterRegistry.counter(name, tag, value).count()
+        val runsBefore = count("categorization.runs", "outcome", "completed")
+        val categorizedBefore = count("categorization.entries", "result", "categorized")
+        val unplacedBefore = count("categorization.entries", "result", "unplaced")
+        val rulesBefore = count("categorization.resolved", "source", "rules")
+
+        categorize(ownerToken).andExpect(status().isOk)
+
+        assertEquals(1.0, count("categorization.runs", "outcome", "completed") - runsBefore)
+        assertEquals(1.0, count("categorization.entries", "result", "categorized") - categorizedBefore)
+        assertEquals(1.0, count("categorization.entries", "result", "unplaced") - unplacedBefore)
+        assertEquals(1.0, count("categorization.resolved", "source", "rules") - rulesBefore)
     }
 
     @Test

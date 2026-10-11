@@ -14,7 +14,10 @@ import org.slf4j.LoggerFactory
  * [EntryCategory.ALL], is dropped, so a malformed, blocked or partly wrong reply costs only the
  * items it got wrong. Never throws.
  */
-internal class GeminiReplyParser(private val objectMapper: ObjectMapper) {
+internal class GeminiReplyParser(
+    private val objectMapper: ObjectMapper,
+    private val metrics: CategorizationMetrics = CategorizationMetrics()
+) {
 
     private val log = LoggerFactory.getLogger(GeminiReplyParser::class.java)
 
@@ -22,6 +25,7 @@ internal class GeminiReplyParser(private val objectMapper: ObjectMapper) {
     fun parse(body: String, batch: List<String>): Map<String, String> = try {
         readItems(body)?.mapNotNull { answerOf(it, batch) }?.distinctBy { it.first }?.toMap().orEmpty()
     } catch (_: JsonProcessingException) {
+        metrics.provider(CategorizationMetrics.Provider.INVALID_REPLY)
         log.warn("Gemini reply was not valid JSON; not classifying this batch")
         emptyMap()
     }

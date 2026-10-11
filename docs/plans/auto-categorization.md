@@ -181,11 +181,18 @@ category, so they are unaffected.
   an edited entry keeps the person's category, refused when AI is off/never saved, access, token, a
   collaborator who turned AI off is skipped).
 
-### Part 5 - Operations and docs
-- Micrometer counters via Actuator (runs, categorised, rule/cache hit, provider error, throttled).
-- Docs: `GEMINI_API_KEY` / `CATEGORIZATION_*` in the `deploy.yml` secrets list and `DEPLOYMENT.md`; update
-  `CLAUDE.md`, `PROGRESS.md`, `postman_requests.md` and the OpenAPI notes on the entry endpoints (`category`
-  optional, `UNCATEGORIZED`).
+### Part 5 - Operations and docs (done)
+- `CategorizationMetrics`: Micrometer counters, tag values are fixed enums (nothing about an entry, budget or
+  user becomes a label): `categorization.runs{outcome}`, `categorization.entries{result}`,
+  `categorization.resolved{source}` (rules / cache / remote: only remote spends quota) and
+  `categorization.provider.requests{outcome}`. Recorded always; readable at `/actuator/metrics/<name>` once
+  `metrics` is exposed, which production does not do by default: `MANAGEMENT_ENDPOINTS_EXPOSED=health,metrics`
+  (the endpoint then needs a token).
+- Docs: `DEPLOYMENT.md` (variables, how to get and use the key, privacy note, the real-call check after changing
+  the model), `MONITORING.md` (what each counter means and what to watch), `.env.example` and
+  `docker-compose.yml` (every new variable is passed through to the container), the `deploy.yml` header,
+  `CLAUDE.md`, `PROGRESS.md`, `postman_requests.md` (new request 16, optional `category`) and the OpenAPI text of
+  the create/update entry endpoints.
 - The scheduled backfill that was planned is dropped: nothing runs without the user asking.
 
 ## Acceptance criteria
