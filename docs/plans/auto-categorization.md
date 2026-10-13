@@ -145,9 +145,9 @@ category, so they are unaffected.
   `CATEGORIZATION_ENABLED` (default on), `GEMINI_API_KEY`, `GEMINI_MODEL`,
   `GEMINI_MAX_REQUESTS_PER_MINUTE`. `GEMINI_API_KEY`/`GEMINI_MODEL` are also passed through
   `docker-compose.yml` and listed in `.env.example`. With no key the bean exists but never sends.
-- **Model id:** default `gemini-3.1-flash-lite`. The 2.5 family is being retired (the app's
-  `gemini-2.5-flash` included, see the PR notes), so verify the id and the free-tier quota in
-  Google's docs before the first deploy; it is only a default.
+- **Model id:** default `gemini-3.5-flash-lite` (stable since 2026-07-21, shutdown not before 2027-07-21;
+  it replaced `gemini-3.1-flash-lite`, which is still available). The 2.5 family is being retired, so verify
+  the id and the free-tier quota in Google's docs before the first deploy; it is only a default.
 - Tests use `MockRestServiceServer`: happy path, header/URL/schema, normalised text, ids and order,
   batching and dedupe, out-of-list value, malformed/blocked replies, retry on 5xx and IO errors,
   no retry on 4xx, 429 cool-down (with and without `Retry-After`), blank key, request budget.

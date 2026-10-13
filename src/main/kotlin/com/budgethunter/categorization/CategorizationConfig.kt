@@ -90,7 +90,7 @@ class CategorizationConfig {
 
     private companion object {
         // Model ids come and go (the 2.5 family is being retired), so this is only a default.
-        const val DEFAULT_MODEL = "gemini-3.1-flash-lite"
+        const val DEFAULT_MODEL = "gemini-3.5-flash-lite"
         const val DEFAULT_BASE_URL = "https://generativelanguage.googleapis.com"
         const val DEFAULT_TIMEOUT_SECONDS = 10L
     }
