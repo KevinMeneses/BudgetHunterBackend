@@ -187,13 +187,26 @@ This document tracks the implementation progress of API endpoints and features a
 - ✅ Returns HTTP 204 No Content
 - ✅ Comprehensive unit tests (3 tests)
 
+### POST /api/budgets/{budgetId}/entries/categorize
+**Status: ✅ COMPLETE**
+- ✅ Controller endpoint (EntryCategorizationController), switched by `categorization.enabled`
+- ✅ Service layer (BudgetCategorizationService): synchronous, no DB connection held during the AI call
+- ✅ Gives an automatic category to the budget's `UNCATEGORIZED` entries whose creator has AI processing on
+- ✅ Layers: keyword rules, in-memory cache, Gemini (batched, deduplicated, rate limited); an `OTHER` from the rules is discarded
+- ✅ Conditional UPDATE per entry: a person's concurrent edit always wins
+- ✅ DTO: CategorizeEntriesResponse (`categorized`, `pending`)
+- ✅ 403 when the caller's AI processing is off, 409 while a run of the same budget is in flight
+- ✅ Micrometer counters `categorization.*` (see MONITORING.md)
+- ✅ `category` is optional when creating/updating entries; none means `UNCATEGORIZED` ("Sin categoría")
+- Plan and design notes: `docs/plans/auto-categorization.md`
+
 ---
 
 ## Summary Statistics
 
 ### Overall Progress
-- **Total Endpoints:** 11
-- **Completed:** 11 (100%) 🎉
+- **Total Endpoints:** 12
+- **Completed:** 12 (100%) 🎉
 - **Pending:** 0 (0%)
 
 ### By Category
@@ -202,7 +215,7 @@ This document tracks the implementation progress of API endpoints and features a
 | Authentication | 2 | 0 | 2 |
 | Budget Management | 3 | 0 | 3 |
 | Collaboration | 3 | 0 | 3 |
-| Budget Entries | 3 | 0 | 3 |
+| Budget Entries | 4 | 0 | 4 |
 
 ---
 
@@ -213,7 +226,7 @@ All endpoints from the system architecture diagram have been successfully implem
 1. ✅ User authentication (sign up, sign in with JWT, refresh token)
 2. ✅ Budget management (create, list, delete budgets)
 3. ✅ Collaboration (add, list, remove collaborators)
-4. ✅ Budget entries (create, update, list, delete entries)
+4. ✅ Budget entries (create, update, list, delete, categorize entries)
 5. ✅ Real-time notifications (SSE for budget entry updates)
 
 ---
@@ -240,7 +253,7 @@ All endpoints from the system architecture diagram have been successfully implem
 - [x] Add SSE connection/disconnection tests ✅
 - [x] Test concurrent budget entry updates ✅
 - [x] Add tests that capture and verify actual SSE event data ✅
-- [x] **Complete Test Summary: 132 total tests - 0 failures, 0 errors** ✅
+- [x] **Complete Test Summary: 315 total tests - 0 failures, 0 errors** ✅
   - Unit Tests: 79 (Services: 31, Controllers: 48)
   - Integration Tests: 53 (Auth: 9, Budget: 20, SSE: 4, SSE stream delivery: 9, Concurrent: 5, Reactive SSE: 6)
 
@@ -265,7 +278,7 @@ All endpoints from the system architecture diagram have been successfully implem
     - `RateLimitConfig.kt` - Token bucket configuration and management
     - `RateLimitInterceptor.kt` - Request interceptor that enforces rate limits
     - `WebMvcConfig.kt` - Spring MVC configuration with production profile detection
-  - **Status:** Fully implemented and tested (132 tests passing)
+  - **Status:** Fully implemented and tested (315 tests passing)
   - **Activation:** Switch profile in `application.properties` from `debug` to `production` (or use command line/env var)
   - **Testing:** Manually verified with curl (10-token bucket: 100% success, HTTP 429 after exhaustion)
   - **Documentation:** Extensive inline comments explaining Token Bucket algorithm, configuration options, and customization examples
@@ -361,7 +374,7 @@ All endpoints from the system architecture diagram have been successfully implem
     - Support for `DATABASE_URL`, `DATABASE_USERNAME`, `DATABASE_PASSWORD`
     - Secure JWT secret configuration via `JWT_SECRET`
     - All sensitive values externalized
-  - **Status:** Fully production-ready, tested with H2 (132 tests passing)
+  - **Status:** Fully production-ready, tested with H2 (315 tests passing)
 - [x] ✅ Add database indexes for performance (included in schema.sql)
 - [ ] Implement soft delete for entries
 - [ ] Add budget entry categories as enum/table
@@ -431,10 +444,11 @@ All endpoints from the system architecture diagram have been successfully implem
 - `UserController.kt` - Authentication endpoints
 - `BudgetService.kt` - Core business logic
 - `ReactiveSseService.kt` - Real-time event management (Flux/Sinks multicast)
+- `categorization/` - Automatic entry categorization: rules, cache, Gemini client, resolver, service, metrics
 - `postman_requests.md` - API documentation and examples
 - `test-sse.html` - Interactive SSE test client
 
-### Test Files (132 total tests)
+### Test Files (315 total tests)
 
 **Service Tests (31 tests)**
 - `UserServiceTest.kt` - Unit tests for user authentication (9 tests)
@@ -452,6 +466,13 @@ All endpoints from the system architecture diagram have been successfully implem
 - `ConcurrentBudgetEntryTest.kt` - Rapid multi-user operations and data consistency (5 tests)
 - `ReactiveSseIntegrationTest.kt` - Reactive Flux-based SSE with actual event capture (6 tests)
 
+**Categorization Tests (`categorization/`, plus integration)**
+- `DescriptionNormalizerTest`, `RuleBasedClassifierTest`, `CategoryCacheTest` - the free layers (normalising, keyword rules, LRU cache)
+- `GeminiCategoryClassifierTest` - the Gemini client against a mock server: request shape, batching, retries, 429 cool-down, malformed replies, request budget, counters
+- `CategoryResolverTest`, `CategorizationMetricsTest`, `CategorizationConfigTest` - layering (an `OTHER` from the rules is discarded), counters, wiring
+- `BudgetCategorizationServiceTest` - the use case with mocked repositories (opt-out, in-flight guard, concurrent edit, `OTHER` settles an entry)
+- `BudgetServiceCategoryTest`, `EntryCategoryIntegrationTest`, `BudgetCategorizationIntegrationTest` - which category an entry is stored with, and the endpoint through the whole stack
+
 ---
 
-**Last Updated:** 2026-08-22 (SSE: proxy-buffering fix, immediate heartbeat, own-event filtering; removed dead SseEmitter service)
+**Last Updated:** 2026-10-12 (automatic entry categorization: `POST /api/budgets/{id}/entries/categorize`, optional `category`, `UNCATEGORIZED`, `categorization.*` metrics)

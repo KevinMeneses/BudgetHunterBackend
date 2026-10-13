@@ -17,6 +17,7 @@ import com.budgethunter.dto.UserResponse
 import com.budgethunter.exception.ForbiddenAccessException
 import com.budgethunter.model.Budget
 import com.budgethunter.model.BudgetEntry
+import com.budgethunter.model.EntryCategory
 import com.budgethunter.model.UserBudget
 import com.budgethunter.model.UserBudgetId
 import com.budgethunter.repository.BudgetEntryRepository
@@ -223,11 +224,12 @@ class BudgetService(
         val user = userRepository.findById(authenticatedUserEmail)
             .orElseThrow { IllegalArgumentException("User not found with email: $authenticatedUserEmail") }
 
+        val category = resolveCategory(request.category)
         val newEntry = BudgetEntry(
             budget = budget,
             amount = request.amount,
             description = request.description,
-            category = request.category,
+            category = category,
             type = request.type,
             createdBy = user,
             creationDate = LocalDateTime.now(),
@@ -257,10 +259,11 @@ class BudgetService(
             throw IllegalArgumentException("Budget entry $entryId does not belong to budget $budgetId")
         }
 
+        val category = resolveCategory(request.category, existingEntry)
         val updatedEntry = existingEntry.copy(
             amount = request.amount,
             description = request.description,
-            category = request.category,
+            category = category,
             type = request.type,
             updatedBy = user,
             modificationDate = LocalDateTime.now(),
@@ -301,11 +304,12 @@ class BudgetService(
     }
 
     private fun createNewEntry(request: PutEntryRequest, budget: Budget, user: com.budgethunter.model.User): BudgetEntry {
+        val category = resolveCategory(request.category)
         val newEntry = BudgetEntry(
             budget = budget,
             amount = request.amount,
             description = request.description,
-            category = request.category,
+            category = category,
             type = request.type,
             createdBy = user,
             creationDate = LocalDateTime.now(),
@@ -324,10 +328,11 @@ class BudgetService(
             throw IllegalArgumentException("Budget entry ${request.id} does not belong to budget ${budget.id}")
         }
 
+        val category = resolveCategory(request.category, existingEntry)
         val updatedEntry = existingEntry.copy(
             amount = request.amount,
             description = request.description,
-            category = request.category,
+            category = category,
             type = request.type,
             updatedBy = user,
             modificationDate = LocalDateTime.now(),
@@ -335,6 +340,27 @@ class BudgetService(
         )
 
         return budgetEntryRepository.save(updatedEntry)
+    }
+
+    /**
+     * Decides which category an entry is stored with.
+     *
+     * A category in the request is the user's choice, except [EntryCategory.UNCATEGORIZED] ("Sin categoría"),
+     * which is the absence of one. Without a choice the entry holds [EntryCategory.UNCATEGORIZED], which is all
+     * that makes it eligible for automatic categorisation if the user ever asks for it. That does not depend on
+     * their AI preference, which only decides whether a categorisation may run (and is checked then): an entry
+     * saved while it was off must still be offered once it is on.
+     *
+     * On update, omitting the category leaves the stored one alone.
+     */
+    private fun resolveCategory(requested: String?, existing: BudgetEntry? = null): String {
+        val explicit = requested?.trim()?.takeIf { it.isNotEmpty() && !it.equals(EntryCategory.UNCATEGORIZED, true) }
+        return when {
+            explicit != null -> explicit
+            // Nothing chosen, or "Sin categoría" picked on purpose, which comes to the same.
+            existing == null || !requested.isNullOrBlank() -> EntryCategory.UNCATEGORIZED
+            else -> existing.category
+        }
     }
 
     private fun BudgetEntry.toResponse() = BudgetEntryResponse(

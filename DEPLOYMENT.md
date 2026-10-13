@@ -271,6 +271,27 @@ docker-compose up -d
 | `PORT` | Server port | `8080` |
 | `JWT_EXPIRATION` | JWT token expiration (ms) | `86400000` (24 hours) |
 | `JWT_REFRESH_EXPIRATION` | Refresh token expiration (ms) | `604800000` (7 days) |
+| `GEMINI_API_KEY` | Google AI Studio key for automatic entry categorization. Empty = the server never calls Gemini (the built-in keyword rules still work) | empty |
+| `GEMINI_MODEL` | Gemini model id. Google retires old ones, so check [the model list](https://ai.google.dev/gemini-api/docs/models) | `gemini-3.5-flash-lite` |
+| `GEMINI_MAX_REQUESTS_PER_MINUTE` | Requests to Gemini per minute, kept under the plan's quota | `10` |
+| `CATEGORIZATION_ENABLED` | `false` removes the categorize endpoint and the Gemini client altogether | `true` |
+| `MANAGEMENT_ENDPOINTS_EXPOSED` | Actuator endpoints to expose; add `metrics` to read the `categorization.*` counters (needs a token, see [MONITORING.md](MONITORING.md)) | `health` |
+
+### Automatic categorization (Gemini)
+
+`POST /api/budgets/{id}/entries/categorize` categorizes the entries that have no category. It works with no key
+(keyword rules only, the rest stays `pending`); with one, descriptions the rules do not recognise are sent to
+Gemini. **Only the normalised description text is sent** (no amounts, emails, budget names or reference
+numbers), and only for entries whose creator has AI processing turned on.
+
+1. Create a key at <https://aistudio.google.com/apikey> and put it in the server's `.env` as `GEMINI_API_KEY`
+   (for the deploy workflow, inside the `ENV_FILE` secret). Redeploy; nothing else changes.
+2. The free tier may use submitted content to improve Google's products, and its quota and the model ids change
+   over time. Use a paid key if that matters, and check the quota before relying on it.
+3. Before the first deploy of a build that changed `GEMINI_MODEL`, make one real call (the endpoint above) and
+   look at `categorization.provider.requests` (`ok` vs `http_error`) to confirm the model id still exists.
+4. The app must not send `UNCATEGORIZED` or call the endpoint until the backend with this feature is live: an
+   older server would store the word as if it were a category.
 
 ### Generating a Secure JWT Secret
 

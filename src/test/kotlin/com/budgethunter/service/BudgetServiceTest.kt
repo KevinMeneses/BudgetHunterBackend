@@ -509,7 +509,7 @@ class BudgetServiceTest {
             budget = testBudget,
             amount = request.amount,
             description = request.description,
-            category = request.category,
+            category = request.category!!,
             type = request.type,
             createdBy = testUser,
             creationDate = LocalDateTime.now(),
@@ -562,7 +562,7 @@ class BudgetServiceTest {
         val updatedEntry = existingEntry.copy(
             amount = request.amount,
             description = request.description,
-            category = request.category,
+            category = request.category!!,
             type = request.type,
             updatedBy = testUser,
             modificationDate = LocalDateTime.now()

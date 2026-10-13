@@ -404,6 +404,10 @@ Copy the `authToken` value for authenticated requests and save the `refreshToken
 }
 ```
 
+`category` is optional. Leave it out (or send `"UNCATEGORIZED"`) and the entry is stored as `UNCATEGORIZED`
+("Sin categoría"), which is what [Categorize Budget Entries](#16-categorize-budget-entries) looks for.
+Anything else you send is stored as given and never changed by the automatic categorization.
+
 **Expected Response (201 Created):**
 ```json
 {
@@ -544,6 +548,42 @@ When you receive an event:
 
 ---
 
+## 16. Categorize Budget Entries
+
+Gives an automatic category to the budget's entries that have none (`UNCATEGORIZED`), from their descriptions
+only. Done before the response returns. Entries that already have a category, whoever chose it and `OTHER`
+included, are never touched, so calling it again only looks at what is still uncategorized.
+
+**Method:** POST
+**URL:** `http://localhost:8080/api/budgets/1/entries/categorize`
+**Headers:**
+- Authorization: Bearer YOUR_JWT_TOKEN_HERE
+
+**Body:** None
+
+**Expected Response (200 OK):**
+```json
+{
+  "categorized": 12,
+  "pending": 3
+}
+```
+`pending` are the entries still uncategorized afterwards: ones nobody could place (no answer) or that could not be
+asked yet because the AI provider's quota ran out. Call again later to retry them.
+
+**Errors:**
+- `400` the budget does not exist
+- `401` missing or invalid token
+- `403` no access to the budget, **or AI processing is off for the account** (turn it on in the app's settings,
+  stored as `aiProcessingEnabled` in `PUT /api/users/me/preferences`). Only entries whose creator has it on are
+  considered, so a collaborator who turned it off keeps their entries out of it.
+- `409` a categorization of this budget is already running
+
+Requires `GEMINI_API_KEY` on the server for anything the built-in keyword rules do not recognise; without it
+only the rules answer and the rest stays `pending`. The endpoint does not exist when `CATEGORIZATION_ENABLED=false`.
+
+---
+
 ## cURL Commands (Alternative)
 
 ### Sign Up
@@ -630,6 +670,12 @@ curl -X POST http://localhost:8080/api/budgets/1/entries \
     "category": "Food",
     "type": "OUTCOME"
   }'
+```
+
+### Categorize Budget Entries
+```bash
+curl -X POST http://localhost:8080/api/budgets/1/entries/categorize \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN"
 ```
 
 ### Update Budget Entry
