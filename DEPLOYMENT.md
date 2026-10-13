@@ -272,7 +272,7 @@ docker-compose up -d
 | `JWT_EXPIRATION` | JWT token expiration (ms) | `86400000` (24 hours) |
 | `JWT_REFRESH_EXPIRATION` | Refresh token expiration (ms) | `604800000` (7 days) |
 | `GEMINI_API_KEY` | Google AI Studio key for automatic entry categorization. Empty = the server never calls Gemini (the built-in keyword rules still work) | empty |
-| `GEMINI_MODEL` | Gemini model id. Google retires old ones, so check [the model list](https://ai.google.dev/gemini-api/docs/models) | `gemini-3.1-flash-lite` |
+| `GEMINI_MODEL` | Gemini model id. Google retires old ones, so check [the model list](https://ai.google.dev/gemini-api/docs/models) | `gemini-3.5-flash-lite` |
 | `GEMINI_MAX_REQUESTS_PER_MINUTE` | Requests to Gemini per minute, kept under the plan's quota | `10` |
 | `CATEGORIZATION_ENABLED` | `false` removes the categorize endpoint and the Gemini client altogether | `true` |
 | `MANAGEMENT_ENDPOINTS_EXPOSED` | Actuator endpoints to expose; add `metrics` to read the `categorization.*` counters (needs a token, see [MONITORING.md](MONITORING.md)) | `health` |
