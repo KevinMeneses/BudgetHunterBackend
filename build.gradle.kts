@@ -60,7 +60,7 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-reactor") // Coroutines ↔ Reactor bridge
 
     // OpenAPI/Swagger Documentation
-    implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:2.9.1")
+    implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:2.10.0")
 
     // Rate Limiting (Token Bucket algorithm)
     implementation("com.bucket4j:bucket4j-core:8.10.1")
