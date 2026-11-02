@@ -66,7 +66,7 @@ dependencies {
     implementation("com.bucket4j:bucket4j-core:8.10.1")
 
     // Google ID token verification (Sign in with Google)
-    implementation("com.google.api-client:google-api-client:2.9.1")
+    implementation("com.google.api-client:google-api-client:2.9.2")
 
     // JWT
     implementation("io.jsonwebtoken:jjwt-api:0.13.0")
