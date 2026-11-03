@@ -1,5 +1,8 @@
 package com.budgethunter.exception
 
+import com.budgethunter.dto.ReceiptErrorResponse
+import com.budgethunter.receipts.AiQuotaExceededException
+import com.budgethunter.receipts.ReceiptException
 import org.slf4j.LoggerFactory
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
@@ -57,6 +60,21 @@ class GlobalExceptionHandler {
             message = ex.message ?: "Access denied"
         )
         return ResponseEntity.status(HttpStatus.FORBIDDEN).body(errorResponse)
+    }
+
+    @ExceptionHandler(AiQuotaExceededException::class)
+    fun handleAiQuotaExceeded(ex: AiQuotaExceededException): ResponseEntity<ReceiptErrorResponse> {
+        logger.info("AI quota exceeded (plan {})", ex.usage.plan)
+        val status = HttpStatus.PAYMENT_REQUIRED.value()
+        return ResponseEntity.status(status)
+            .body(ReceiptErrorResponse(status, "AI_QUOTA_EXCEEDED", ex.message ?: "Quota exceeded", ex.usage))
+    }
+
+    @ExceptionHandler(ReceiptException::class)
+    fun handleReceiptException(ex: ReceiptException): ResponseEntity<ReceiptErrorResponse> {
+        logger.warn("Receipt not read: {}", ex.code)
+        return ResponseEntity.status(ex.status)
+            .body(ReceiptErrorResponse(ex.status, ex.code, ex.message ?: "The receipt could not be read"))
     }
 
     @ExceptionHandler(MethodArgumentNotValidException::class)

@@ -125,6 +125,20 @@ server {
         proxy_send_timeout 3600s;
     }
 
+    # Receipt scans carry the whole image or PDF Base64-encoded (up to 12 MB raw, 16 MB on the
+    # wire). Nginx's default client_max_body_size is 1m, which would answer 413 to most photos.
+    location = /api/receipts/extract {
+        client_max_body_size 20m;
+        proxy_pass http://localhost:8080;
+        proxy_http_version 1.1;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+        # The AI can take up to 30s per attempt
+        proxy_read_timeout 120s;
+    }
+
     location / {
         proxy_pass http://localhost:8080;
         proxy_http_version 1.1;

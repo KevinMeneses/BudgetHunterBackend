@@ -3,10 +3,9 @@ package com.budgethunter.categorization
 import com.budgethunter.model.EntryCategory
 
 /**
- * What each category means, in one line. This is the wording the app's receipt prompt uses
- * (`categoryHints` in `CreateBudgetEntryFromImageUseCase`), on purpose: a receipt scanned on the
- * phone and the same purchase categorised here should land in the same category. Change one side
- * and the other has to follow.
+ * What each category means, in one line. Both prompts use it, the categorization one and the receipt one
+ * (`GeminiReceiptExtractor.prompt`), so a scanned receipt and the same purchase categorised from its
+ * description land in the same category.
  */
 object CategoryGuide {
 
