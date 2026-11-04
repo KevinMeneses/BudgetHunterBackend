@@ -64,6 +64,8 @@ run with it off too.
 - `ci.yml` — every PR and push to main: lint, tests + coverage, shellcheck, compose
   validation, actionlint, dependency review.
 - `codeql.yml` — CodeQL security analysis (PRs, main, weekly).
+- `claude-code-review.yml` — once the other checks pass, Claude reviews the PR and comments on it.
+  Needs the `CLAUDE_CODE_OAUTH_TOKEN` secret (`claude setup-token`); skips drafts, Dependabot and forks.
 - `deploy.yml` — manual (*Actions → Deploy → Run workflow*), deploys any branch/tag/SHA by
   running `deploy.sh` with secrets from the `production` environment. See the header of the
   file for the required secrets.

@@ -1,0 +1,107 @@
+name: Claude Code Review
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+
+# A new push replaces the review of the previous one.
+concurrency:
+  group: claude-review-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  # Wait for the other checks of the PR, so Claude does not review code that does not build.
+  wait-for-checks:
+    # Secrets are not available to Dependabot or fork PRs, so the review could only fail there.
+    # Drafts are reviewed once they are marked ready.
+    if: >-
+      !github.event.pull_request.draft &&
+      github.event.pull_request.user.login != 'dependabot[bot]' &&
+      github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    permissions:
+      checks: read
+      statuses: read
+    steps:
+      - name: Wait for status checks
+        uses: lewagon/wait-on-check-action@v1.3.4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+          wait-interval: 10
+          running-workflow-name: wait-for-checks
+          allowed-conclusions: success,skipped,neutral
+
+  claude-review:
+    needs: wait-for-checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: write
+      id-token: write
+
+    steps:
+      - name: Check the Claude token
+        env:
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+        run: |
+          if [ -z "$CLAUDE_CODE_OAUTH_TOKEN" ]; then
+            echo "::error title=Missing secret::CLAUDE_CODE_OAUTH_TOKEN is not set in this repository. Generate one with 'claude setup-token' and add it under Settings > Secrets and variables > Actions."
+            exit 1
+          fi
+
+      - name: Checkout repository
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 1
+
+      - name: Run Claude Code Review
+        id: claude-review
+        uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          prompt: |
+            REPO: ${{ github.repository }}
+            PR NUMBER: ${{ github.event.pull_request.number }}
+
+            Please review this pull request and provide feedback on:
+            - Code quality and best practices
+            - Potential bugs or issues
+            - Performance considerations
+            - Security concerns
+            - Test coverage
+
+            Use the repository's CLAUDE.md for guidance on style and conventions. Be constructive and helpful in your feedback.
+
+            Use `gh pr comment` with your Bash tool to leave your review as a comment on the PR.
+
+          # See https://github.com/anthropics/claude-code-action/blob/main/docs/usage.md
+          # or https://docs.claude.com/en/docs/claude-code/cli-reference for available options
+          claude_args: '--allowed-tools "Bash(gh issue view:*),Bash(gh search:*),Bash(gh issue list:*),Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Bash(gh pr list:*)"'
+
+      # The action hides Claude's output, so a failure only said "is_error:true". This prints
+      # the error Claude returned (e.g. an expired or revoked token), and nothing else.
+      - name: Explain the failure
+        if: failure() && steps.claude-review.outputs.execution_file != ''
+        env:
+          EXECUTION_FILE: ${{ steps.claude-review.outputs.execution_file }}
+        run: |
+          [ -f "$EXECUTION_FILE" ] || exit 0
+          message=$(jq -r '
+            (if type == "array" then . else [.] end)
+            | map(select(.type == "result")) | last // {}
+            | (.result // (.errors // [] | join("; ")) // "")
+          ' "$EXECUTION_FILE" | tr '\r\n' '  ' | head -c 2000)
+          echo "Claude returned: ${message:-<no message>}"
+          case "$message" in
+            *[Aa]uth*|*[Tt]oken*|*[Ll]ogin*|*"API key"*|*401*|*403*)
+              echo "::error title=Claude rejected the token::${message} Regenerate it with 'claude setup-token' and update the CLAUDE_CODE_OAUTH_TOKEN secret." ;;
+            *)
+              echo "::error title=Claude review failed::${message:-See the log of the previous step.}" ;;
+          esac
