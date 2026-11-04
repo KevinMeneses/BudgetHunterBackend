@@ -68,8 +68,15 @@ class ReceiptConfig {
         receiptExtractor: ReceiptExtractor,
         receiptQuotaService: ReceiptQuotaService,
         registry: MeterRegistry,
-        @Value("\${receipts.max-file-bytes:$DEFAULT_MAX_FILE_BYTES}") maxFileBytes: Int
-    ) = ReceiptService(receiptExtractor, receiptQuotaService, maxFileBytes, registry)
+        @Value("\${receipts.max-file-bytes:$DEFAULT_MAX_FILE_BYTES}") maxFileBytes: Int,
+        @Value("\${receipts.max-scans-per-user-per-minute:$DEFAULT_MAX_SCANS_PER_USER_PER_MINUTE}") perUserPerMinute: Int
+    ) = ReceiptService(
+        receiptExtractor,
+        receiptQuotaService,
+        ReceiptFileValidator(maxFileBytes),
+        ScanRateLimiter(perUserPerMinute),
+        registry
+    )
 
     private companion object {
         // Model ids come and go, so this is only a default (the one the app used to call).
@@ -78,6 +85,9 @@ class ReceiptConfig {
         const val DEFAULT_TIMEOUT_SECONDS = 30L
         const val DEFAULT_FREE_MONTHLY_SCANS = 10
         const val DEFAULT_PREMIUM_MONTHLY_SCANS = 200
+
+        // Well above a person scanning receipts by hand, well below what drains the server-wide budget.
+        const val DEFAULT_MAX_SCANS_PER_USER_PER_MINUTE = 6
 
         // 12 MB raw, the size the app already caps PDFs at; Base64 makes it 16 MB on the wire.
         const val DEFAULT_MAX_FILE_BYTES = 12 * 1024 * 1024

@@ -279,6 +279,7 @@ docker-compose up -d
 | `RECEIPTS_MAX_REQUESTS_PER_MINUTE` | Receipt requests to Gemini per minute for the whole server; above it a scan answers `503 AI_BUSY` | `30` |
 | `RECEIPTS_FREE_MONTHLY_SCANS` | Receipt scans a `FREE` account gets per UTC calendar month | `10` |
 | `RECEIPTS_PREMIUM_MONTHLY_SCANS` | Receipt scans a `PREMIUM` account gets per month (fair-use cap) | `200` |
+| `RECEIPTS_MAX_SCANS_PER_USER_PER_MINUTE` | Scans one account may start per minute; above it `429 TOO_MANY_SCANS` | `6` |
 | `RECEIPTS_ENABLED` | `false` removes the receipt endpoints altogether | `true` |
 | `MANAGEMENT_ENDPOINTS_EXPOSED` | Actuator endpoints to expose; add `metrics` to read the `categorization.*` counters (needs a token, see [MONITORING.md](MONITORING.md)) | `health` |
 
@@ -313,7 +314,8 @@ store purchase says otherwise) and a number of scans per UTC month (`ai_usage`);
 2. **Order:** deploy this backend before releasing an app build that reads receipts through it; an older server
    answers 404 and the app shows the generic "could not read the file" message.
 3. Migration `V4__add_plan_and_ai_usage.sql` adds the column and the table; Flyway applies it on startup.
-4. Watch `receipts.scans` (see MONITORING.md): many `ai_unavailable` means the key or the model id is wrong.
+4. After the first deploy, scan one real receipt and check `receipts.scans` (see MONITORING.md): `read` means the
+   key and `RECEIPTS_GEMINI_MODEL` work; `ai_unavailable` or `ai_rejected` usually means a wrong key or model id.
 
 ### Generating a Secure JWT Secret
 

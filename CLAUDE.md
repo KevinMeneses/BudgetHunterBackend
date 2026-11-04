@@ -180,14 +180,18 @@ asks Gemini (`GeminiReceiptExtractor`, prompt kept here) and answers what it rea
 - **Plans:** `users.plan` is `FREE` or `PREMIUM` (`model/Plan.kt`); everyone starts `FREE`. The store purchase
   (RevenueCat, next step) is what will set `PREMIUM`.
 - **Quota:** `ai_usage` holds receipt scans per account and UTC month ('YYYY-MM'), one row per month, so nothing
-  resets. `ReceiptQuotaService` takes a scan *before* asking the AI with a conditional `UPDATE ... WHERE
+  resets. The row is created with a native `INSERT ... WHERE NOT EXISTS`, never by saving the entity (a merge
+  could write 0 over a counter another request just raised). `ReceiptQuotaService` takes a scan *before* asking the AI with a conditional `UPDATE ... WHERE
   receipt_scans < limit` (no race) and gives it back when the AI fails on its side (`ReceiptFailure`). A file
   that is not a receipt still counts. Past the limit: `402` with code `AI_QUOTA_EXCEEDED` and the usage.
   `GET /api/receipts/usage` returns the month's count.
-- **Errors:** `ReceiptErrorResponse` with a `code` (`TOO_LARGE` 413, `UNSUPPORTED_TYPE` 415, `AI_BLOCKED` 422,
+- **Checks before counting** (`ReceiptFileValidator`): type, padded Base64, size from length and padding, and the
+  first bytes must match the type (JPEG/PNG/WEBP/`%PDF`); no full decode. Then `ScanRateLimiter`: scans per account
+  per minute (failed scans are refunded, so this stops free retries; the IP limiter trusts `X-Forwarded-For`).
+- **Errors:** `ReceiptErrorResponse` with a `code` (`TOO_MANY_SCANS` 429, `TOO_LARGE` 413, `UNSUPPORTED_TYPE` 415, `AI_BLOCKED` 422,
   `AI_INVALID_RESPONSE`/`AI_REJECTED` 502, `AI_UNAVAILABLE`/`AI_BUSY` 503, `AI_TIMEOUT` 504).
 - **Config:** `RECEIPTS_FREE_MONTHLY_SCANS` (10), `RECEIPTS_PREMIUM_MONTHLY_SCANS` (200, fair use),
-  `RECEIPTS_GEMINI_MODEL`, `RECEIPTS_MAX_REQUESTS_PER_MINUTE`, `RECEIPTS_ENABLED`; defaults in `ReceiptConfig`.
+  `RECEIPTS_MAX_SCANS_PER_USER_PER_MINUTE` (6), `RECEIPTS_GEMINI_MODEL`, `RECEIPTS_MAX_REQUESTS_PER_MINUTE`, `RECEIPTS_ENABLED`; defaults in `ReceiptConfig`.
   Shares `GEMINI_API_KEY` (empty = every scan answers 503 and is given back). Counter: `receipts.scans`.
 - Nginx needs `client_max_body_size 20m` on that path (see `setup-ssl.sh`, DEPLOYMENT.md).
 

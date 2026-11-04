@@ -4,8 +4,10 @@ import com.budgethunter.dto.SignInRequest
 import com.budgethunter.dto.SignInResponse
 import com.budgethunter.dto.SignUpRequest
 import com.budgethunter.model.Plan
+import com.budgethunter.receipts.AiQuotaExceededException
 import com.budgethunter.receipts.ReceiptExtractor
 import com.budgethunter.receipts.ReceiptFailure
+import com.budgethunter.receipts.ReceiptQuotaService
 import com.budgethunter.receipts.ReceiptReading
 import com.budgethunter.repository.UserRepository
 import com.fasterxml.jackson.databind.ObjectMapper
@@ -31,6 +33,8 @@ import java.time.YearMonth
 import java.time.ZoneOffset
 import java.util.Base64
 import java.util.UUID
+import java.util.concurrent.Callable
+import java.util.concurrent.Executors
 
 /**
  * `POST /api/receipts/extract` and `GET /api/receipts/usage` through the whole stack, with a fake AI so the
@@ -40,7 +44,8 @@ import java.util.UUID
     properties = [
         "receipts.free-monthly-scans=2",
         "receipts.premium-monthly-scans=3",
-        "receipts.max-file-bytes=64"
+        "receipts.max-file-bytes=64",
+        "receipts.max-scans-per-user-per-minute=5"
     ]
 )
 @AutoConfigureMockMvc
@@ -52,6 +57,7 @@ class ReceiptIntegrationTest {
         @Primary
         fun fakeReceiptExtractor() = ReceiptExtractor { _, _, today ->
             seenToday = today
+            if (throwNext) error("extractor bug")
             next
         }
     }
@@ -60,6 +66,14 @@ class ReceiptIntegrationTest {
         @Volatile var next: ReceiptReading = ReceiptReading.NotAReceipt
 
         @Volatile var seenToday: LocalDate? = null
+
+        @Volatile var throwNext = false
+
+        const val PARALLEL_REQUESTS = 20
+
+        /** The start of a JPEG: enough for the content check, which only reads the first bytes. */
+        val JPEG: ByteArray = byteArrayOf(0xFF.toByte(), 0xD8.toByte(), 0xFF.toByte(), 0xE0.toByte()) +
+            "fake jpeg bytes".toByteArray()
     }
 
     @Autowired private lateinit var mockMvc: MockMvc
@@ -68,15 +82,18 @@ class ReceiptIntegrationTest {
 
     @Autowired private lateinit var userRepository: UserRepository
 
+    @Autowired private lateinit var quotaService: ReceiptQuotaService
+
     private val email = "receipts-${UUID.randomUUID().toString().take(8)}@example.com"
     private lateinit var token: String
-    private val file = Base64.getEncoder().encodeToString("fake jpeg bytes".toByteArray())
+    private val file = Base64.getEncoder().encodeToString(JPEG)
     private val read = ReceiptReading.Read(BigDecimal("45900"), "Éxito", "GROCERIES", LocalDate.parse("2026-11-02"))
 
     @BeforeEach
     fun setup() {
         next = read
         seenToday = null
+        throwNext = false
         mockMvc.perform(
             post("/api/users/sign_up").contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(SignUpRequest(email, "User", "Password123!")))
@@ -218,5 +235,51 @@ class ReceiptIntegrationTest {
     @Test
     fun `without a token there is no scan`() {
         extract(auth = null).andExpect(status().isUnauthorized)
+    }
+
+    @Test
+    fun `an extractor that throws gives the scan back`() {
+        throwNext = true
+        extract().andExpect(status().isServiceUnavailable).andExpect(jsonPath("$.code").value("AI_UNAVAILABLE"))
+        usage().andExpect(jsonPath("$.receiptScansUsed").value(0))
+    }
+
+    @Test
+    fun `content that does not match the declared type is 415 and costs nothing`() {
+        val pdf = Base64.getEncoder().encodeToString("%PDF-1.7 tiny".toByteArray())
+        extract(data = pdf, mimeType = "image/jpeg").andExpect(status().isUnsupportedMediaType)
+            .andExpect(jsonPath("$.code").value("UNSUPPORTED_TYPE"))
+        extract(data = pdf, mimeType = "application/pdf").andExpect(status().isOk)
+        usage().andExpect(jsonPath("$.receiptScansUsed").value(1))
+    }
+
+    @Test
+    fun `an account is limited per minute, even when its scans are given back`() {
+        next = ReceiptReading.Failed(ReceiptFailure.INVALID_RESPONSE)
+        repeat(5) { extract().andExpect(status().isBadGateway) }
+        extract().andExpect(status().isTooManyRequests).andExpect(jsonPath("$.code").value("TOO_MANY_SCANS"))
+        usage().andExpect(jsonPath("$.receiptScansUsed").value(0))
+    }
+
+    @Test
+    fun `parallel scans never go over the allowance`() {
+        val pool = Executors.newFixedThreadPool(PARALLEL_REQUESTS)
+        try {
+            val attempts = (1..PARALLEL_REQUESTS).map {
+                Callable {
+                    try {
+                        quotaService.reserve(email)
+                        true
+                    } catch (_: AiQuotaExceededException) {
+                        false
+                    }
+                }
+            }
+            val granted = pool.invokeAll(attempts).count { it.get() }
+            assertEquals(2, granted)
+        } finally {
+            pool.shutdown()
+        }
+        usage().andExpect(jsonPath("$.receiptScansUsed").value(2))
     }
 }

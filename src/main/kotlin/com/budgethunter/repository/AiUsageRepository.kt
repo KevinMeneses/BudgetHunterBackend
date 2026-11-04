@@ -29,6 +29,21 @@ interface AiUsageRepository : JpaRepository<AiUsage, AiUsageId> {
         @Param("limit") limit: Int
     ): Int
 
+    /**
+     * Creates the month's row with nothing used, unless it exists. Never touches an existing row: saving the
+     * entity instead would be a merge, which could write 0 over a counter another request just raised. Two
+     * requests racing here make the second fail on the primary key, which the caller ignores.
+     */
+    @Modifying
+    @Transactional
+    @Query(
+        value = "INSERT INTO ai_usage (user_email, period, receipt_scans) " +
+            "SELECT :email, :period, 0 WHERE NOT EXISTS " +
+            "(SELECT 1 FROM ai_usage WHERE user_email = :email AND period = :period)",
+        nativeQuery = true
+    )
+    fun createIfMissing(@Param("email") email: String, @Param("period") period: String): Int
+
     /** Gives back a scan that was taken for a request that then failed on our side or the AI's. */
     @Modifying
     @Transactional

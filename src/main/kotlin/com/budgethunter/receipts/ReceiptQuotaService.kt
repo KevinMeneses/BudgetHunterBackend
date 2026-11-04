@@ -1,7 +1,6 @@
 package com.budgethunter.receipts
 
 import com.budgethunter.dto.AiUsageResponse
-import com.budgethunter.model.AiUsage
 import com.budgethunter.model.AiUsageId
 import com.budgethunter.model.Plan
 import com.budgethunter.repository.AiUsageRepository
@@ -81,10 +80,8 @@ class ReceiptQuotaService(
 
     /** The first request of the month creates the row; losing that race to a parallel request is fine. */
     private fun ensureRow(email: String, period: String) {
-        val id = AiUsageId(email, period)
-        if (aiUsageRepository.existsById(id)) return
         try {
-            aiUsageRepository.saveAndFlush(AiUsage(id))
+            aiUsageRepository.createIfMissing(email, period)
         } catch (_: DataIntegrityViolationException) {
             // Another request created it first.
         }

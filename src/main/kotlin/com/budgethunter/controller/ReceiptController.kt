@@ -36,8 +36,8 @@ class ReceiptController(
         summary = "Read a receipt, invoice or bill",
         description = "Sends the file to the AI and answers what it read. Each call takes one scan from the " +
             "month's allowance (FREE and PREMIUM have different ones), including a file that turns out not to be " +
-            "a receipt; a failure on the AI's side gives the scan back. Nothing is stored: the client fills its " +
-            "form with the answer."
+            "a receipt; a failure on the AI's side gives the scan back. An account may start a few scans per " +
+            "minute. Nothing is stored: the client fills its form with the answer."
     )
     @ApiResponses(
         value = [
@@ -53,16 +53,41 @@ class ReceiptController(
                 description = "No scans left this month (code AI_QUOTA_EXCEEDED, with the usage)",
                 content = [Content(schema = Schema(implementation = ReceiptErrorResponse::class))]
             ),
-            ApiResponse(responseCode = "413", description = "File too large (TOO_LARGE)", content = [Content()]),
-            ApiResponse(responseCode = "415", description = "Unsupported type (UNSUPPORTED_TYPE)", content = [Content()]),
-            ApiResponse(responseCode = "422", description = "The AI refused the content (AI_BLOCKED)", content = [Content()]),
+            ApiResponse(
+                responseCode = "429",
+                description = "Too many scans from this account in the last minute (TOO_MANY_SCANS)",
+                content = [Content(schema = Schema(implementation = ReceiptErrorResponse::class))]
+            ),
+            ApiResponse(
+                responseCode = "413",
+                description = "File too large (TOO_LARGE)",
+                content = [Content(schema = Schema(implementation = ReceiptErrorResponse::class))]
+            ),
+            ApiResponse(
+                responseCode = "415",
+                description = "Unsupported type (UNSUPPORTED_TYPE)",
+                content = [Content(schema = Schema(implementation = ReceiptErrorResponse::class))]
+            ),
+            ApiResponse(
+                responseCode = "422",
+                description = "The AI refused the content (AI_BLOCKED)",
+                content = [Content(schema = Schema(implementation = ReceiptErrorResponse::class))]
+            ),
             ApiResponse(
                 responseCode = "502",
                 description = "The AI's answer could not be used (AI_INVALID_RESPONSE, AI_REJECTED)",
-                content = [Content()]
+                content = [Content(schema = Schema(implementation = ReceiptErrorResponse::class))]
             ),
-            ApiResponse(responseCode = "503", description = "AI unavailable or busy (AI_UNAVAILABLE, AI_BUSY)", content = [Content()]),
-            ApiResponse(responseCode = "504", description = "The AI took too long (AI_TIMEOUT)", content = [Content()])
+            ApiResponse(
+                responseCode = "503",
+                description = "AI unavailable or busy (AI_UNAVAILABLE, AI_BUSY)",
+                content = [Content(schema = Schema(implementation = ReceiptErrorResponse::class))]
+            ),
+            ApiResponse(
+                responseCode = "504",
+                description = "The AI took too long (AI_TIMEOUT)",
+                content = [Content(schema = Schema(implementation = ReceiptErrorResponse::class))]
+            )
         ]
     )
     fun extract(
