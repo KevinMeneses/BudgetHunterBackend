@@ -280,6 +280,7 @@ docker-compose up -d
 | `RECEIPTS_FREE_MONTHLY_SCANS` | Receipt scans a `FREE` account gets per UTC calendar month | `10` |
 | `RECEIPTS_PREMIUM_MONTHLY_SCANS` | Receipt scans a `PREMIUM` account gets per month (fair-use cap) | `200` |
 | `RECEIPTS_MAX_SCANS_PER_USER_PER_MINUTE` | Scans one account may start per minute; above it `429 TOO_MANY_SCANS` | `6` |
+| `RECEIPTS_MAX_CONCURRENT_SCANS` | Scans in flight at once on the server; above it `503 AI_BUSY` (bounds memory and threads) | `8` |
 | `RECEIPTS_ENABLED` | `false` removes the receipt endpoints altogether | `true` |
 | `MANAGEMENT_ENDPOINTS_EXPOSED` | Actuator endpoints to expose; add `metrics` to read the `categorization.*` counters (needs a token, see [MONITORING.md](MONITORING.md)) | `health` |
 

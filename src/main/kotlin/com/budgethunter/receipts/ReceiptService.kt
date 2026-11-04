@@ -9,6 +9,7 @@ import org.slf4j.LoggerFactory
 import java.time.LocalDate
 import java.time.ZoneOffset
 import java.time.format.DateTimeParseException
+import java.util.concurrent.Semaphore
 
 /** Thrown for a request that cannot be read or the AI could not handle; carries the HTTP answer. */
 class ReceiptException(val status: Int, val code: String, message: String) : RuntimeException(message) {
@@ -32,14 +33,20 @@ class ReceiptService(
     private val quota: ReceiptQuotaService,
     private val fileValidator: ReceiptFileValidator,
     private val rateLimiter: ScanRateLimiter,
-    private val registry: MeterRegistry = SimpleMeterRegistry()
+    private val registry: MeterRegistry = SimpleMeterRegistry(),
+    maxConcurrentScans: Int = DEFAULT_MAX_CONCURRENT_SCANS
 ) {
+
+    // Each scan holds its file (up to 16 MB of Base64, plus the copy sent to Gemini) and a request thread for up to
+    // a minute; past this many at once the next one answers AI_BUSY instead of piling up.
+    private val inFlight = Semaphore(maxConcurrentScans)
 
     private val log = LoggerFactory.getLogger(ReceiptService::class.java)
 
     fun extract(request: ReceiptExtractionRequest, email: String): ReceiptExtractionResponse {
         val (data, mimeType) = fileValidator.validate(request.data, request.mimeType)
         val today = parseToday(request.today)
+        // Before the allowance on purpose: a client retrying after a 402 is throttled too, without a query.
         rateLimiter.check(email)
 
         val (reservation, usage) = try {
@@ -55,7 +62,7 @@ class ReceiptService(
         try {
             @Suppress("TooGenericExceptionCaught") // On purpose: an extractor bug must not cost the user a scan.
             val reading = try {
-                extractor.extract(data, mimeType, today)
+                extractWithinLimit(data, mimeType, today)
             } catch (e: RuntimeException) {
                 log.error("Receipt extractor threw; giving the scan back", e)
                 ReceiptReading.Failed(ReceiptFailure.UNAVAILABLE)
@@ -64,6 +71,18 @@ class ReceiptService(
             return respond(reading, usage)
         } finally {
             if (!keepScan) giveBack(reservation)
+        }
+    }
+
+    private fun extractWithinLimit(data: String, mimeType: String, today: LocalDate): ReceiptReading {
+        if (!inFlight.tryAcquire()) {
+            log.warn("Too many receipt scans in flight; answering busy")
+            return ReceiptReading.Failed(ReceiptFailure.BUSY)
+        }
+        try {
+            return extractor.extract(data, mimeType, today)
+        } finally {
+            inFlight.release()
         }
     }
 
@@ -112,4 +131,8 @@ class ReceiptService(
     }
 
     private fun count(outcome: String) = registry.counter("receipts.scans", "outcome", outcome).increment()
+
+    private companion object {
+        const val DEFAULT_MAX_CONCURRENT_SCANS = 8
+    }
 }

@@ -12,6 +12,10 @@
 
 ALTER TABLE users ADD COLUMN IF NOT EXISTS plan VARCHAR(20) NOT NULL DEFAULT 'FREE';
 
+-- A value the app does not know would fail the enum mapping on every request of that user.
+ALTER TABLE users DROP CONSTRAINT IF EXISTS users_plan_check;
+ALTER TABLE users ADD CONSTRAINT users_plan_check CHECK (plan IN ('FREE', 'PREMIUM'));
+
 CREATE TABLE IF NOT EXISTS ai_usage (
     user_email VARCHAR(255) NOT NULL REFERENCES users(email) ON DELETE CASCADE,
     period VARCHAR(7) NOT NULL,
