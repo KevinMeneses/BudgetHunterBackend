@@ -23,12 +23,31 @@ java {
 // bypass via a fragmented TLS ClientHello, fixed in 4.1.137.Final). Netty arrives through
 // reactor-netty and terminates no TLS here - the app serves plain HTTP on Tomcat behind Nginx -
 // but this is a patch-line bump, far cheaper than carrying an exception in the dependency review.
-extra["netty.version"] = "4.1.138.Final"
+// 4.1.140.Final also fixes the November 2026 batch (out-of-bounds reads in netty-buffer
+// GHSA-m77g-r4c7-3w77 / GHSA-rx4g-qxm6-238r / GHSA-qhw9-p586-v948, mTLS bypass via session
+// resumption GHSA-6xv6-9mgg-mfvc, unbounded memory in codec-http2 GHSA-hc9x-r52h-gh4x, ...)
+// and the haproxy parser desync fixed in 4.1.139.Final.
+extra["netty.version"] = "4.1.140.Final"
 
 // Boot 3.5.16 pins tomcat 10.1.55, affected by three critical advisories fixed in 10.1.58:
 // GHSA-9xv2-5v5q-p794 (DIGEST auth capture-replay), GHSA-gcx9-497g-6cp6 (improper access
-// control) and GHSA-h3x4-894j-xpx5 (FORM auth incorrect authorization).
-extra["tomcat.version"] = "10.1.60"
+// control) and GHSA-h3x4-894j-xpx5 (FORM auth incorrect authorization). 10.1.61 fixes the
+// October 2026 batch, among them CVE-2026-101356 (HTTP/2 request/response mix-up between users
+// after an error in async processing, 10.1.55-10.1.60) and CVE-2026-101296 (JNDIRealm bind
+// fails open for non-GSSAPI SASL).
+extra["tomcat.version"] = "10.1.61"
+
+// Boot 3.5.16 pins jackson 2.21.4, affected by GHSA-q4xh-88c3-wmh7 / CVE-2026-68497 (High, 7.5:
+// unauthenticated CPU DoS binding long strings to Duration/XMLGregorianCalendar, fixed in 2.21.6)
+// and GHSA-5gvw-p9qm-jgwh / CVE-2026-59889 (@JsonView not enforced on @JsonUnwrapped on
+// deserialization, fixed in 2.21.5). Every request body goes through Jackson, so this is the most
+// exposed override here.
+extra["jackson-bom.version"] = "2.21.8"
+
+// Boot 3.5.16 pins logback 1.5.34, affected by CVE-2026-13006 (Janino <if> condition bypass,
+// fully fixed in 1.5.37). Exploiting it needs control of the logging config, so the risk here is
+// low, but it is a patch-line bump.
+extra["logback.version"] = "1.5.38"
 
 // Boot 3.5.16 pins the PostgreSQL driver at 42.7.11, affected by GHSA-j92g-9f8w-j867: a server
 // offering unsupported certificate algorithms silently downgrades channel-binding auth instead
