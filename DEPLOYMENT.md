@@ -275,6 +275,13 @@ docker-compose up -d
 | `GEMINI_MODEL` | Gemini model id. Google retires old ones, so check [the model list](https://ai.google.dev/gemini-api/docs/models) | `gemini-3.5-flash-lite` |
 | `GEMINI_MAX_REQUESTS_PER_MINUTE` | Requests to Gemini per minute, kept under the plan's quota | `10` |
 | `CATEGORIZATION_ENABLED` | `false` removes the categorize endpoint and the Gemini client altogether | `true` |
+| `RECEIPTS_GEMINI_MODEL` | Gemini model that reads receipts (multimodal; uses the same `GEMINI_API_KEY`) | `gemini-3.8-flash` |
+| `RECEIPTS_MAX_REQUESTS_PER_MINUTE` | Receipt requests to Gemini per minute for the whole server; above it a scan answers `503 AI_BUSY` | `30` |
+| `RECEIPTS_FREE_MONTHLY_SCANS` | Receipt scans a `FREE` account gets per UTC calendar month | `10` |
+| `RECEIPTS_PREMIUM_MONTHLY_SCANS` | Receipt scans a `PREMIUM` account gets per month (fair-use cap) | `200` |
+| `RECEIPTS_MAX_SCANS_PER_USER_PER_MINUTE` | Scans one account may start per minute; above it `429 TOO_MANY_SCANS` | `6` |
+| `RECEIPTS_MAX_CONCURRENT_SCANS` | Scans in flight at once on the server; above it `503 AI_BUSY` (bounds memory and threads) | `8` |
+| `RECEIPTS_ENABLED` | `false` removes the receipt endpoints altogether | `true` |
 | `MANAGEMENT_ENDPOINTS_EXPOSED` | Actuator endpoints to expose; add `metrics` to read the `categorization.*` counters (needs a token, see [MONITORING.md](MONITORING.md)) | `health` |
 
 ### Automatic categorization (Gemini)
@@ -292,6 +299,24 @@ numbers), and only for entries whose creator has AI processing turned on.
    look at `categorization.provider.requests` (`ok` vs `http_error`) to confirm the model id still exists.
 4. The app must not send `UNCATEGORIZED` or call the endpoint until the backend with this feature is live: an
    older server would store the word as if it were a category.
+
+### Receipt reading (Gemini) and monthly scans
+
+`POST /api/receipts/extract` reads a receipt photo or PDF for the app, which used to call Gemini itself with the
+key inside the binary. **The whole file is sent to Gemini**, so a paid key matters even more here than for
+categorization (the free tier may use submitted content). Every account has a plan (`users.plan`, `FREE` until a
+store purchase says otherwise) and a number of scans per UTC month (`ai_usage`); past it the endpoint answers
+`402 AI_QUOTA_EXCEEDED`. `GET /api/receipts/usage` returns the month's count.
+
+1. **Nginx:** a receipt is up to 16 MB of Base64, and Nginx's default `client_max_body_size` is 1 MB.
+   `setup-ssl.sh` now adds a `location = /api/receipts/extract` block with `client_max_body_size 20m` and a
+   120 s read timeout. A server configured before this change needs that block added by hand to
+   `/etc/nginx/sites-available/budgethunter` (copy it from `setup-ssl.sh`), then `nginx -t && systemctl reload nginx`.
+2. **Order:** deploy this backend before releasing an app build that reads receipts through it; an older server
+   answers 404 and the app shows the generic "could not read the file" message.
+3. Migration `V4__add_plan_and_ai_usage.sql` adds the column and the table; Flyway applies it on startup.
+4. After the first deploy, scan one real receipt and check `receipts.scans` (see MONITORING.md): `read` means the
+   key and `RECEIPTS_GEMINI_MODEL` work; `ai_unavailable` or `ai_rejected` usually means a wrong key or model id.
 
 ### Generating a Secure JWT Secret
 

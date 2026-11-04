@@ -36,7 +36,17 @@ CREATE TABLE IF NOT EXISTS users (
     sms_reading_enabled BOOLEAN,
     ai_processing_enabled BOOLEAN,
     default_budget_id BIGINT,
-    selected_bank_ids VARCHAR(1000)
+    selected_bank_ids VARCHAR(1000),
+    -- What the account paid for (FREE / PREMIUM); see V4__add_plan_and_ai_usage.sql.
+    plan VARCHAR(20) NOT NULL DEFAULT 'FREE' CONSTRAINT users_plan_check CHECK (plan IN ('FREE', 'PREMIUM'))
+);
+
+-- Paid AI used per account and UTC calendar month ('YYYY-MM'); see V4__add_plan_and_ai_usage.sql.
+CREATE TABLE IF NOT EXISTS ai_usage (
+    user_email VARCHAR(255) NOT NULL REFERENCES users(email) ON DELETE CASCADE,
+    period VARCHAR(7) NOT NULL,
+    receipt_scans INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY (user_email, period)
 );
 
 -- Budgets table

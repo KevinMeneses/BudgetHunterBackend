@@ -61,6 +61,11 @@ data class User(
     @field:Column(name = "selected_bank_ids", length = 1000)
     var selectedBankIds: String? = null,
 
+    // What the account paid for; decides how much paid AI it gets (see ReceiptQuotaService).
+    @field:Enumerated(EnumType.STRING)
+    @field:Column(name = "plan", nullable = false, length = 20)
+    var plan: Plan = Plan.FREE,
+
     @field:OneToMany(mappedBy = "user", cascade = [CascadeType.ALL], orphanRemoval = true)
     val userBudgets: MutableList<UserBudget> = mutableListOf()
 )
