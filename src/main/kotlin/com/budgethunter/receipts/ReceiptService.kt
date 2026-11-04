@@ -1,5 +1,6 @@
 package com.budgethunter.receipts
 
+import com.budgethunter.dto.AiUsageResponse
 import com.budgethunter.dto.ReceiptExtractionRequest
 import com.budgethunter.dto.ReceiptExtractionResponse
 import io.micrometer.core.instrument.MeterRegistry
@@ -48,36 +49,53 @@ class ReceiptService(
             throw e
         }
 
-        @Suppress("TooGenericExceptionCaught") // On purpose: whatever went wrong, the reserved scan goes back.
-        val reading = try {
-            extractor.extract(data, mimeType, today)
-        } catch (e: RuntimeException) {
-            // Extractors are meant to answer Failed, never throw; if one does, the user must not pay for it.
-            log.error("Receipt extractor threw; giving the scan back", e)
-            ReceiptReading.Failed(ReceiptFailure.UNAVAILABLE)
+        // The scan is kept only when the AI answered; on any other way out (a Failed answer, an exception, even an
+        // Error) the finally gives it back.
+        var keepScan = false
+        try {
+            @Suppress("TooGenericExceptionCaught") // On purpose: an extractor bug must not cost the user a scan.
+            val reading = try {
+                extractor.extract(data, mimeType, today)
+            } catch (e: RuntimeException) {
+                log.error("Receipt extractor threw; giving the scan back", e)
+                ReceiptReading.Failed(ReceiptFailure.UNAVAILABLE)
+            }
+            keepScan = reading !is ReceiptReading.Failed
+            return respond(reading, usage)
+        } finally {
+            if (!keepScan) giveBack(reservation)
         }
+    }
 
-        return when (reading) {
-            is ReceiptReading.Read -> {
-                count("read")
-                ReceiptExtractionResponse(
-                    isReceipt = true,
-                    amount = reading.amount,
-                    description = reading.description,
-                    category = reading.category,
-                    date = reading.date.toString(),
-                    usage = usage
-                )
-            }
-            ReceiptReading.NotAReceipt -> {
-                count("not_a_receipt")
-                ReceiptExtractionResponse(isReceipt = false, usage = usage)
-            }
-            is ReceiptReading.Failed -> {
-                count(reading.reason.code.lowercase())
-                quota.release(reservation)
-                throw ReceiptException(reading.reason)
-            }
+    private fun respond(reading: ReceiptReading, usage: AiUsageResponse): ReceiptExtractionResponse = when (reading) {
+        is ReceiptReading.Read -> {
+            count("read")
+            ReceiptExtractionResponse(
+                isReceipt = true,
+                amount = reading.amount,
+                description = reading.description,
+                category = reading.category,
+                date = reading.date.toString(),
+                usage = usage
+            )
+        }
+        ReceiptReading.NotAReceipt -> {
+            count("not_a_receipt")
+            ReceiptExtractionResponse(isReceipt = false, usage = usage)
+        }
+        is ReceiptReading.Failed -> {
+            count(reading.reason.code.lowercase())
+            throw ReceiptException(reading.reason)
+        }
+    }
+
+    /** Never throws: a failed refund is logged, and must not hide the answer the user is owed. */
+    @Suppress("TooGenericExceptionCaught")
+    private fun giveBack(reservation: ReceiptQuotaService.Reservation) {
+        try {
+            quota.release(reservation)
+        } catch (e: RuntimeException) {
+            log.error("Could not give back a receipt scan for period {}", reservation.period, e)
         }
     }
 

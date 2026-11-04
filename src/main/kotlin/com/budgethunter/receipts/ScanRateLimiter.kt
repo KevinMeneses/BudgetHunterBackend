@@ -10,6 +10,7 @@ import java.util.Collections
  * account, not the IP (the IP limiter trusts a client-supplied X-Forwarded-For).
  *
  * In memory and bounded (least recently used accounts are forgotten), which is fine for a per-minute window.
+ * Per server instance: with several instances behind a load balancer the effective limit multiplies.
  */
 class ScanRateLimiter(private val scansPerMinute: Int) {
 
@@ -25,7 +26,9 @@ class ScanRateLimiter(private val scansPerMinute: Int) {
 
     /** Throws [ReceiptException] (429 `TOO_MANY_SCANS`) when the account scanned too much in the last minute. */
     fun check(email: String) {
-        val bucket = buckets.getOrPut(email) { newBucket() }
+        // getOrPut is a get then a put; holding the map's lock makes it one step, so two first requests
+        // from an account cannot each get a fresh bucket.
+        val bucket = synchronized(buckets) { buckets.getOrPut(email) { newBucket() } }
         if (!bucket.tryConsume(1)) {
             throw ReceiptException(TOO_MANY_REQUESTS, "TOO_MANY_SCANS", "Too many scans; try again in a minute")
         }
