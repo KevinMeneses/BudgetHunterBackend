@@ -69,21 +69,16 @@ class BudgetService(
             id = savedBudget.id!!,
             name = savedBudget.name,
             amount = savedBudget.amount,
-            date = savedBudget.date
+            date = savedBudget.date,
+            collaboratorCount = 1
         )
     }
 
     @Transactional(readOnly = true)
     fun getBudgetsByUserEmail(userEmail: String): List<BudgetResponse> {
         val budgets = userBudgetRepository.findBudgetsByUserEmail(userEmail)
-        return budgets.map { budget ->
-            BudgetResponse(
-                id = budget.id!!,
-                name = budget.name,
-                amount = budget.amount,
-                date = budget.date
-            )
-        }
+        val counts = collaboratorCounts(budgets)
+        return budgets.map { it.toResponse(counts) }
     }
 
     @Transactional(readOnly = true)
@@ -97,14 +92,8 @@ class BudgetService(
         val pageable = PageRequest.of(page, size, sort)
         val budgetsPage = userBudgetRepository.findBudgetsByUserEmail(userEmail, pageable)
 
-        return budgetsPage.toPageResponse { budget ->
-            BudgetResponse(
-                id = budget.id!!,
-                name = budget.name,
-                amount = budget.amount,
-                date = budget.date
-            )
-        }
+        val counts = collaboratorCounts(budgetsPage.content)
+        return budgetsPage.toPageResponse { it.toResponse(counts) }
     }
 
     @Transactional
@@ -126,7 +115,8 @@ class BudgetService(
             id = savedBudget.id!!,
             name = savedBudget.name,
             amount = savedBudget.amount,
-            date = savedBudget.date
+            date = savedBudget.date,
+            collaboratorCount = userBudgetRepository.countByBudgetId(budgetId).toInt()
         )
     }
 
@@ -362,6 +352,21 @@ class BudgetService(
             else -> existing.category
         }
     }
+
+    /** One grouped query for the whole list, instead of one count per budget. */
+    private fun collaboratorCounts(budgets: List<Budget>): Map<Long, Int> {
+        if (budgets.isEmpty()) return emptyMap()
+        return userBudgetRepository.countByBudgetIds(budgets.map { it.id!! })
+            .associate { it.budgetId to it.total.toInt() }
+    }
+
+    private fun Budget.toResponse(counts: Map<Long, Int>) = BudgetResponse(
+        id = id!!,
+        name = name,
+        amount = amount,
+        date = date,
+        collaboratorCount = counts[id] ?: 0
+    )
 
     private fun BudgetEntry.toResponse() = BudgetEntryResponse(
         id = this.id!!,

@@ -8,6 +8,7 @@ import com.budgethunter.dto.SignInRequest
 import com.budgethunter.dto.SignInResponse
 import com.budgethunter.dto.SignUpRequest
 import com.budgethunter.dto.UserResponse
+import com.budgethunter.exception.DuplicateEmailException
 import com.budgethunter.model.AuthProvider
 import com.budgethunter.model.User
 import com.budgethunter.repository.UserRepository
@@ -32,9 +33,7 @@ class UserService(
 
     @Transactional
     fun signUp(request: SignUpRequest): UserResponse {
-        if (userRepository.existsByEmail(request.email)) {
-            throw IllegalArgumentException("Email already exists")
-        }
+        if (userRepository.existsByEmail(request.email)) throw DuplicateEmailException()
 
         val user = User(
             email = request.email,

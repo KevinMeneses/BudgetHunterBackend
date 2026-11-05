@@ -32,5 +32,17 @@ interface UserBudgetRepository : JpaRepository<UserBudget, UserBudgetId> {
     @Query("SELECT COUNT(ub) FROM UserBudget ub WHERE ub.id.budgetId = :budgetId")
     fun countByBudgetId(@Param("budgetId") budgetId: Long): Long
 
+    @Query(
+        "SELECT ub.id.budgetId AS budgetId, COUNT(ub) AS total FROM UserBudget ub " +
+            "WHERE ub.id.budgetId IN :budgetIds GROUP BY ub.id.budgetId"
+    )
+    fun countByBudgetIds(@Param("budgetIds") budgetIds: Collection<Long>): List<BudgetCollaboratorCount>
+
     fun deleteByBudgetId(budgetId: Long)
+}
+
+/** Projection of [UserBudgetRepository.countByBudgetIds]. */
+interface BudgetCollaboratorCount {
+    val budgetId: Long
+    val total: Long
 }

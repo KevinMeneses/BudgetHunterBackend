@@ -120,6 +120,7 @@ class BudgetManagementIntegrationTest {
             .andExpect(jsonPath("$.id").exists())
             .andExpect(jsonPath("$.name").value("Monthly Budget"))
             .andExpect(jsonPath("$.amount").value(2500.00))
+            .andExpect(jsonPath("$.collaboratorCount").value(1))
             .andReturn()
 
         val response = objectMapper.readValue(result.response.contentAsString, BudgetResponse::class.java)
@@ -299,6 +300,24 @@ class BudgetManagementIntegrationTest {
             .andExpect(jsonPath("$.budgetId").value(budget.id))
             .andExpect(jsonPath("$.collaboratorEmail").value(user2Email))
             .andExpect(jsonPath("$.collaboratorName").value(user2Name))
+
+        // The list reports both users with access
+        mockMvc.perform(
+            get("/api/budgets")
+                .header("Authorization", "Bearer $user1AuthToken")
+        )
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$[0].collaboratorCount").value(2))
+
+        // The paginated list reports it too
+        mockMvc.perform(
+            get("/api/budgets")
+                .param("page", "0")
+                .param("size", "10")
+                .header("Authorization", "Bearer $user1AuthToken")
+        )
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.content[0].collaboratorCount").value(2))
 
         // Then - User 2 should see the budget
         mockMvc.perform(

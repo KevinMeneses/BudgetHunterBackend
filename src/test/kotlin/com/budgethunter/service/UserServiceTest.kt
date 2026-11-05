@@ -5,6 +5,7 @@ import com.budgethunter.dto.RefreshTokenRequest
 import com.budgethunter.dto.SetPasswordRequest
 import com.budgethunter.dto.SignInRequest
 import com.budgethunter.dto.SignUpRequest
+import com.budgethunter.exception.DuplicateEmailException
 import com.budgethunter.model.AuthProvider
 import com.budgethunter.model.User
 import com.budgethunter.repository.UserRepository
@@ -95,7 +96,7 @@ class UserServiceTest {
         every { userRepository.existsByEmail(request.email) } returns true
 
         // When & Then
-        val exception = assertThrows<IllegalArgumentException> {
+        val exception = assertThrows<DuplicateEmailException> {
             userService.signUp(request)
         }
 

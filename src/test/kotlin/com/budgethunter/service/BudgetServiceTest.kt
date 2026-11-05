@@ -9,6 +9,7 @@ import com.budgethunter.model.BudgetEntry
 import com.budgethunter.model.EntryType
 import com.budgethunter.model.User
 import com.budgethunter.model.UserBudgetId
+import com.budgethunter.repository.BudgetCollaboratorCount
 import com.budgethunter.repository.BudgetEntryRepository
 import com.budgethunter.repository.BudgetRepository
 import com.budgethunter.repository.UserBudgetRepository
@@ -98,6 +99,7 @@ class BudgetServiceTest {
         assertEquals(savedBudget.id, result.id)
         assertEquals(request.name, result.name)
         assertEquals(request.amount, result.amount)
+        assertEquals(1, result.collaboratorCount)
 
         verify(exactly = 1) { userRepository.findById(testUserEmail) }
         verify(exactly = 1) { budgetRepository.save(any()) }
@@ -124,6 +126,11 @@ class BudgetServiceTest {
         verify(exactly = 0) { budgetRepository.save(any()) }
     }
 
+    private fun collaboratorCount(id: Long, count: Long) = object : BudgetCollaboratorCount {
+        override val budgetId = id
+        override val total = count
+    }
+
     // GetBudgetsByUserEmail Tests
 
     @Test
@@ -135,6 +142,10 @@ class BudgetServiceTest {
         )
 
         every { userBudgetRepository.findBudgetsByUserEmail(testUserEmail) } returns budgets
+        every { userBudgetRepository.countByBudgetIds(listOf(1L, 2L)) } returns listOf(
+            collaboratorCount(1L, 1L),
+            collaboratorCount(2L, 3L)
+        )
 
         // When
         val result = budgetService.getBudgetsByUserEmail(testUserEmail)
@@ -145,8 +156,11 @@ class BudgetServiceTest {
         assertEquals(budgets[0].name, result[0].name)
         assertEquals(budgets[1].id, result[1].id)
         assertEquals(budgets[1].name, result[1].name)
+        assertEquals(1, result[0].collaboratorCount)
+        assertEquals(3, result[1].collaboratorCount)
 
         verify(exactly = 1) { userBudgetRepository.findBudgetsByUserEmail(testUserEmail) }
+        verify(exactly = 1) { userBudgetRepository.countByBudgetIds(any()) }
     }
 
     @Test
@@ -186,11 +200,13 @@ class BudgetServiceTest {
         every { userBudgetRepository.existsById(userBudgetId) } returns true
         every { budgetRepository.findById(budgetId) } returns Optional.of(existingBudget)
         every { budgetRepository.save(any()) } returns updatedBudget
+        every { userBudgetRepository.countByBudgetId(budgetId) } returns 2L
 
         // When
         val result = budgetService.updateBudget(budgetId, request, testUserEmail)
 
         // Then
+        assertEquals(2, result.collaboratorCount)
         assertEquals(budgetId, result.id)
         assertEquals(request.name, result.name)
         assertEquals(request.amount, result.amount)

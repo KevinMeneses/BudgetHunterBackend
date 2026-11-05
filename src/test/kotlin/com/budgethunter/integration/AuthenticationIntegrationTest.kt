@@ -88,7 +88,7 @@ class AuthenticationIntegrationTest {
     }
 
     @Test
-    fun `should return 400 when signing up with duplicate email`() {
+    fun `should return 409 when signing up with duplicate email`() {
         // Given - First sign up
         val request = SignUpRequest(
             email = testEmail,
@@ -109,7 +109,7 @@ class AuthenticationIntegrationTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request))
         )
-            .andExpect(status().isBadRequest)
+            .andExpect(status().isConflict)
     }
 
     // Sign In Tests
