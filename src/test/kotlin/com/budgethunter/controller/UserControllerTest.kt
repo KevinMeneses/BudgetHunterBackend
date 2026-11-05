@@ -8,6 +8,7 @@ import com.budgethunter.dto.SignInRequest
 import com.budgethunter.dto.SignInResponse
 import com.budgethunter.dto.SignUpRequest
 import com.budgethunter.dto.UserResponse
+import com.budgethunter.exception.DuplicateEmailException
 import com.budgethunter.model.AuthProvider
 import com.budgethunter.service.UserService
 import io.mockk.Runs
@@ -77,10 +78,10 @@ class UserControllerTest {
             password = "password123"
         )
 
-        every { userService.signUp(request) } throws com.budgethunter.exception.DuplicateEmailException()
+        every { userService.signUp(request) } throws DuplicateEmailException()
 
         // When & Then
-        val exception = org.junit.jupiter.api.assertThrows<com.budgethunter.exception.DuplicateEmailException> {
+        val exception = org.junit.jupiter.api.assertThrows<DuplicateEmailException> {
             userController.signUp(request)
         }
 
