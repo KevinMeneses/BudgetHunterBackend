@@ -1,7 +1,7 @@
 package com.budgethunter.exception
 
 /**
- * Thrown when signing up with an email that already has an account.
- * Mapped to HTTP 409 Conflict by [GlobalExceptionHandler].
+ * Thrown when an account cannot be created because its email is already taken, including when a
+ * concurrent request created it first. Mapped to HTTP 409 Conflict by [GlobalExceptionHandler].
  */
-class DuplicateEmailException : RuntimeException("Email already exists")
+class DuplicateEmailException(message: String = "Email already exists") : RuntimeException(message)

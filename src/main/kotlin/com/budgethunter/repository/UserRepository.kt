@@ -6,7 +6,7 @@ import org.springframework.stereotype.Repository
 import java.util.Optional
 
 @Repository
-interface UserRepository : JpaRepository<User, String> {
+interface UserRepository : JpaRepository<User, String>, UserInsertRepository {
     fun existsByEmail(email: String): Boolean
     fun findByRefreshToken(refreshToken: String): Optional<User>
     fun findByGoogleSubject(googleSubject: String): Optional<User>
