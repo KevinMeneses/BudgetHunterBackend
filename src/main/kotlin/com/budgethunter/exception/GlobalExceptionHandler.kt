@@ -42,6 +42,16 @@ class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.CONFLICT).body(errorResponse)
     }
 
+    @ExceptionHandler(DuplicateEmailException::class)
+    fun handleDuplicateEmailException(ex: DuplicateEmailException): ResponseEntity<ErrorResponse> {
+        logger.warn("Conflict: ${ex.message}")
+        val errorResponse = ErrorResponse(
+            status = HttpStatus.CONFLICT.value(),
+            message = ex.message ?: "Email already exists"
+        )
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(errorResponse)
+    }
+
     @ExceptionHandler(BadCredentialsException::class)
     fun handleBadCredentialsException(ex: BadCredentialsException): ResponseEntity<ErrorResponse> {
         logger.warn("Authentication failed: ${ex.message}")

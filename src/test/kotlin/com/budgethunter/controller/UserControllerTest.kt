@@ -77,10 +77,10 @@ class UserControllerTest {
             password = "password123"
         )
 
-        every { userService.signUp(request) } throws IllegalStateException("Email already exists")
+        every { userService.signUp(request) } throws com.budgethunter.exception.DuplicateEmailException()
 
         // When & Then
-        val exception = org.junit.jupiter.api.assertThrows<IllegalStateException> {
+        val exception = org.junit.jupiter.api.assertThrows<com.budgethunter.exception.DuplicateEmailException> {
             userController.signUp(request)
         }
 

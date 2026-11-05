@@ -95,7 +95,7 @@ class UserServiceTest {
         every { userRepository.existsByEmail(request.email) } returns true
 
         // When & Then
-        val exception = assertThrows<IllegalStateException> {
+        val exception = assertThrows<com.budgethunter.exception.DuplicateEmailException> {
             userService.signUp(request)
         }
 

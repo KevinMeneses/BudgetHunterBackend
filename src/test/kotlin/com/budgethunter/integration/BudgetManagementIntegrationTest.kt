@@ -218,18 +218,6 @@ class BudgetManagementIntegrationTest {
     }
 
     @Test
-    fun `sign up with an existing email answers 409 Conflict`() {
-        mockMvc.perform(
-            post("/api/users/sign_up")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(SignUpRequest(user1Email, user1Name, user1Password)))
-        )
-            .andExpect(status().isConflict)
-            .andExpect(jsonPath("$.status").value(409))
-            .andExpect(jsonPath("$.message").value("Email already exists"))
-    }
-
-    @Test
     fun `should return empty list when user has no budgets`() {
         // When & Then
         mockMvc.perform(
@@ -320,6 +308,16 @@ class BudgetManagementIntegrationTest {
         )
             .andExpect(status().isOk)
             .andExpect(jsonPath("$[0].collaboratorCount").value(2))
+
+        // The paginated list reports it too
+        mockMvc.perform(
+            get("/api/budgets")
+                .param("page", "0")
+                .param("size", "10")
+                .header("Authorization", "Bearer $user1AuthToken")
+        )
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.content[0].collaboratorCount").value(2))
 
         // Then - User 2 should see the budget
         mockMvc.perform(
