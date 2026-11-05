@@ -188,7 +188,12 @@ class UserService(
         try {
             userRepository.insert(user)
         } catch (e: DataIntegrityViolationException) {
+            // The failed flush leaves the session and transaction unusable: throw right away and
+            // let @Transactional roll back. Never keep using the repository after this catch.
             logger.warn("Account creation lost a race on an existing email: {}", e.javaClass.simpleName)
+            // The root cause names the violated constraint, to tell a real email clash from an
+            // unexpected one; debug only, since it can include the email.
+            logger.debug("Account creation constraint violation", e.mostSpecificCause)
             throw onConflict()
         }
 

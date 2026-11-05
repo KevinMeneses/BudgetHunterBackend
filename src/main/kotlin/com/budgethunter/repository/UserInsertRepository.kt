@@ -16,6 +16,7 @@ interface UserInsertRepository {
     /**
      * Persists [user] and flushes immediately, so a duplicate email fails here (as a
      * `DataIntegrityViolationException`, translated by the repository proxy) and never overwrites.
+     * Returns the same, now managed, instance (not a copy as `save()`'s merge would).
      */
     fun insert(user: User): User
 }

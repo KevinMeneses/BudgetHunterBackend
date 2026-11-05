@@ -146,6 +146,12 @@ class UserController(
                 responseCode = "401",
                 description = "The Google ID token is invalid, expired, issued for another audience, or carries an unverified email",
                 content = [Content()]
+            ),
+            ApiResponse(
+                responseCode = "409",
+                description = "A concurrent request created this account at the same moment. Retryable: " +
+                    "the retry finds the account and links it",
+                content = [Content()]
             )
         ]
     )
