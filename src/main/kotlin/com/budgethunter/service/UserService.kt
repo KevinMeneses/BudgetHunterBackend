@@ -15,6 +15,7 @@ import com.budgethunter.repository.UserRepository
 import com.budgethunter.util.GoogleTokenVerifier
 import com.budgethunter.util.JwtUtil
 import org.slf4j.LoggerFactory
+import org.springframework.dao.DataIntegrityViolationException
 import org.springframework.security.authentication.BadCredentialsException
 import org.springframework.security.crypto.password.PasswordEncoder
 import org.springframework.stereotype.Service
@@ -33,6 +34,8 @@ class UserService(
 
     @Transactional
     fun signUp(request: SignUpRequest): UserResponse {
+        // Fast path for the common case. It is not atomic, so the insert below is what actually
+        // guarantees a concurrent sign-up can't overwrite an account (see UserInsertRepository).
         if (userRepository.existsByEmail(request.email)) throw DuplicateEmailException()
 
         val user = User(
@@ -42,7 +45,7 @@ class UserService(
             authProvider = AuthProvider.PASSWORD
         )
 
-        val savedUser = userRepository.save(user)
+        val savedUser = insertNewUser(user) { DuplicateEmailException() }
 
         return UserResponse(
             email = savedUser.email,
@@ -118,14 +121,20 @@ class UserService(
                     AuthProvider.GOOGLE
                 }
             }
-            ?: User(
-                email = email,
-                // name is NOT NULL in the database and the claim is optional on an ID token.
-                name = info.name?.takeIf { it.isNotBlank() } ?: email.substringBefore('@'),
-                password = null,
-                googleSubject = info.subject,
-                authProvider = AuthProvider.GOOGLE
-            )
+            ?: insertNewUser(
+                User(
+                    email = email,
+                    // name is NOT NULL in the database and the claim is optional on an ID token.
+                    name = info.name?.takeIf { it.isNotBlank() } ?: email.substringBefore('@'),
+                    password = null,
+                    googleSubject = info.subject,
+                    authProvider = AuthProvider.GOOGLE
+                )
+            ) {
+                // Another request created this account between our lookup and the insert. A
+                // retry will find it and link it instead of wiping its password with a merge.
+                DuplicateEmailException("Account was created by another request, please try again")
+            }
 
         return issueSession(user)
     }
@@ -170,6 +179,18 @@ class UserService(
         }
         userRepository.save(user)
     }
+
+    /**
+     * Creates [user] with an `INSERT`, never a merge. A primary key or unique clash means the
+     * account already exists (typically a concurrent request won the race) and becomes [onConflict].
+     */
+    private fun insertNewUser(user: User, onConflict: () -> DuplicateEmailException): User =
+        try {
+            userRepository.insert(user)
+        } catch (e: DataIntegrityViolationException) {
+            logger.warn("Account creation lost a race on an existing email: {}", e.javaClass.simpleName)
+            throw onConflict()
+        }
 
     /**
      * Issues a fresh access token and rotates the refresh token.

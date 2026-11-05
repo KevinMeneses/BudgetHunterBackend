@@ -24,6 +24,7 @@ import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
+import org.springframework.dao.DataIntegrityViolationException
 import org.springframework.security.authentication.BadCredentialsException
 import org.springframework.security.crypto.password.PasswordEncoder
 import java.time.Instant
@@ -70,7 +71,7 @@ class UserServiceTest {
 
         every { userRepository.existsByEmail(request.email) } returns false
         every { passwordEncoder.encode(request.password) } returns encodedPassword
-        every { userRepository.save(any()) } returns savedUser
+        every { userRepository.insert(any()) } returns savedUser
 
         // When
         val result = userService.signUp(request)
@@ -81,7 +82,23 @@ class UserServiceTest {
 
         verify(exactly = 1) { userRepository.existsByEmail(request.email) }
         verify(exactly = 1) { passwordEncoder.encode(request.password) }
-        verify(exactly = 1) { userRepository.save(any()) }
+        verify(exactly = 1) { userRepository.insert(any()) }
+        // save() would merge over an account created concurrently
+        verify(exactly = 0) { userRepository.save(any()) }
+    }
+
+    @Test
+    fun `signUp should answer DuplicateEmailException when a concurrent sign-up wins the insert`() {
+        // Given - the existence check passed, but another request created the account first
+        val request = SignUpRequest(email = "race@example.com", name = "Test User", password = "password123")
+        every { userRepository.existsByEmail(request.email) } returns false
+        every { passwordEncoder.encode(request.password) } returns "encodedPassword"
+        every { userRepository.insert(any()) } throws DataIntegrityViolationException("duplicate key")
+
+        // When / Then
+        val exception = assertThrows<DuplicateEmailException> { userService.signUp(request) }
+        assertEquals("Email already exists", exception.message)
+        verify(exactly = 0) { userRepository.save(any()) }
     }
 
     @Test
@@ -103,6 +120,7 @@ class UserServiceTest {
         assertEquals("Email already exists", exception.message)
         verify(exactly = 1) { userRepository.existsByEmail(request.email) }
         verify(exactly = 0) { passwordEncoder.encode(any()) }
+        verify(exactly = 0) { userRepository.insert(any()) }
         verify(exactly = 0) { userRepository.save(any()) }
     }
 
@@ -316,6 +334,7 @@ class UserServiceTest {
         every { jwtUtil.generateToken(any()) } returns "authToken"
         every { jwtUtil.generateRefreshToken() } returns "refreshToken"
         every { jwtUtil.getRefreshTokenExpiry() } returns Instant.now().plusSeconds(3600)
+        every { userRepository.insert(any()) } answers { firstArg() }
         every { userRepository.save(any()) } answers { firstArg() }
     }
 
@@ -336,11 +355,27 @@ class UserServiceTest {
         assertEquals("Test User", result.name)
         assertEquals("authToken", result.authToken)
 
-        val saved = slot<User>()
-        verify { userRepository.save(capture(saved)) }
-        assertEquals(AuthProvider.GOOGLE, saved.captured.authProvider)
-        assertNull(saved.captured.password)
-        assertEquals("google-sub-123", saved.captured.googleSubject)
+        // Created with an INSERT, so it can never merge over an account made concurrently
+        val inserted = slot<User>()
+        verify(exactly = 1) { userRepository.insert(capture(inserted)) }
+        assertEquals(AuthProvider.GOOGLE, inserted.captured.authProvider)
+        assertNull(inserted.captured.password)
+        assertEquals("google-sub-123", inserted.captured.googleSubject)
+    }
+
+    @Test
+    fun `signInWithGoogle should not overwrite an account created concurrently`() {
+        // Given - a password sign-up for the same email committed between our lookup and insert
+        val request = GoogleSignInRequest("id-token")
+        every { googleTokenVerifier.verify(request.idToken) } returns googleInfo()
+        every { userRepository.findByGoogleSubject("google-sub-123") } returns Optional.empty()
+        every { userRepository.findById("test@example.com") } returns Optional.empty()
+        every { userRepository.insert(any()) } throws DataIntegrityViolationException("duplicate key")
+
+        // When / Then - a retry will find the account and link it
+        assertThrows<DuplicateEmailException> { userService.signInWithGoogle(request) }
+        verify(exactly = 0) { userRepository.save(any()) }
+        verify(exactly = 0) { jwtUtil.generateToken(any()) }
     }
 
     @Test
