@@ -120,6 +120,7 @@ class BudgetManagementIntegrationTest {
             .andExpect(jsonPath("$.id").exists())
             .andExpect(jsonPath("$.name").value("Monthly Budget"))
             .andExpect(jsonPath("$.amount").value(2500.00))
+            .andExpect(jsonPath("$.collaboratorCount").value(1))
             .andReturn()
 
         val response = objectMapper.readValue(result.response.contentAsString, BudgetResponse::class.java)
@@ -217,6 +218,18 @@ class BudgetManagementIntegrationTest {
     }
 
     @Test
+    fun `sign up with an existing email answers 409 Conflict`() {
+        mockMvc.perform(
+            post("/api/users/sign_up")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(SignUpRequest(user1Email, user1Name, user1Password)))
+        )
+            .andExpect(status().isConflict)
+            .andExpect(jsonPath("$.status").value(409))
+            .andExpect(jsonPath("$.message").value("Email already exists"))
+    }
+
+    @Test
     fun `should return empty list when user has no budgets`() {
         // When & Then
         mockMvc.perform(
@@ -299,6 +312,14 @@ class BudgetManagementIntegrationTest {
             .andExpect(jsonPath("$.budgetId").value(budget.id))
             .andExpect(jsonPath("$.collaboratorEmail").value(user2Email))
             .andExpect(jsonPath("$.collaboratorName").value(user2Name))
+
+        // The list reports both users with access
+        mockMvc.perform(
+            get("/api/budgets")
+                .header("Authorization", "Bearer $user1AuthToken")
+        )
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$[0].collaboratorCount").value(2))
 
         // Then - User 2 should see the budget
         mockMvc.perform(

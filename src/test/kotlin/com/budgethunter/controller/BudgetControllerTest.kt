@@ -77,7 +77,8 @@ class BudgetControllerTest {
         val expectedResponse = BudgetResponse(
             id = 1L,
             name = request.name,
-            amount = request.amount
+            amount = request.amount,
+            collaboratorCount = 1
         )
 
         every { budgetService.createBudget(request, testUserEmail) } returns expectedResponse
@@ -118,8 +119,8 @@ class BudgetControllerTest {
     fun `getBudgets should return ok status with list of budgets`() {
         // Given
         val expectedBudgets = listOf(
-            BudgetResponse(id = 1L, name = "Budget 1", amount = BigDecimal("1000.00")),
-            BudgetResponse(id = 2L, name = "Budget 2", amount = BigDecimal("2000.00"))
+            BudgetResponse(id = 1L, name = "Budget 1", amount = BigDecimal("1000.00"), collaboratorCount = 1),
+            BudgetResponse(id = 2L, name = "Budget 2", amount = BigDecimal("2000.00"), collaboratorCount = 3)
         )
 
         every { budgetService.getBudgetsByUserEmail(testUserEmail) } returns expectedBudgets
@@ -166,7 +167,8 @@ class BudgetControllerTest {
         val expectedResponse = BudgetResponse(
             id = budgetId,
             name = request.name,
-            amount = request.amount
+            amount = request.amount,
+            collaboratorCount = 1
         )
 
         every { budgetService.updateBudget(budgetId, request, testUserEmail) } returns expectedResponse

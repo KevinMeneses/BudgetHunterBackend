@@ -32,9 +32,8 @@ class UserService(
 
     @Transactional
     fun signUp(request: SignUpRequest): UserResponse {
-        if (userRepository.existsByEmail(request.email)) {
-            throw IllegalArgumentException("Email already exists")
-        }
+        // check() throws IllegalStateException, which GlobalExceptionHandler maps to 409 Conflict.
+        check(!userRepository.existsByEmail(request.email)) { "Email already exists" }
 
         val user = User(
             email = request.email,

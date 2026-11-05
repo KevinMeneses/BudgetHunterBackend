@@ -95,7 +95,7 @@ class UserServiceTest {
         every { userRepository.existsByEmail(request.email) } returns true
 
         // When & Then
-        val exception = assertThrows<IllegalArgumentException> {
+        val exception = assertThrows<IllegalStateException> {
             userService.signUp(request)
         }
 

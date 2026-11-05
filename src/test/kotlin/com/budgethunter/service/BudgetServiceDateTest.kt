@@ -148,6 +148,7 @@ class BudgetServiceDateTest {
         every { userBudgetRepository.existsById(userBudgetId) } returns true
         every { budgetRepository.findById(budgetId) } returns Optional.of(existingBudget)
         every { budgetRepository.save(capture(budgetSlot)) } answers { budgetSlot.captured }
+        every { userBudgetRepository.countByBudgetId(budgetId) } returns 1L
 
         // When
         val result = budgetService.updateBudget(budgetId, request, testUserEmail)
@@ -179,6 +180,7 @@ class BudgetServiceDateTest {
         every { userBudgetRepository.existsById(userBudgetId) } returns true
         every { budgetRepository.findById(budgetId) } returns Optional.of(existingBudget)
         every { budgetRepository.save(capture(budgetSlot)) } answers { budgetSlot.captured }
+        every { userBudgetRepository.countByBudgetId(budgetId) } returns 1L
 
         // When
         val result = budgetService.updateBudget(budgetId, request, testUserEmail)
