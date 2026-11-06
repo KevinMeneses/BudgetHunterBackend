@@ -284,7 +284,7 @@ class GeminiReceiptExtractorTest {
     }
 
     @Test
-    fun `a rejected request or a timeout is not handed to the fallback`() {
+    fun `a rejected request is not handed to the fallback, a timeout is`() {
         server.expect(once(), requestTo(url)).andRespond(withStatus(HttpStatus.BAD_REQUEST))
         server.expect(never(), requestTo(fallbackUrl))
         assertEquals(
@@ -295,11 +295,35 @@ class GeminiReceiptExtractorTest {
 
         server.reset()
         server.expect(once(), requestTo(url)).andRespond(withException(SocketTimeoutException("read timed out")))
-        server.expect(never(), requestTo(fallbackUrl))
-        assertEquals(
-            ReceiptReading.Failed(ReceiptFailure.TIMEOUT),
-            extractor(fallbackModel = "backup-model").extract("QUJD", "image/jpeg", today)
-        )
+        server.expect(once(), requestTo(fallbackUrl)).andRespond(withSuccess(reply("""{"isInvoice":false}"""), MediaType.APPLICATION_JSON))
+        assertEquals(ReceiptReading.NotAReceipt, extractor(fallbackModel = "backup-model").extract("QUJD", "image/jpeg", today))
+        server.verify()
+    }
+
+    @Test
+    fun `without a fallback a timeout is not retried on the same model`() {
+        server.expect(once(), requestTo(url)).andRespond(withException(SocketTimeoutException("read timed out")))
+        assertEquals(ReceiptReading.Failed(ReceiptFailure.TIMEOUT), extractor().extract("QUJD", "image/jpeg", today))
+        server.verify()
+    }
+
+    @Test
+    fun `the thinking level is sent when set and left out when blank`() {
+        server.expect(once(), requestTo(url))
+            .andExpect(jsonPath("$.generationConfig.thinkingConfig.thinkingLevel").value("low"))
+            .andRespond(withSuccess(reply("""{"isInvoice":false}"""), MediaType.APPLICATION_JSON))
+        GeminiReceiptExtractor(
+            restClient,
+            ReceiptGeminiSettings("secret-key", "test-model", retryDelayMillis = 0, thinkingLevel = "low"),
+            objectMapper
+        ).extract("QUJD", "image/jpeg", today)
+        server.verify()
+
+        server.reset()
+        server.expect(once(), requestTo(url))
+            .andExpect(jsonPath("$.generationConfig.thinkingConfig").doesNotExist())
+            .andRespond(withSuccess(reply("""{"isInvoice":false}"""), MediaType.APPLICATION_JSON))
+        extractor().extract("QUJD", "image/jpeg", today)
         server.verify()
     }
 

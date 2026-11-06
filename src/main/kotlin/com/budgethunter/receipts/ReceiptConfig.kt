@@ -35,6 +35,7 @@ class ReceiptConfig {
         @Value("\${receipts.gemini.api-key:\${categorization.gemini.api-key:}}") apiKey: String,
         @Value("\${receipts.gemini.model:$DEFAULT_MODEL}") model: String,
         @Value("\${receipts.gemini.fallback-model:$DEFAULT_FALLBACK_MODEL}") fallbackModel: String,
+        @Value("\${receipts.gemini.thinking-level:$DEFAULT_THINKING_LEVEL}") thinkingLevel: String,
         @Value("\${receipts.gemini.base-url:$DEFAULT_BASE_URL}") baseUrl: String,
         @Value("\${receipts.gemini.timeout-seconds:$DEFAULT_TIMEOUT_SECONDS}") timeoutSeconds: Long,
         @Value("\${receipts.gemini.max-requests-per-minute:${ReceiptGeminiSettings.DEFAULT_MAX_REQUESTS_PER_MINUTE}}")
@@ -47,7 +48,13 @@ class ReceiptConfig {
         val restClient = restClientBuilder.baseUrl(baseUrl).requestFactory(requestFactory).build()
         return GeminiReceiptExtractor(
             restClient,
-            ReceiptGeminiSettings(apiKey.trim(), model.trim(), maxRequestsPerMinute, fallbackModel.trim()),
+            ReceiptGeminiSettings(
+                apiKey = apiKey.trim(),
+                model = model.trim(),
+                maxRequestsPerMinute = maxRequestsPerMinute,
+                fallbackModel = fallbackModel.trim(),
+                thinkingLevel = thinkingLevel.trim()
+            ),
             objectMapper
         )
     }
@@ -91,6 +98,9 @@ class ReceiptConfig {
         const val DEFAULT_FALLBACK_MODEL = "gemini-3.5-flash-lite"
         const val DEFAULT_BASE_URL = "https://generativelanguage.googleapis.com"
         const val DEFAULT_TIMEOUT_SECONDS = 30L
+
+        // Gemini 3 models reason before answering by default, which on a receipt image could pass the timeout.
+        const val DEFAULT_THINKING_LEVEL = "low"
         const val DEFAULT_FREE_MONTHLY_SCANS = 10
         const val DEFAULT_PREMIUM_MONTHLY_SCANS = 200
 

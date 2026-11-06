@@ -277,6 +277,8 @@ docker-compose up -d
 | `CATEGORIZATION_ENABLED` | `false` removes the categorize endpoint and the Gemini client altogether | `true` |
 | `RECEIPTS_GEMINI_MODEL` | Gemini model that reads receipts (multimodal; uses the same `GEMINI_API_KEY`) | `gemini-3.8-flash` |
 | `RECEIPTS_GEMINI_FALLBACK_MODEL` | Model asked when the main one is overloaded (503) or failing, or rate limited (429). Empty = retry the main one once | `gemini-3.5-flash-lite` |
+| `RECEIPTS_GEMINI_THINKING_LEVEL` | Gemini 3 `thinkingLevel` for receipts. The default level reasons long enough on an image to pass the timeout; empty = the model's default | `low` |
+| `RECEIPTS_GEMINI_TIMEOUT_SECONDS` | Seconds per attempt; a timeout goes to the fallback model. Keep two attempts under the app's 90 s | `30` |
 | `RECEIPTS_MAX_REQUESTS_PER_MINUTE` | Receipt requests to Gemini per minute for the whole server; above it a scan answers `503 AI_BUSY` | `30` |
 | `RECEIPTS_FREE_MONTHLY_SCANS` | Receipt scans a `FREE` account gets per UTC calendar month | `10` |
 | `RECEIPTS_PREMIUM_MONTHLY_SCANS` | Receipt scans a `PREMIUM` account gets per month (fair-use cap) | `200` |

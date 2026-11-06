@@ -22,7 +22,12 @@ data class ReceiptGeminiSettings(
     /** Asked when [model] is overloaded or failing; blank = retry [model] itself once instead. */
     val fallbackModel: String = "",
     /** Pause before the second attempt, so a momentary spike has a moment to pass. */
-    val retryDelayMillis: Long = DEFAULT_RETRY_DELAY_MILLIS
+    val retryDelayMillis: Long = DEFAULT_RETRY_DELAY_MILLIS,
+    /**
+     * Gemini 3 `thinkingLevel` ("low", "high"...). Reading a receipt needs little reasoning, and the default level
+     * can take longer than the timeout on an image. Blank = leave the model's default (for models without it).
+     */
+    val thinkingLevel: String = ""
 ) {
     init {
         require(maxRequestsPerMinute > 0) { "maxRequestsPerMinute must be positive" }
@@ -44,7 +49,8 @@ data class ReceiptGeminiSettings(
  * - At most two attempts. When the model answers 5xx ("high demand") or cannot be reached, the second one goes to
  *   [ReceiptGeminiSettings.fallbackModel] (or the same model again when there is none), after a short pause. A 429
  *   is only worth asking another model (quotas are per model), so without a fallback it is [ReceiptFailure.BUSY]
- *   straight away. A 4xx or a timeout is not retried.
+ *   straight away, and so is a timeout (one more full wait on the same model would rarely help). A 4xx is not
+ *   retried.
  * - The file and the reply are never logged; the key goes in a header, never in the URL.
  */
 class GeminiReceiptExtractor(
@@ -128,7 +134,9 @@ class GeminiReceiptExtractor(
         val fallback = settings.fallbackModel.takeIf { it.isNotBlank() && it != settings.model }
         return when (first) {
             is Attempt.Retry -> fallback ?: settings.model
+            // Busy or slow: another model may answer; the same one is unlikely to, and the wait would double.
             Attempt.Busy -> fallback
+            is Attempt.GiveUp -> fallback.takeIf { first.reason == ReceiptFailure.TIMEOUT }
             else -> null
         }
     }
@@ -143,11 +151,14 @@ class GeminiReceiptExtractor(
                 )
             )
         ),
-        "generationConfig" to mapOf(
-            "temperature" to TEMPERATURE,
-            "responseMimeType" to "application/json",
-            "responseSchema" to RESPONSE_SCHEMA
-        )
+        "generationConfig" to buildMap {
+            put("temperature", TEMPERATURE)
+            put("responseMimeType", "application/json")
+            put("responseSchema", RESPONSE_SCHEMA)
+            if (settings.thinkingLevel.isNotBlank()) {
+                put("thinkingConfig", mapOf("thinkingLevel" to settings.thinkingLevel))
+            }
+        }
     )
 
     private fun attemptOnce(model: String, request: Map<String, Any>): Attempt = try {
