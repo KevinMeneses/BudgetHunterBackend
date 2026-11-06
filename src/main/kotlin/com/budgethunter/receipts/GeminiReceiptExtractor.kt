@@ -26,6 +26,8 @@ data class ReceiptGeminiSettings(
     /**
      * Gemini 3 `thinkingLevel` ("low", "high"...). Reading a receipt needs little reasoning, and the default level
      * can take longer than the timeout on an image. Blank = leave the model's default (for models without it).
+     * It is sent to [fallbackModel] too, so both must accept it: a model that does not (e.g. a 2.5 one) answers
+     * 400 and the fallback never helps.
      */
     val thinkingLevel: String = ""
 ) {

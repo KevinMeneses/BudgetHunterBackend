@@ -41,6 +41,7 @@ class ReceiptConfig {
         @Value("\${receipts.gemini.max-requests-per-minute:${ReceiptGeminiSettings.DEFAULT_MAX_REQUESTS_PER_MINUTE}}")
         maxRequestsPerMinute: Int
     ): ReceiptExtractor {
+        require(timeoutSeconds > 0) { "receipts.gemini.timeout-seconds must be positive" }
         if (apiKey.isBlank()) log.info("Receipt reading has no GEMINI_API_KEY; every scan will answer AI_UNAVAILABLE")
         val timeout = Duration.ofSeconds(timeoutSeconds)
         val requestFactory = JdkClientHttpRequestFactory(HttpClient.newBuilder().connectTimeout(timeout).build())
