@@ -47,10 +47,15 @@ class GeminiReceiptExtractorTest {
 
     private val fallbackUrl = "https://gemini.test/v1beta/models/backup-model:generateContent"
 
-    private fun extractor(apiKey: String = "secret-key", maxRequestsPerMinute: Int = 100, fallbackModel: String = "") =
+    private fun extractor(
+        apiKey: String = "secret-key",
+        maxRequestsPerMinute: Int = 100,
+        fallbackModel: String = "",
+        retryDelayMillis: Long = 0
+    ) =
         GeminiReceiptExtractor(
             restClient,
-            ReceiptGeminiSettings(apiKey, "test-model", maxRequestsPerMinute, fallbackModel, retryDelayMillis = 0),
+            ReceiptGeminiSettings(apiKey, "test-model", maxRequestsPerMinute, fallbackModel, retryDelayMillis),
             objectMapper
         )
 
@@ -275,6 +280,7 @@ class GeminiReceiptExtractorTest {
             ReceiptReading.Failed(ReceiptFailure.BUSY),
             extractor(fallbackModel = "backup-model").extract("QUJD", "image/jpeg", today)
         )
+        server.verify()
     }
 
     @Test
@@ -304,6 +310,51 @@ class GeminiReceiptExtractorTest {
             ReceiptReading.Failed(ReceiptFailure.BUSY),
             extractor(fallbackModel = "test-model").extract("QUJD", "image/jpeg", today)
         )
+        server.verify()
+    }
+
+    @Test
+    fun `a fallback that rejects the request reports why the main model failed`() {
+        server.expect(once(), requestTo(url)).andRespond(withStatus(HttpStatus.SERVICE_UNAVAILABLE))
+        server.expect(once(), requestTo(fallbackUrl)).andRespond(withStatus(HttpStatus.NOT_FOUND))
+
+        assertEquals(
+            ReceiptReading.Failed(ReceiptFailure.UNAVAILABLE),
+            extractor(fallbackModel = "backup-model").extract("QUJD", "image/jpeg", today)
+        )
+        server.verify()
+    }
+
+    @Test
+    fun `an error body that is not JSON, or a long multi-line message, does not change the outcome`() {
+        server.expect(once(), requestTo(url))
+            .andRespond(withStatus(HttpStatus.BAD_REQUEST).body("<html>not json</html>").contentType(MediaType.TEXT_HTML))
+        assertEquals(ReceiptReading.Failed(ReceiptFailure.REJECTED), extractor().extract("QUJD", "image/jpeg", today))
+        server.verify()
+
+        server.reset()
+        val longMessage = "line one\nline two ".repeat(100)
+        server.expect(once(), requestTo(url)).andRespond(
+            withStatus(HttpStatus.BAD_REQUEST).contentType(MediaType.APPLICATION_JSON)
+                .body(objectMapper.writeValueAsString(mapOf("error" to mapOf("status" to "INVALID", "message" to longMessage))))
+        )
+        assertEquals(ReceiptReading.Failed(ReceiptFailure.REJECTED), extractor().extract("QUJD", "image/jpeg", today))
+        server.verify()
+    }
+
+    @Test
+    fun `an interrupted pause gives up as UNAVAILABLE and keeps the interrupt`() {
+        server.expect(once(), requestTo(url)).andRespond(withStatus(HttpStatus.SERVICE_UNAVAILABLE))
+        server.expect(never(), requestTo(fallbackUrl))
+        Thread.currentThread().interrupt()
+        try {
+            val reading = extractor(fallbackModel = "backup-model", retryDelayMillis = 10_000)
+                .extract("QUJD", "image/jpeg", today)
+            assertEquals(ReceiptReading.Failed(ReceiptFailure.UNAVAILABLE), reading)
+            assertTrue(Thread.currentThread().isInterrupted)
+        } finally {
+            Thread.interrupted()
+        }
         server.verify()
     }
 }

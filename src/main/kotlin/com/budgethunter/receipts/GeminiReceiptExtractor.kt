@@ -2,7 +2,6 @@ package com.budgethunter.receipts
 
 import com.budgethunter.categorization.CategoryGuide
 import com.budgethunter.model.EntryCategory
-import com.fasterxml.jackson.core.JsonProcessingException
 import com.fasterxml.jackson.databind.ObjectMapper
 import io.github.bucket4j.Bucket
 import org.slf4j.LoggerFactory
@@ -84,14 +83,37 @@ class GeminiReceiptExtractor(
     }
 
     private fun askWithFallback(request: Map<String, Any>, today: LocalDate): ReceiptReading {
-        var attempt = attemptOnce(settings.model, request)
-        val secondModel = secondModelAfter(attempt)
-        if (secondModel != null) {
-            if (settings.retryDelayMillis > 0) Thread.sleep(settings.retryDelayMillis)
-            if (secondModel != settings.model) log.info("Asking the fallback model {} for a receipt", secondModel)
-            attempt = attemptOnce(secondModel, request)
+        val first = attemptOnce(settings.model, request)
+        val secondModel = secondModelAfter(first)
+        return when {
+            secondModel == null -> outcome(first, today)
+            !pause() -> ReceiptReading.Failed(ReceiptFailure.UNAVAILABLE)
+            secondModel == settings.model -> outcome(attemptOnce(secondModel, request), today)
+            else -> {
+                log.info("Asking the fallback model {} for a receipt", secondModel)
+                val second = attemptOnce(secondModel, request)
+                // A fallback that rejects the request (say, a retired model id) says nothing about the receipt:
+                // report why the main model failed instead of a misleading AI_REJECTED.
+                val rejected = second is Attempt.GiveUp && second.reason == ReceiptFailure.REJECTED
+                outcome(if (rejected) first else second, today)
+            }
         }
-        return when (attempt) {
+    }
+
+    /** Waits before the second attempt; false if the thread was interrupted (the flag is kept for the caller). */
+    private fun pause(): Boolean {
+        if (settings.retryDelayMillis <= 0) return true
+        return try {
+            Thread.sleep(settings.retryDelayMillis)
+            true
+        } catch (_: InterruptedException) {
+            Thread.currentThread().interrupt()
+            false
+        }
+    }
+
+    private fun outcome(attempt: Attempt, today: LocalDate): ReceiptReading =
+        when (attempt) {
             is Attempt.Success -> replyParser.parse(attempt.body, today)
             is Attempt.GiveUp -> ReceiptReading.Failed(attempt.reason)
             Attempt.Busy -> ReceiptReading.Failed(ReceiptFailure.BUSY)
@@ -100,7 +122,6 @@ class GeminiReceiptExtractor(
                 ReceiptReading.Failed(attempt.reason)
             }
         }
-    }
 
     /** Which model gets the second attempt, or null when there is none worth making. */
     private fun secondModelAfter(first: Attempt): String? {
@@ -161,7 +182,13 @@ class GeminiReceiptExtractor(
             Attempt.GiveUp(ReceiptFailure.TIMEOUT)
         } else {
             val cause = generateSequence<Throwable>(e) { it.cause }.last()
-            log.warn("Gemini ({}) unreachable for a receipt: {}: {}", model, cause.javaClass.simpleName, cause.message)
+            log.warn(
+                "Gemini ({}) unreachable for a receipt: {} caused by {}: {}",
+                model,
+                e.javaClass.simpleName,
+                cause.javaClass.simpleName,
+                cause.message.orEmpty().forLog()
+            )
             Attempt.Retry(ReceiptFailure.UNAVAILABLE)
         }
     }
@@ -170,16 +197,21 @@ class GeminiReceiptExtractor(
      * Google's own `status` and `message` from an error reply (e.g. "UNAVAILABLE: The model is overloaded"), cut
      * short. Error replies describe the request, never the file, so this is safe to log; the body itself is not.
      */
+    // Runs inside a catch block: whatever the body holds, it must not throw and change the outcome.
+    @Suppress("TooGenericExceptionCaught")
     private fun googleError(e: RestClientResponseException): String {
         val error = try {
             objectMapper.readTree(e.responseBodyAsString).path("error")
-        } catch (_: JsonProcessingException) {
+        } catch (_: Exception) {
             null
         }
         val status = error?.path("status")?.asText().orEmpty()
         val message = error?.path("message")?.asText().orEmpty()
-        return "$status $message".trim().ifEmpty { "(no error details)" }.take(MAX_ERROR_LOG_LENGTH)
+        return "$status $message".trim().ifEmpty { "(no error details)" }.forLog()
     }
+
+    /** One line (a reply's line breaks could forge log lines), cut short. */
+    private fun String.forLog(): String = replace(Regex("[\\r\\n]+"), " ").take(MAX_ERROR_LOG_LENGTH)
 
     private fun ResourceAccessException.isTimeout(): Boolean =
         generateSequence(cause) { it.cause }.any { it is HttpTimeoutException || it is SocketTimeoutException }
