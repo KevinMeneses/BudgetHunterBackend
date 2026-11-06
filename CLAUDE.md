@@ -193,7 +193,8 @@ asks Gemini (`GeminiReceiptExtractor`, prompt kept here) and answers what it rea
 - **Errors:** `ReceiptErrorResponse` with a `code` (`TOO_MANY_SCANS` 429, `TOO_LARGE` 413, `UNSUPPORTED_TYPE` 415, `AI_BLOCKED` 422,
   `AI_INVALID_RESPONSE`/`AI_REJECTED` 502, `AI_UNAVAILABLE`/`AI_BUSY` 503, `AI_TIMEOUT` 504).
 - **Config:** `RECEIPTS_FREE_MONTHLY_SCANS` (10), `RECEIPTS_PREMIUM_MONTHLY_SCANS` (200, fair use),
-  `RECEIPTS_MAX_SCANS_PER_USER_PER_MINUTE` (6), `RECEIPTS_MAX_CONCURRENT_SCANS` (8), `RECEIPTS_GEMINI_MODEL`, `RECEIPTS_MAX_REQUESTS_PER_MINUTE`, `RECEIPTS_ENABLED`; defaults in `ReceiptConfig`.
+  `RECEIPTS_MAX_SCANS_PER_USER_PER_MINUTE` (6), `RECEIPTS_MAX_CONCURRENT_SCANS` (8), `RECEIPTS_GEMINI_MODEL`, `RECEIPTS_GEMINI_FALLBACK_MODEL` (asked on a 5xx, transport error or 429 from
+  the main one, after a 1 s pause; empty = retry the main one), `RECEIPTS_MAX_REQUESTS_PER_MINUTE`, `RECEIPTS_ENABLED`; defaults in `ReceiptConfig`.
   Shares `GEMINI_API_KEY` (empty = every scan answers 503 and is given back). Counter: `receipts.scans`.
 - Nginx needs `client_max_body_size 20m` on that path (see `setup-ssl.sh`, DEPLOYMENT.md).
 

@@ -45,8 +45,14 @@ class GeminiReceiptExtractorTest {
         restClient = builder.build()
     }
 
-    private fun extractor(apiKey: String = "secret-key", maxRequestsPerMinute: Int = 100) =
-        GeminiReceiptExtractor(restClient, ReceiptGeminiSettings(apiKey, "test-model", maxRequestsPerMinute), objectMapper)
+    private val fallbackUrl = "https://gemini.test/v1beta/models/backup-model:generateContent"
+
+    private fun extractor(apiKey: String = "secret-key", maxRequestsPerMinute: Int = 100, fallbackModel: String = "") =
+        GeminiReceiptExtractor(
+            restClient,
+            ReceiptGeminiSettings(apiKey, "test-model", maxRequestsPerMinute, fallbackModel, retryDelayMillis = 0),
+            objectMapper
+        )
 
     /** A Gemini reply whose text part is [extraction]. */
     private fun reply(extraction: String): String = objectMapper.writeValueAsString(
@@ -216,5 +222,88 @@ class GeminiReceiptExtractorTest {
         val prompt = GeminiReceiptExtractor.prompt(today)
         EntryCategory.ALL.forEach { assertTrue(prompt.contains("- $it: "), "missing $it") }
         assertTrue(!prompt.contains(EntryCategory.UNCATEGORIZED))
+    }
+
+    @Test
+    fun `an overloaded model hands the receipt to the fallback model`() {
+        server.expect(once(), requestTo(url)).andRespond(withStatus(HttpStatus.SERVICE_UNAVAILABLE))
+        server.expect(once(), requestTo(fallbackUrl))
+            .andRespond(withSuccess(reply("""{"isInvoice":true,"amount":12,"description":"Taxi"}"""), MediaType.APPLICATION_JSON))
+
+        val reading = extractor(fallbackModel = "backup-model").extract("QUJD", "image/jpeg", today)
+
+        assertTrue(reading is ReceiptReading.Read)
+        server.verify()
+    }
+
+    @Test
+    fun `an unreachable model hands the receipt to the fallback model`() {
+        server.expect(once(), requestTo(url)).andRespond(withException(IOException("connection reset")))
+        server.expect(once(), requestTo(fallbackUrl)).andRespond(withSuccess(reply("""{"isInvoice":false}"""), MediaType.APPLICATION_JSON))
+
+        assertEquals(ReceiptReading.NotAReceipt, extractor(fallbackModel = "backup-model").extract("QUJD", "image/jpeg", today))
+        server.verify()
+    }
+
+    @Test
+    fun `a rate limited model hands the receipt to the fallback model`() {
+        server.expect(once(), requestTo(url)).andRespond(withStatus(HttpStatus.TOO_MANY_REQUESTS))
+        server.expect(once(), requestTo(fallbackUrl)).andRespond(withSuccess(reply("""{"isInvoice":false}"""), MediaType.APPLICATION_JSON))
+
+        assertEquals(ReceiptReading.NotAReceipt, extractor(fallbackModel = "backup-model").extract("QUJD", "image/jpeg", today))
+        server.verify()
+    }
+
+    @Test
+    fun `when both models fail the receipt is UNAVAILABLE after two attempts`() {
+        server.expect(once(), requestTo(url)).andRespond(withStatus(HttpStatus.SERVICE_UNAVAILABLE))
+        server.expect(once(), requestTo(fallbackUrl)).andRespond(withStatus(HttpStatus.SERVICE_UNAVAILABLE))
+
+        assertEquals(
+            ReceiptReading.Failed(ReceiptFailure.UNAVAILABLE),
+            extractor(fallbackModel = "backup-model").extract("QUJD", "image/jpeg", today)
+        )
+        server.verify()
+    }
+
+    @Test
+    fun `a rate limited fallback is BUSY`() {
+        server.expect(once(), requestTo(url)).andRespond(withStatus(HttpStatus.SERVICE_UNAVAILABLE))
+        server.expect(once(), requestTo(fallbackUrl)).andRespond(withStatus(HttpStatus.TOO_MANY_REQUESTS))
+
+        assertEquals(
+            ReceiptReading.Failed(ReceiptFailure.BUSY),
+            extractor(fallbackModel = "backup-model").extract("QUJD", "image/jpeg", today)
+        )
+    }
+
+    @Test
+    fun `a rejected request or a timeout is not handed to the fallback`() {
+        server.expect(once(), requestTo(url)).andRespond(withStatus(HttpStatus.BAD_REQUEST))
+        server.expect(never(), requestTo(fallbackUrl))
+        assertEquals(
+            ReceiptReading.Failed(ReceiptFailure.REJECTED),
+            extractor(fallbackModel = "backup-model").extract("QUJD", "image/jpeg", today)
+        )
+        server.verify()
+
+        server.reset()
+        server.expect(once(), requestTo(url)).andRespond(withException(SocketTimeoutException("read timed out")))
+        server.expect(never(), requestTo(fallbackUrl))
+        assertEquals(
+            ReceiptReading.Failed(ReceiptFailure.TIMEOUT),
+            extractor(fallbackModel = "backup-model").extract("QUJD", "image/jpeg", today)
+        )
+        server.verify()
+    }
+
+    @Test
+    fun `a fallback equal to the main model behaves like no fallback`() {
+        server.expect(once(), requestTo(url)).andRespond(withStatus(HttpStatus.TOO_MANY_REQUESTS))
+        assertEquals(
+            ReceiptReading.Failed(ReceiptFailure.BUSY),
+            extractor(fallbackModel = "test-model").extract("QUJD", "image/jpeg", today)
+        )
+        server.verify()
     }
 }

@@ -19,14 +19,20 @@ import java.time.LocalDate
 data class ReceiptGeminiSettings(
     val apiKey: String,
     val model: String,
-    val maxRequestsPerMinute: Int = DEFAULT_MAX_REQUESTS_PER_MINUTE
+    val maxRequestsPerMinute: Int = DEFAULT_MAX_REQUESTS_PER_MINUTE,
+    /** Asked when [model] is overloaded or failing; blank = retry [model] itself once instead. */
+    val fallbackModel: String = "",
+    /** Pause before the second attempt, so a momentary spike has a moment to pass. */
+    val retryDelayMillis: Long = DEFAULT_RETRY_DELAY_MILLIS
 ) {
     init {
         require(maxRequestsPerMinute > 0) { "maxRequestsPerMinute must be positive" }
+        require(retryDelayMillis >= 0) { "retryDelayMillis must not be negative" }
     }
 
     companion object {
         const val DEFAULT_MAX_REQUESTS_PER_MINUTE = 30
+        const val DEFAULT_RETRY_DELAY_MILLIS = 1_000L
     }
 }
 
@@ -36,7 +42,10 @@ data class ReceiptGeminiSettings(
  *
  * - The reply is constrained by a response schema whose `category` is an enum of [EntryCategory.ALL] and is
  *   checked again here.
- * - Only 5xx and transport errors are retried, once. A 429 is answered as [ReceiptFailure.BUSY] straight away.
+ * - At most two attempts. When the model answers 5xx ("high demand") or cannot be reached, the second one goes to
+ *   [ReceiptGeminiSettings.fallbackModel] (or the same model again when there is none), after a short pause. A 429
+ *   is only worth asking another model (quotas are per model), so without a fallback it is [ReceiptFailure.BUSY]
+ *   straight away. A 4xx or a timeout is not retried.
  * - The file and the reply are never logged; the key goes in a header, never in the URL.
  */
 class GeminiReceiptExtractor(
@@ -59,6 +68,9 @@ class GeminiReceiptExtractor(
     private sealed interface Attempt {
         class Success(val body: String) : Attempt
         class Retry(val reason: ReceiptFailure) : Attempt
+
+        /** Rate limited (429): another model may still answer, the same one will not. */
+        data object Busy : Attempt
         class GiveUp(val reason: ReceiptFailure) : Attempt
     }
 
@@ -68,23 +80,35 @@ class GeminiReceiptExtractor(
             log.warn("Receipt request budget used up for this minute")
             ReceiptReading.Failed(ReceiptFailure.BUSY)
         }
-        else -> askWithRetry(buildRequest(base64Data, mimeType, today), today)
+        else -> askWithFallback(buildRequest(base64Data, mimeType, today), today)
     }
 
-    private fun askWithRetry(request: Map<String, Any>, today: LocalDate): ReceiptReading {
-        var attempt = attemptOnce(request)
-        var tries = 1
-        while (attempt is Attempt.Retry && tries < MAX_ATTEMPTS) {
-            attempt = attemptOnce(request)
-            tries++
+    private fun askWithFallback(request: Map<String, Any>, today: LocalDate): ReceiptReading {
+        var attempt = attemptOnce(settings.model, request)
+        val secondModel = secondModelAfter(attempt)
+        if (secondModel != null) {
+            if (settings.retryDelayMillis > 0) Thread.sleep(settings.retryDelayMillis)
+            if (secondModel != settings.model) log.info("Asking the fallback model {} for a receipt", secondModel)
+            attempt = attemptOnce(secondModel, request)
         }
         return when (attempt) {
             is Attempt.Success -> replyParser.parse(attempt.body, today)
             is Attempt.GiveUp -> ReceiptReading.Failed(attempt.reason)
+            Attempt.Busy -> ReceiptReading.Failed(ReceiptFailure.BUSY)
             is Attempt.Retry -> {
                 log.warn("Gemini kept failing to read a receipt: {}", attempt.reason)
                 ReceiptReading.Failed(attempt.reason)
             }
+        }
+    }
+
+    /** Which model gets the second attempt, or null when there is none worth making. */
+    private fun secondModelAfter(first: Attempt): String? {
+        val fallback = settings.fallbackModel.takeIf { it.isNotBlank() && it != settings.model }
+        return when (first) {
+            is Attempt.Retry -> fallback ?: settings.model
+            Attempt.Busy -> fallback
+            else -> null
         }
     }
 
@@ -105,10 +129,10 @@ class GeminiReceiptExtractor(
         )
     )
 
-    private fun attemptOnce(request: Map<String, Any>): Attempt = try {
+    private fun attemptOnce(model: String, request: Map<String, Any>): Attempt = try {
         Attempt.Success(
             restClient.post()
-                .uri("/v1beta/models/{model}:generateContent", settings.model)
+                .uri("/v1beta/models/{model}:generateContent", model)
                 .header(API_KEY_HEADER, settings.apiKey)
                 .contentType(MediaType.APPLICATION_JSON)
                 .body(request)
@@ -118,23 +142,26 @@ class GeminiReceiptExtractor(
         )
     } catch (e: RestClientResponseException) {
         when {
-            e.statusCode.value() == TOO_MANY_REQUESTS -> Attempt.GiveUp(ReceiptFailure.BUSY)
+            e.statusCode.value() == TOO_MANY_REQUESTS -> {
+                log.warn("Gemini ({}) rate limited a receipt: {}", model, googleError(e))
+                Attempt.Busy
+            }
             e.statusCode.is5xxServerError -> {
-                log.warn("Gemini answered HTTP {} to a receipt: {}", e.statusCode.value(), googleError(e))
+                log.warn("Gemini ({}) answered HTTP {} to a receipt: {}", model, e.statusCode.value(), googleError(e))
                 Attempt.Retry(ReceiptFailure.UNAVAILABLE)
             }
             else -> {
-                log.warn("Gemini answered HTTP {} to a receipt: {}", e.statusCode.value(), googleError(e))
+                log.warn("Gemini ({}) answered HTTP {} to a receipt: {}", model, e.statusCode.value(), googleError(e))
                 Attempt.GiveUp(ReceiptFailure.REJECTED)
             }
         }
     } catch (e: ResourceAccessException) {
         if (e.isTimeout()) {
-            log.warn("Gemini did not answer a receipt in time")
+            log.warn("Gemini ({}) did not answer a receipt in time", model)
             Attempt.GiveUp(ReceiptFailure.TIMEOUT)
         } else {
             val cause = generateSequence<Throwable>(e) { it.cause }.last()
-            log.warn("Gemini unreachable for a receipt: {}: {}", cause.javaClass.simpleName, cause.message)
+            log.warn("Gemini ({}) unreachable for a receipt: {}: {}", model, cause.javaClass.simpleName, cause.message)
             Attempt.Retry(ReceiptFailure.UNAVAILABLE)
         }
     }
@@ -160,7 +187,6 @@ class GeminiReceiptExtractor(
     companion object {
         private const val API_KEY_HEADER = "x-goog-api-key"
         private const val TOO_MANY_REQUESTS = 429
-        private const val MAX_ATTEMPTS = 2
         private const val MAX_ERROR_LOG_LENGTH = 300
         private const val TEMPERATURE = 0.1
 

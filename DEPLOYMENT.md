@@ -276,6 +276,7 @@ docker-compose up -d
 | `GEMINI_MAX_REQUESTS_PER_MINUTE` | Requests to Gemini per minute, kept under the plan's quota | `10` |
 | `CATEGORIZATION_ENABLED` | `false` removes the categorize endpoint and the Gemini client altogether | `true` |
 | `RECEIPTS_GEMINI_MODEL` | Gemini model that reads receipts (multimodal; uses the same `GEMINI_API_KEY`) | `gemini-3.8-flash` |
+| `RECEIPTS_GEMINI_FALLBACK_MODEL` | Model asked when the main one is overloaded (503) or failing, or rate limited (429). Empty = retry the main one once | `gemini-3.5-flash-lite` |
 | `RECEIPTS_MAX_REQUESTS_PER_MINUTE` | Receipt requests to Gemini per minute for the whole server; above it a scan answers `503 AI_BUSY` | `30` |
 | `RECEIPTS_FREE_MONTHLY_SCANS` | Receipt scans a `FREE` account gets per UTC calendar month | `10` |
 | `RECEIPTS_PREMIUM_MONTHLY_SCANS` | Receipt scans a `PREMIUM` account gets per month (fair-use cap) | `200` |

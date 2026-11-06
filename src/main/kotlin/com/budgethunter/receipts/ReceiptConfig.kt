@@ -34,6 +34,7 @@ class ReceiptConfig {
         objectMapper: ObjectMapper,
         @Value("\${receipts.gemini.api-key:\${categorization.gemini.api-key:}}") apiKey: String,
         @Value("\${receipts.gemini.model:$DEFAULT_MODEL}") model: String,
+        @Value("\${receipts.gemini.fallback-model:$DEFAULT_FALLBACK_MODEL}") fallbackModel: String,
         @Value("\${receipts.gemini.base-url:$DEFAULT_BASE_URL}") baseUrl: String,
         @Value("\${receipts.gemini.timeout-seconds:$DEFAULT_TIMEOUT_SECONDS}") timeoutSeconds: Long,
         @Value("\${receipts.gemini.max-requests-per-minute:${ReceiptGeminiSettings.DEFAULT_MAX_REQUESTS_PER_MINUTE}}")
@@ -46,7 +47,7 @@ class ReceiptConfig {
         val restClient = restClientBuilder.baseUrl(baseUrl).requestFactory(requestFactory).build()
         return GeminiReceiptExtractor(
             restClient,
-            ReceiptGeminiSettings(apiKey.trim(), model, maxRequestsPerMinute),
+            ReceiptGeminiSettings(apiKey.trim(), model.trim(), maxRequestsPerMinute, fallbackModel.trim()),
             objectMapper
         )
     }
@@ -84,6 +85,10 @@ class ReceiptConfig {
     private companion object {
         // Model ids come and go, so this is only a default (the one the app used to call).
         const val DEFAULT_MODEL = "gemini-3.8-flash"
+
+        // Asked when the main model is overloaded (Gemini answers 503 "high demand" at peaks). A lighter model
+        // that categorization already uses; set RECEIPTS_GEMINI_FALLBACK_MODEL empty to retry the main one instead.
+        const val DEFAULT_FALLBACK_MODEL = "gemini-3.5-flash-lite"
         const val DEFAULT_BASE_URL = "https://generativelanguage.googleapis.com"
         const val DEFAULT_TIMEOUT_SECONDS = 30L
         const val DEFAULT_FREE_MONTHLY_SCANS = 10
