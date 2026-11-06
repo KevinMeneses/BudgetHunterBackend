@@ -2,6 +2,7 @@ package com.budgethunter.receipts
 
 import com.budgethunter.categorization.CategoryGuide
 import com.budgethunter.model.EntryCategory
+import com.fasterxml.jackson.core.JsonProcessingException
 import com.fasterxml.jackson.databind.ObjectMapper
 import io.github.bucket4j.Bucket
 import org.slf4j.LoggerFactory
@@ -118,19 +119,39 @@ class GeminiReceiptExtractor(
     } catch (e: RestClientResponseException) {
         when {
             e.statusCode.value() == TOO_MANY_REQUESTS -> Attempt.GiveUp(ReceiptFailure.BUSY)
-            e.statusCode.is5xxServerError -> Attempt.Retry(ReceiptFailure.UNAVAILABLE)
+            e.statusCode.is5xxServerError -> {
+                log.warn("Gemini answered HTTP {} to a receipt: {}", e.statusCode.value(), googleError(e))
+                Attempt.Retry(ReceiptFailure.UNAVAILABLE)
+            }
             else -> {
-                log.warn("Gemini answered HTTP {} to a receipt", e.statusCode.value())
+                log.warn("Gemini answered HTTP {} to a receipt: {}", e.statusCode.value(), googleError(e))
                 Attempt.GiveUp(ReceiptFailure.REJECTED)
             }
         }
     } catch (e: ResourceAccessException) {
         if (e.isTimeout()) {
+            log.warn("Gemini did not answer a receipt in time")
             Attempt.GiveUp(ReceiptFailure.TIMEOUT)
         } else {
-            log.debug("Gemini unreachable ({})", e.cause?.javaClass?.simpleName)
+            val cause = generateSequence<Throwable>(e) { it.cause }.last()
+            log.warn("Gemini unreachable for a receipt: {}: {}", cause.javaClass.simpleName, cause.message)
             Attempt.Retry(ReceiptFailure.UNAVAILABLE)
         }
+    }
+
+    /**
+     * Google's own `status` and `message` from an error reply (e.g. "UNAVAILABLE: The model is overloaded"), cut
+     * short. Error replies describe the request, never the file, so this is safe to log; the body itself is not.
+     */
+    private fun googleError(e: RestClientResponseException): String {
+        val error = try {
+            objectMapper.readTree(e.responseBodyAsString).path("error")
+        } catch (_: JsonProcessingException) {
+            null
+        }
+        val status = error?.path("status")?.asText().orEmpty()
+        val message = error?.path("message")?.asText().orEmpty()
+        return "$status $message".trim().ifEmpty { "(no error details)" }.take(MAX_ERROR_LOG_LENGTH)
     }
 
     private fun ResourceAccessException.isTimeout(): Boolean =
@@ -140,6 +161,7 @@ class GeminiReceiptExtractor(
         private const val API_KEY_HEADER = "x-goog-api-key"
         private const val TOO_MANY_REQUESTS = 429
         private const val MAX_ATTEMPTS = 2
+        private const val MAX_ERROR_LOG_LENGTH = 300
         private const val TEMPERATURE = 0.1
 
         /** The prompt the app used to send, now kept here. "Today" is the user's date, for documents without one. */
