@@ -381,4 +381,32 @@ class GeminiReceiptExtractorTest {
         }
         server.verify()
     }
+
+    @Test
+    fun `amounts never come out in scientific notation`() {
+        mapOf(
+            "55730" to "55730",
+            "55730.00" to "55730",
+            "1000000" to "1000000",
+            "45900.50" to "45900.5",
+            "12.345" to "12.345"
+        ).forEach { (sent, expected) ->
+            server.reset()
+            expectReply("""{"isInvoice":true,"amount":$sent,"description":"D1"}""")
+            val reading = extractor().extract("QUJD", "image/jpeg", today) as ReceiptReading.Read
+            assertEquals(expected, reading.amount?.toString(), "amount $sent")
+            assertEquals(expected, objectMapper.writeValueAsString(reading.amount), "JSON for $sent")
+        }
+    }
+
+    @Test
+    fun `an absurd amount is dropped instead of being written out`() {
+        listOf("1E+999999999", "1E+30", "\"1E+999999999\"").forEach { sent ->
+            server.reset()
+            expectReply("""{"isInvoice":true,"amount":$sent,"description":"D1"}""")
+            val reading = extractor().extract("QUJD", "image/jpeg", today) as ReceiptReading.Read
+            assertEquals(null, reading.amount, "amount $sent")
+            assertEquals("D1", reading.description)
+        }
+    }
 }
