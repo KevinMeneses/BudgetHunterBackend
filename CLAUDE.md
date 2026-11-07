@@ -148,7 +148,8 @@ src/main/kotlin/com/budgethunter/
 │   ├── UserBudget.kt
 │   └── BudgetEntry.kt            # also EntryCategory (the closed category list, OTHER, UNCATEGORIZED)
 ├── categorization/                # automatic entry categorization (see below)
-└── receipts/                      # AI receipt reading and the monthly scans per plan (see below)
+├── receipts/                      # AI receipt reading and the monthly scans per plan (see below)
+└── billing/                       # store purchases through RevenueCat (see "Store purchases")
 ```
 
 ## Automatic categorization
@@ -180,7 +181,8 @@ The app no longer calls Gemini: `POST /api/receipts/extract` (package `receipts/
 asks Gemini (`GeminiReceiptExtractor`, prompt kept here) and answers what it read. Nothing is stored.
 
 - **Plans:** `users.plan` is `FREE` or `PREMIUM` (`model/Plan.kt`); everyone starts `FREE`. The store purchase
-  (RevenueCat, next step) is what will set `PREMIUM`.
+  (RevenueCat, see "Store purchases" below) is what sets `PREMIUM`. Always read the plan through
+  `User.planAt(now)`: a `PREMIUM` past `plan_expires_at` is `FREE`.
 - **Quota:** `ai_usage` holds receipt scans per account and UTC month ('YYYY-MM'), one row per month, so nothing
   resets. The row is created with a native `INSERT ... WHERE NOT EXISTS`, never by saving the entity (a merge
   could write 0 over a counter another request just raised). `ReceiptQuotaService` takes a scan *before* asking the AI with a conditional `UPDATE ... WHERE
@@ -205,6 +207,24 @@ asks Gemini (`GeminiReceiptExtractor`, prompt kept here) and answers what it rea
   changing a model id; `-latest` aliases and previews are avoided on purpose (they change without notice).
 - The Gemini client for receipts is pinned to HTTP/1.1 (`ReceiptConfig`). It was added while chasing those timeouts
   and kept because it costs nothing for one request per call.
+
+## Store purchases (RevenueCat)
+
+Package `billing/`. Google Play / App Store sell the subscription, RevenueCat tracks it, the server decides.
+
+- **Ids:** each account has a random `users.billing_id` (set on creation, never changes, `V5__add_billing.sql`).
+  It is the RevenueCat app user id; the app gets it from `GET /api/billing/status` and calls `Purchases.logIn`.
+  Never use the email there (it would reach RevenueCat and the stores).
+- **Never trust an event's content.** `POST /api/webhooks/revenuecat` (public in `SecurityConfig`, checked against
+  `REVENUECAT_WEBHOOK_AUTHORIZATION` in constant time) only says *which* accounts to look at (`app_user_id`,
+  `original_app_user_id`, `aliases`, `transferred_from/to`); `BillingService` then asks RevenueCat's REST API
+  (`RevenueCatClient`, `GET /v1/subscribers/{id}`, secret key) and writes the result with
+  `UserRepository.updatePlan` (only the plan columns, so it cannot undo a concurrent preference change).
+  `POST /api/billing/sync` does the same on demand, for right after a purchase or a restore.
+- **Expiry:** `plan_expires_at` = the entitlement's `expires_date`, or its `grace_period_expires_date` if later;
+  null = does not run out. A RevenueCat failure answers 503 (`BillingUnavailableException`); RevenueCat retries.
+- **Config:** `REVENUECAT_SECRET_API_KEY`, `REVENUECAT_WEBHOOK_AUTHORIZATION`, `REVENUECAT_ENTITLEMENT_ID`
+  (`premium`); defaults in `BillingConfig`. Setup steps in DEPLOYMENT.md.
 
 ## Deployment
 

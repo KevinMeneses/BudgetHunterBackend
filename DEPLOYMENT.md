@@ -285,6 +285,9 @@ docker-compose up -d
 | `RECEIPTS_MAX_SCANS_PER_USER_PER_MINUTE` | Scans one account may start per minute; above it `429 TOO_MANY_SCANS` | `6` |
 | `RECEIPTS_MAX_CONCURRENT_SCANS` | Scans in flight at once on the server; above it `503 AI_BUSY` (bounds memory and threads) | `8` |
 | `RECEIPTS_ENABLED` | `false` removes the receipt endpoints altogether | `true` |
+| `REVENUECAT_SECRET_API_KEY` | RevenueCat secret key (`sk_...`); the server reads each account's entitlement with it. Empty = plans never leave `FREE` and `/api/billing/sync` answers 503 | empty |
+| `REVENUECAT_WEBHOOK_AUTHORIZATION` | Exact `Authorization` header value configured on RevenueCat's webhook. Empty = every webhook answers 401 | empty |
+| `REVENUECAT_ENTITLEMENT_ID` | The entitlement the premium products unlock, as named in RevenueCat | `premium` |
 | `MANAGEMENT_ENDPOINTS_EXPOSED` | Actuator endpoints to expose; add `metrics` to read the `categorization.*` counters (needs a token, see [MONITORING.md](MONITORING.md)) | `health` |
 
 ### Automatic categorization (Gemini)
@@ -320,6 +323,32 @@ store purchase says otherwise) and a number of scans per UTC month (`ai_usage`);
 3. Migration `V4__add_plan_and_ai_usage.sql` adds the column and the table; Flyway applies it on startup.
 4. After the first deploy, scan one real receipt and check `receipts.scans` (see MONITORING.md): `read` means the
    key and `RECEIPTS_GEMINI_MODEL` work; `ai_unavailable` or `ai_rejected` usually means a wrong key or model id.
+
+### Store purchases (RevenueCat)
+
+The stores sell the subscription and RevenueCat tells the server; the server decides the plan. Each account has a
+random `users.billing_id`, which is its RevenueCat "app user id" (the email never goes to RevenueCat or the
+stores). The app reads it from `GET /api/billing/status` and passes it to `Purchases.logIn` after sign-in.
+
+Whenever something happens (a webhook, or the app calling `POST /api/billing/sync` after a purchase or restore),
+the server asks RevenueCat's REST API (`GET /v1/subscribers/{id}`) for the entitlement and writes `users.plan`
+and `users.plan_expires_at` (end of the paid period, grace period included). It never applies what an event
+says, so retries, duplicates and events out of order are harmless. A `PREMIUM` whose `plan_expires_at` has passed
+counts as `FREE` even if the expiry webhook never arrived.
+
+1. In RevenueCat: create the entitlement `premium` and attach the monthly and yearly products to it.
+2. *Project settings > API keys*: create a **secret** key (v1 is enough, read-only access) and put it in the
+   server's `.env` as `REVENUECAT_SECRET_API_KEY`. It is a server secret: the app uses the public `goog_` key.
+3. Generate a webhook secret (`openssl rand -hex 32`) and put it in `.env` as `REVENUECAT_WEBHOOK_AUTHORIZATION`.
+4. *Integrations > Webhooks*: URL `https://<your domain>/api/webhooks/revenuecat`, *Authorization header value*
+   the same secret, events for both environments (sandbox purchases from license testers must work for testing).
+5. Redeploy (migration `V5__add_billing.sql` gives every existing account its `billing_id`), then use
+   RevenueCat's *Send test event*: the log shows `RevenueCat webhook TEST (...): 0 account(s) refreshed` and
+   RevenueCat marks it delivered. A 401 means the two secrets differ.
+
+To give an account premium by hand (a tester, a refund dispute): `UPDATE users SET plan = 'PREMIUM',
+plan_expires_at = NULL WHERE email = '...'`. Note that the next webhook or sync for that account writes what
+RevenueCat says again.
 
 ### Generating a Secure JWT Secret
 

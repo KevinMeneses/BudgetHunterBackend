@@ -11,6 +11,7 @@ import jakarta.persistence.Table
 import jakarta.validation.constraints.Email
 import jakarta.validation.constraints.NotBlank
 import java.time.Instant
+import java.util.UUID
 
 @Entity
 @Table(name = "users")
@@ -66,6 +67,22 @@ data class User(
     @field:Column(name = "plan", nullable = false, length = 20)
     var plan: Plan = Plan.FREE,
 
+    // Until when PREMIUM holds, as the store reported it (renewals and grace periods included). Null with
+    // PREMIUM means it does not run out (a lifetime purchase, or a plan granted by hand). See [planAt].
+    @field:Column(name = "plan_expires_at")
+    var planExpiresAt: Instant? = null,
+
+    // The id this account has at RevenueCat (its "app user id"). Random and never shown to anyone, so the
+    // store and RevenueCat never see the email. Set once when the account is created; never changes.
+    @field:Column(name = "billing_id", nullable = false, unique = true, updatable = false, length = 36)
+    val billingId: String = UUID.randomUUID().toString(),
+
     @field:OneToMany(mappedBy = "user", cascade = [CascadeType.ALL], orphanRemoval = true)
     val userBudgets: MutableList<UserBudget> = mutableListOf()
-)
+) {
+    /** The plan in force at [now]: PREMIUM only until [planExpiresAt], in case the expiry webhook never came. */
+    fun planAt(now: Instant): Plan {
+        val expiresAt = planExpiresAt
+        return if (plan == Plan.PREMIUM && (expiresAt == null || now.isBefore(expiresAt))) Plan.PREMIUM else Plan.FREE
+    }
+}

@@ -38,7 +38,10 @@ CREATE TABLE IF NOT EXISTS users (
     default_budget_id BIGINT,
     selected_bank_ids VARCHAR(1000),
     -- What the account paid for (FREE / PREMIUM); see V4__add_plan_and_ai_usage.sql.
-    plan VARCHAR(20) NOT NULL DEFAULT 'FREE' CONSTRAINT users_plan_check CHECK (plan IN ('FREE', 'PREMIUM'))
+    plan VARCHAR(20) NOT NULL DEFAULT 'FREE' CONSTRAINT users_plan_check CHECK (plan IN ('FREE', 'PREMIUM')),
+    -- Store purchases; see V5__add_billing.sql.
+    plan_expires_at TIMESTAMP WITH TIME ZONE,
+    billing_id VARCHAR(36) NOT NULL UNIQUE DEFAULT gen_random_uuid()::text
 );
 
 -- Paid AI used per account and UTC calendar month ('YYYY-MM'); see V4__add_plan_and_ai_usage.sql.
