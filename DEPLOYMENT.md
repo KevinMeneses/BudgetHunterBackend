@@ -275,8 +275,8 @@ docker-compose up -d
 | `GEMINI_MODEL` | Gemini model id. Google retires old ones, so check [the model list](https://ai.google.dev/gemini-api/docs/models) | `gemini-3.5-flash-lite` |
 | `GEMINI_MAX_REQUESTS_PER_MINUTE` | Requests to Gemini per minute, kept under the plan's quota | `10` |
 | `CATEGORIZATION_ENABLED` | `false` removes the categorize endpoint and the Gemini client altogether | `true` |
-| `RECEIPTS_GEMINI_MODEL` | Gemini model that reads receipts (multimodal; uses the same `GEMINI_API_KEY`) | `gemini-3.8-flash` |
-| `RECEIPTS_GEMINI_FALLBACK_MODEL` | Model asked when the main one is overloaded (503) or failing, or rate limited (429). Empty = retry the main one once | `gemini-3.5-flash-lite` |
+| `RECEIPTS_GEMINI_MODEL` | Gemini model that reads receipts (multimodal; uses the same `GEMINI_API_KEY`). Check Google's deprecations page before changing it; `gemini-3.8-flash` answered 503 "high demand" to nearly every call in Nov 2026 | `gemini-3.5-flash-lite` |
+| `RECEIPTS_GEMINI_FALLBACK_MODEL` | Model asked when the main one is overloaded (503), failing, rate limited (429) or too slow. Empty = retry the main one once | `gemini-3.6-flash` |
 | `RECEIPTS_GEMINI_THINKING_LEVEL` | Gemini 3 `thinkingLevel` for receipts. The default level reasons long enough on an image to pass the timeout; empty = the model's default. Sent to both models, so a fallback that is not Gemini 3 needs it empty | `low` |
 | `RECEIPTS_GEMINI_TIMEOUT_SECONDS` | Seconds per attempt, for connecting and for the answer; a timeout goes to the fallback model. Must be positive; keep two attempts under the app's 90 s | `30` |
 | `RECEIPTS_MAX_REQUESTS_PER_MINUTE` | Receipt requests to Gemini per minute for the whole server; above it a scan answers `503 AI_BUSY` | `30` |

@@ -199,8 +199,12 @@ asks Gemini (`GeminiReceiptExtractor`, prompt kept here) and answers what it rea
   `RECEIPTS_GEMINI_TIMEOUT_SECONDS` (30), `RECEIPTS_MAX_REQUESTS_PER_MINUTE`, `RECEIPTS_ENABLED`; defaults in `ReceiptConfig`.
   Shares `GEMINI_API_KEY` (empty = every scan answers 503 and is given back). Counter: `receipts.scans`.
 - Nginx needs `client_max_body_size 20m` on that path (see `setup-ssl.sh`, DEPLOYMENT.md).
-- The Gemini client for receipts is pinned to HTTP/1.1 (`ReceiptConfig`): large bodies could stall on the JDK
-  client's default HTTP/2 until the read timeout.
+- **Models** (Nov 2026, measured from the droplet): main `gemini-3.5-flash-lite` (~0.6 s), fallback `gemini-3.6-flash`
+  (6-20 s). `gemini-3.8-flash`, the app's old model, answered 503 "high demand" to nearly every call, sometimes
+  after 44 s: that, not the network, made scans time out at 30 s. Check Google's deprecations page before
+  changing a model id; `-latest` aliases and previews are avoided on purpose (they change without notice).
+- The Gemini client for receipts is pinned to HTTP/1.1 (`ReceiptConfig`). It was added while chasing those timeouts
+  and kept because it costs nothing for one request per call.
 
 ## Deployment
 
