@@ -44,10 +44,9 @@ class ReceiptConfig {
         require(timeoutSeconds > 0) { "receipts.gemini.timeout-seconds must be positive" }
         if (apiKey.isBlank()) log.info("Receipt reading has no GEMINI_API_KEY; every scan will answer AI_UNAVAILABLE")
         val timeout = Duration.ofSeconds(timeoutSeconds)
-        // HTTP/1.1 on purpose: the JDK client negotiates HTTP/2 by default, and large request bodies (a receipt is
-        // megabytes of Base64) can stall on HTTP/2 flow control until the read timeout. Scans timed out after
-        // exactly 30 s from the server while the same model answered from the phone; one request per call loses
-        // nothing that HTTP/2 multiplexing would have given here.
+        // HTTP/1.1: added while scans timed out at exactly 30 s, in case large bodies stalled on the JDK client's
+        // HTTP/2. The cause turned out to be the overloaded main model (see DEFAULT_MODEL); this stays because one
+        // request per call loses nothing that HTTP/2 multiplexing would have given here.
         val httpClient = HttpClient.newBuilder()
             .version(HttpClient.Version.HTTP_1_1)
             .connectTimeout(timeout)
@@ -99,12 +98,16 @@ class ReceiptConfig {
     )
 
     private companion object {
-        // Model ids come and go, so this is only a default (the one the app used to call).
-        const val DEFAULT_MODEL = "gemini-3.8-flash"
+        // Model ids come and go, so these are only defaults; see Google's deprecations page before changing them.
+        // Measured from the production droplet (Nov 2026, three calls each): 3.5-flash-lite answered 200 in ~0.6 s
+        // every time; 3.6-flash 200 in 6-20 s; 3.8-flash (the one the app used to call) 503 "high demand" every
+        // time, once after 44 s, which is what made scans time out at 30 s. Older ids (3.5-flash, 3.7-flash) now
+        // route to 3.6/3.8, and the 2.5 ones are retiring or do not accept thinkingLevel.
+        const val DEFAULT_MODEL = "gemini-3.5-flash-lite"
 
-        // Asked when the main model is overloaded (Gemini answers 503 "high demand" at peaks). A lighter model
-        // that categorization already uses; set RECEIPTS_GEMINI_FALLBACK_MODEL empty to retry the main one instead.
-        const val DEFAULT_FALLBACK_MODEL = "gemini-3.5-flash-lite"
+        // Asked when the main model fails: a full Flash model, slower but stable and better on hard receipts.
+        // Set RECEIPTS_GEMINI_FALLBACK_MODEL empty to retry the main one instead.
+        const val DEFAULT_FALLBACK_MODEL = "gemini-3.6-flash"
         const val DEFAULT_BASE_URL = "https://generativelanguage.googleapis.com"
         const val DEFAULT_TIMEOUT_SECONDS = 30L
 
