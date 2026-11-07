@@ -11,6 +11,7 @@ import com.budgethunter.receipts.ReceiptQuotaService
 import com.budgethunter.receipts.ReceiptReading
 import com.budgethunter.repository.UserRepository
 import com.fasterxml.jackson.databind.ObjectMapper
+import org.hamcrest.Matchers.containsString
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -25,6 +26,7 @@ import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.ResultActions
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
+import org.springframework.test.web.servlet.result.MockMvcResultMatchers.content
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
 import java.math.BigDecimal
@@ -148,6 +150,8 @@ class ReceiptIntegrationTest {
         extract().andExpect(status().isOk)
             .andExpect(jsonPath("$.isReceipt").value(true))
             .andExpect(jsonPath("$.amount").value(45900))
+            // The raw JSON, not just the number: 4.59E+4 is the same number but the app shows the text
+            .andExpect(content().string(containsString("\"amount\":45900,")))
             .andExpect(jsonPath("$.description").value("Éxito"))
             .andExpect(jsonPath("$.category").value("GROCERIES"))
             .andExpect(jsonPath("$.date").value("2026-11-02"))

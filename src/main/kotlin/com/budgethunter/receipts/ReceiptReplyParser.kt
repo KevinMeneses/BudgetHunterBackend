@@ -61,7 +61,16 @@ internal class ReceiptReplyParser(private val objectMapper: ObjectMapper) {
             isTextual -> asText().trim().toBigDecimalOrNull()
             else -> null
         }
-        return value?.takeIf { it.signum() > 0 }?.stripTrailingZeros()
+        return value?.takeIf { it.signum() > 0 }?.plain()
+    }
+
+    /**
+     * Without trailing decimal zeros, but never in scientific notation: `stripTrailingZeros` alone turns 55730 into
+     * 5.573E+4 (a negative scale), which Jackson writes as is and the app showed verbatim in the amount field.
+     */
+    private fun BigDecimal.plain(): BigDecimal {
+        val stripped = stripTrailingZeros()
+        return if (stripped.scale() < 0) stripped.setScale(0) else stripped
     }
 
     private fun JsonNode.toDate(): LocalDate? = asText("").trim().takeIf { ISO_DATE.matches(it) }?.let {
