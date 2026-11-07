@@ -248,7 +248,7 @@ class BillingIntegrationTest {
 
         webhook(mapOf("type" to "RENEWAL", "app_user_id" to billingId, "aliases" to aliases))
             .andExpect(status().isOk).andExpect(jsonPath("$.accountsRefreshed").value(1))
-        // Only the first ten ids are looked up, and the buyer's own id comes first.
+        // Only the first five ids are looked up, and the buyer's own id comes first.
         assertEquals(listOf(billingId), asked)
     }
 

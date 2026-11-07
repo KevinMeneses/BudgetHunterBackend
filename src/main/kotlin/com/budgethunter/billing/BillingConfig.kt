@@ -54,7 +54,8 @@ class BillingConfig {
         const val DEFAULT_ENTITLEMENT_ID = "premium"
         const val DEFAULT_BASE_URL = "https://api.revenuecat.com"
 
-        // RevenueCat waits for the webhook's answer and retries on a timeout, so this stays well below that.
-        const val TIMEOUT_SECONDS = 10L
+        // Per call to RevenueCat (its API answers in well under a second). A webhook makes up to
+        // BillingService's 5 calls in a row, so this keeps the whole event around 25 s at worst.
+        const val TIMEOUT_SECONDS = 5L
     }
 }

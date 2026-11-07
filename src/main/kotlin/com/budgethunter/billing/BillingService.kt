@@ -7,6 +7,7 @@ import com.budgethunter.repository.UserRepository
 import com.budgethunter.util.PerAccountRateLimiter
 import com.fasterxml.jackson.databind.JsonNode
 import org.slf4j.LoggerFactory
+import org.springframework.security.authentication.BadCredentialsException
 import java.time.Clock
 
 /**
@@ -66,7 +67,8 @@ class BillingService(
     }
 
     private fun userOf(email: String): User = userRepository.findById(email)
-        .orElseThrow { IllegalStateException("Signed-in account $email no longer exists") }
+        // Deleted after its token was checked: answer like any request without a valid account (401).
+        .orElseThrow { BadCredentialsException("Account not found") }
 
     private fun statusOf(user: User): BillingStatusResponse {
         val plan = user.planAt(clock.instant())
@@ -90,9 +92,9 @@ class BillingService(
         val ID_FIELDS = listOf("app_user_id", "original_app_user_id")
         val LIST_FIELDS = listOf("aliases", "transferred_from", "transferred_to")
 
-        // An event names one customer and a few aliases. Refreshes run one after another and RevenueCat waits
-        // for the answer, so this keeps a slow API from pushing the webhook past its timeout.
-        const val MAX_IDS_PER_EVENT = 10
+        // An event names one customer and a few aliases (in practice 1-3 of them ours). Refreshes run one after
+        // another and RevenueCat waits for the answer: at most 5 ids x BillingConfig's 5 s timeout = 25 s.
+        const val MAX_IDS_PER_EVENT = 5
 
         // Enough for purchase, restore and a retry or two.
         const val DEFAULT_SYNCS_PER_MINUTE = 5
