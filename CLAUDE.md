@@ -117,7 +117,7 @@ The application uses **profile-based database configuration**:
 - **Configuration**: `application-debug.properties`
 
 ### Production (`production` profile)
-- **Database**: PostgreSQL 12+
+- **Database**: PostgreSQL 13+ (`gen_random_uuid()` in V5 is built in from 13)
 - **JDBC URL**: Configurable via `DATABASE_URL` environment variable
 - **Schema**: Available in `database/schema.sql`
 - **Connection Pool**: HikariCP with optimized settings
@@ -220,7 +220,9 @@ Package `billing/`. Google Play / App Store sell the subscription, RevenueCat tr
   `original_app_user_id`, `aliases`, `transferred_from/to`); `BillingService` then asks RevenueCat's REST API
   (`RevenueCatClient`, `GET /v1/subscribers/{id}`, secret key) and writes the result with
   `UserRepository.updatePlan` (only the plan columns, so it cannot undo a concurrent preference change).
-  `POST /api/billing/sync` does the same on demand, for right after a purchase or a restore.
+  `POST /api/billing/sync` does the same on demand, for right after a purchase or a restore (5 per account per
+  minute, then 429: each call spends the shared secret key's RevenueCat quota, which the webhook needs too).
+  An event refreshes at most 10 ids, one after another, all or nothing.
 - **Expiry:** `plan_expires_at` = the entitlement's `expires_date`, or its `grace_period_expires_date` if later;
   null = does not run out. A RevenueCat failure answers 503 (`BillingUnavailableException`); RevenueCat retries.
 - **Config:** `REVENUECAT_SECRET_API_KEY`, `REVENUECAT_WEBHOOK_AUTHORIZATION`, `REVENUECAT_ENTITLEMENT_ID`

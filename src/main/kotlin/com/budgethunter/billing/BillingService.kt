@@ -4,6 +4,7 @@ import com.budgethunter.dto.BillingStatusResponse
 import com.budgethunter.model.Plan
 import com.budgethunter.model.User
 import com.budgethunter.repository.UserRepository
+import com.budgethunter.util.PerAccountRateLimiter
 import com.fasterxml.jackson.databind.JsonNode
 import org.slf4j.LoggerFactory
 import java.time.Clock
@@ -18,14 +19,21 @@ import java.time.Clock
 class BillingService(
     private val userRepository: UserRepository,
     private val subscriberLookup: SubscriberLookup,
+    private val syncLimiter: PerAccountRateLimiter = PerAccountRateLimiter(DEFAULT_SYNCS_PER_MINUTE),
     private val clock: Clock = Clock.systemUTC()
 ) {
     private val log = LoggerFactory.getLogger(BillingService::class.java)
 
     fun status(email: String): BillingStatusResponse = statusOf(userOf(email))
 
-    /** Asks RevenueCat now instead of waiting for the webhook (the app calls it after a purchase or restore). */
+    /**
+     * Asks RevenueCat now instead of waiting for the webhook (the app calls it after a purchase or restore).
+     * Limited per account: every call costs a request on the shared secret key, which the webhook needs too.
+     *
+     * @throws BillingSyncThrottledException past a few calls a minute
+     */
     fun sync(email: String): BillingStatusResponse {
+        if (!syncLimiter.tryAcquire(email)) throw BillingSyncThrottledException()
         val user = userOf(email)
         refresh(user)
         return statusOf(userOf(email))
@@ -38,6 +46,8 @@ class BillingService(
      * @return how many accounts were refreshed
      */
     fun onWebhook(body: JsonNode): Int {
+        // All or nothing: if RevenueCat fails for one account the whole event answers 503 and is retried, and
+        // refreshing the others again then is harmless.
         val event = body.path("event")
         val type = event.path("type").asText("")
         val users = userRepository.findByBillingIdIn(appUserIdsIn(event))
@@ -50,7 +60,7 @@ class BillingService(
         val entitlement = subscriberLookup.premiumEntitlement(user.billingId)
         val expiresAt = entitlement?.expiresAt
         val now = clock.instant()
-        val plan = if (entitlement != null && (expiresAt == null || now.isBefore(expiresAt))) Plan.PREMIUM else Plan.FREE
+        val plan = if (entitlement != null) Plan.inForce(Plan.PREMIUM, expiresAt, now) else Plan.FREE
         userRepository.updatePlan(user.email, plan, expiresAt)
         if (plan != user.planAt(now)) log.info("Plan changed to {} for billing id {}", plan, user.billingId)
     }
@@ -80,7 +90,11 @@ class BillingService(
         val ID_FIELDS = listOf("app_user_id", "original_app_user_id")
         val LIST_FIELDS = listOf("aliases", "transferred_from", "transferred_to")
 
-        // An event names one customer and a few aliases; anything far past that is not worth a query.
-        const val MAX_IDS_PER_EVENT = 50
+        // An event names one customer and a few aliases. Refreshes run one after another and RevenueCat waits
+        // for the answer, so this keeps a slow API from pushing the webhook past its timeout.
+        const val MAX_IDS_PER_EVENT = 10
+
+        // Enough for purchase, restore and a retry or two.
+        const val DEFAULT_SYNCS_PER_MINUTE = 5
     }
 }

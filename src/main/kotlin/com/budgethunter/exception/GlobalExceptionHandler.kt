@@ -1,6 +1,5 @@
 package com.budgethunter.exception
 
-import com.budgethunter.billing.BillingUnavailableException
 import com.budgethunter.dto.ReceiptErrorResponse
 import com.budgethunter.receipts.AiQuotaExceededException
 import com.budgethunter.receipts.ReceiptException
@@ -86,14 +85,6 @@ class GlobalExceptionHandler {
         logger.warn("Receipt not read: {}", ex.code)
         return ResponseEntity.status(ex.status)
             .body(ReceiptErrorResponse(ex.status, ex.code, ex.message ?: "The receipt could not be read"))
-    }
-
-    @ExceptionHandler(BillingUnavailableException::class)
-    fun handleBillingUnavailable(ex: BillingUnavailableException): ResponseEntity<ErrorResponse> {
-        logger.warn("Billing unavailable: {}", ex.message)
-        val status = HttpStatus.SERVICE_UNAVAILABLE
-        return ResponseEntity.status(status)
-            .body(ErrorResponse(status = status.value(), message = "Purchases are unavailable, try again later"))
     }
 
     @ExceptionHandler(MethodArgumentNotValidException::class)

@@ -17,7 +17,7 @@ This guide covers deploying BudgetHunter Backend to production with PostgreSQL d
 
 ### Required Software
 - **Java 17** or higher
-- **PostgreSQL 12+** (recommended: PostgreSQL 15 or 16)
+- **PostgreSQL 13+** (recommended: PostgreSQL 15 or 16; migration V5 uses the built-in `gen_random_uuid()`)
 - **Gradle 8.x** (or use included wrapper: `./gradlew`)
 
 ### Required Access

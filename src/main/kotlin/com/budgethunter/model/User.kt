@@ -81,8 +81,5 @@ data class User(
     val userBudgets: MutableList<UserBudget> = mutableListOf()
 ) {
     /** The plan in force at [now]: PREMIUM only until [planExpiresAt], in case the expiry webhook never came. */
-    fun planAt(now: Instant): Plan {
-        val expiresAt = planExpiresAt
-        return if (plan == Plan.PREMIUM && (expiresAt == null || now.isBefore(expiresAt))) Plan.PREMIUM else Plan.FREE
-    }
+    fun planAt(now: Instant): Plan = Plan.inForce(plan, planExpiresAt, now)
 }

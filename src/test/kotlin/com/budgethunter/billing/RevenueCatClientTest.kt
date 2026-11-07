@@ -1,6 +1,7 @@
 package com.budgethunter.billing
 
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
@@ -97,8 +98,8 @@ class RevenueCatClientTest {
     fun `the webhook secret must match exactly`() {
         val authorization = WebhookAuthorization("s3cret")
         assertTrue(authorization.matches("s3cret"))
-        assertTrue(!authorization.matches("s3cret "))
-        assertTrue(!authorization.matches(null))
-        assertTrue(!WebhookAuthorization("").matches(""))
+        assertFalse(authorization.matches("s3cret "))
+        assertFalse(authorization.matches(null))
+        assertFalse(WebhookAuthorization("").matches(""))
     }
 }

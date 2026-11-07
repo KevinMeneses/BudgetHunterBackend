@@ -11,6 +11,9 @@ data class StoreEntitlement(
 /** Thrown when the purchases provider cannot be asked (not configured, down, or an unusable answer). */
 class BillingUnavailableException(message: String, cause: Throwable? = null) : RuntimeException(message, cause)
 
+/** Thrown when an account asks for a sync too often. Answered with HTTP 429. */
+class BillingSyncThrottledException : RuntimeException("Too many plan refreshes; try again in a minute")
+
 /** Asks the purchases provider (RevenueCat) for an account's entitlement. */
 fun interface SubscriberLookup {
     /**

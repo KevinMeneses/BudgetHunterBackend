@@ -219,6 +219,40 @@ class BillingIntegrationTest {
     }
 
     @Test
+    fun `sync is limited per account`() {
+        repeat(5) {
+            mockMvc.perform(post("/api/billing/sync").header("Authorization", "Bearer $token")).andExpect(status().isOk)
+        }
+        mockMvc.perform(post("/api/billing/sync").header("Authorization", "Bearer $token"))
+            .andExpect(status().isTooManyRequests)
+    }
+
+    @Test
+    fun `a body that is not an event is acknowledged without changes, and junk is a 400`() {
+        for (body in listOf("[]", "{}", "{\"event\": 3}")) {
+            mockMvc.perform(
+                post("/api/webhooks/revenuecat").contentType(MediaType.APPLICATION_JSON)
+                    .header("Authorization", SECRET).content(body)
+            ).andExpect(status().isOk).andExpect(jsonPath("$.accountsRefreshed").value(0))
+        }
+        mockMvc.perform(
+            post("/api/webhooks/revenuecat").contentType(MediaType.APPLICATION_JSON)
+                .header("Authorization", SECRET).content("{not json")
+        ).andExpect(status().isBadRequest)
+        assertEquals(emptyList<String>(), asked)
+    }
+
+    @Test
+    fun `an event naming many ids refreshes only the first few`() {
+        val aliases = (1..20).map { "alias-$it" }
+
+        webhook(mapOf("type" to "RENEWAL", "app_user_id" to billingId, "aliases" to aliases))
+            .andExpect(status().isOk).andExpect(jsonPath("$.accountsRefreshed").value(1))
+        // Only the first ten ids are looked up, and the buyer's own id comes first.
+        assertEquals(listOf(billingId), asked)
+    }
+
+    @Test
     fun `the billing endpoints need a signed-in account`() {
         mockMvc.perform(get("/api/billing/status")).andExpect(status().isUnauthorized)
         mockMvc.perform(post("/api/billing/sync")).andExpect(status().isUnauthorized)

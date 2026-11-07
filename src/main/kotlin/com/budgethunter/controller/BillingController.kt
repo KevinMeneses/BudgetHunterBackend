@@ -3,7 +3,9 @@ package com.budgethunter.controller
 import com.budgethunter.billing.BillingService
 import com.budgethunter.billing.WebhookAuthorization
 import com.budgethunter.dto.BillingStatusResponse
+import com.fasterxml.jackson.core.JsonProcessingException
 import com.fasterxml.jackson.databind.JsonNode
+import com.fasterxml.jackson.databind.ObjectMapper
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.tags.Tag
 import org.springframework.http.HttpHeaders
@@ -46,7 +48,8 @@ class BillingController(private val billingService: BillingService) {
 @Tag(name = "Billing")
 class RevenueCatWebhookController(
     private val billingService: BillingService,
-    private val webhookAuthorization: WebhookAuthorization
+    private val webhookAuthorization: WebhookAuthorization,
+    private val objectMapper: ObjectMapper
 ) {
 
     @PostMapping("/revenuecat")
@@ -57,9 +60,21 @@ class RevenueCatWebhookController(
     )
     fun revenueCat(
         @RequestHeader(HttpHeaders.AUTHORIZATION, required = false) authorization: String?,
-        @RequestBody body: JsonNode
+        @RequestBody body: String
     ): ResponseEntity<Map<String, Int>> {
+        // The body is read as text and parsed only once the secret matches, so strangers get nothing parsed.
         if (!webhookAuthorization.matches(authorization)) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build()
-        return ResponseEntity.ok(mapOf("accountsRefreshed" to billingService.onWebhook(body)))
+        val event = parsed(body)
+        return if (event == null) {
+            ResponseEntity.badRequest().build()
+        } else {
+            ResponseEntity.ok(mapOf("accountsRefreshed" to billingService.onWebhook(event)))
+        }
+    }
+
+    private fun parsed(body: String): JsonNode? = try {
+        objectMapper.readTree(body)
+    } catch (_: JsonProcessingException) {
+        null
     }
 }
