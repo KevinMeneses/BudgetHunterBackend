@@ -56,9 +56,8 @@ class RevenueCatClientTest {
     fun `no expiry means it does not run out`() {
         answer(subscriber("""{"premium": {"expires_date": null}}"""))
 
-        val entitlement = client.premiumEntitlement("abc-123")
-        assertTrue(entitlement != null)
-        assertNull(entitlement?.expiresAt)
+        val entitlement = checkNotNull(client.premiumEntitlement("abc-123")) { "expected an entitlement" }
+        assertNull(entitlement.expiresAt)
     }
 
     @Test
