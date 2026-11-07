@@ -34,19 +34,36 @@ class ReceiptConfig {
         objectMapper: ObjectMapper,
         @Value("\${receipts.gemini.api-key:\${categorization.gemini.api-key:}}") apiKey: String,
         @Value("\${receipts.gemini.model:$DEFAULT_MODEL}") model: String,
+        @Value("\${receipts.gemini.fallback-model:$DEFAULT_FALLBACK_MODEL}") fallbackModel: String,
+        @Value("\${receipts.gemini.thinking-level:$DEFAULT_THINKING_LEVEL}") thinkingLevel: String,
         @Value("\${receipts.gemini.base-url:$DEFAULT_BASE_URL}") baseUrl: String,
         @Value("\${receipts.gemini.timeout-seconds:$DEFAULT_TIMEOUT_SECONDS}") timeoutSeconds: Long,
         @Value("\${receipts.gemini.max-requests-per-minute:${ReceiptGeminiSettings.DEFAULT_MAX_REQUESTS_PER_MINUTE}}")
         maxRequestsPerMinute: Int
     ): ReceiptExtractor {
+        require(timeoutSeconds > 0) { "receipts.gemini.timeout-seconds must be positive" }
         if (apiKey.isBlank()) log.info("Receipt reading has no GEMINI_API_KEY; every scan will answer AI_UNAVAILABLE")
         val timeout = Duration.ofSeconds(timeoutSeconds)
-        val requestFactory = JdkClientHttpRequestFactory(HttpClient.newBuilder().connectTimeout(timeout).build())
+        // HTTP/1.1 on purpose: the JDK client negotiates HTTP/2 by default, and large request bodies (a receipt is
+        // megabytes of Base64) can stall on HTTP/2 flow control until the read timeout. Scans timed out after
+        // exactly 30 s from the server while the same model answered from the phone; one request per call loses
+        // nothing that HTTP/2 multiplexing would have given here.
+        val httpClient = HttpClient.newBuilder()
+            .version(HttpClient.Version.HTTP_1_1)
+            .connectTimeout(timeout)
+            .build()
+        val requestFactory = JdkClientHttpRequestFactory(httpClient)
             .apply { setReadTimeout(timeout) }
         val restClient = restClientBuilder.baseUrl(baseUrl).requestFactory(requestFactory).build()
         return GeminiReceiptExtractor(
             restClient,
-            ReceiptGeminiSettings(apiKey.trim(), model, maxRequestsPerMinute),
+            ReceiptGeminiSettings(
+                apiKey = apiKey.trim(),
+                model = model.trim(),
+                maxRequestsPerMinute = maxRequestsPerMinute,
+                fallbackModel = fallbackModel.trim(),
+                thinkingLevel = thinkingLevel.trim()
+            ),
             objectMapper
         )
     }
@@ -84,8 +101,15 @@ class ReceiptConfig {
     private companion object {
         // Model ids come and go, so this is only a default (the one the app used to call).
         const val DEFAULT_MODEL = "gemini-3.8-flash"
+
+        // Asked when the main model is overloaded (Gemini answers 503 "high demand" at peaks). A lighter model
+        // that categorization already uses; set RECEIPTS_GEMINI_FALLBACK_MODEL empty to retry the main one instead.
+        const val DEFAULT_FALLBACK_MODEL = "gemini-3.5-flash-lite"
         const val DEFAULT_BASE_URL = "https://generativelanguage.googleapis.com"
         const val DEFAULT_TIMEOUT_SECONDS = 30L
+
+        // Gemini 3 models reason before answering by default, which on a receipt image could pass the timeout.
+        const val DEFAULT_THINKING_LEVEL = "low"
         const val DEFAULT_FREE_MONTHLY_SCANS = 10
         const val DEFAULT_PREMIUM_MONTHLY_SCANS = 200
 

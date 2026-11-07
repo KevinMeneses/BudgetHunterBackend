@@ -18,14 +18,27 @@ import java.time.LocalDate
 data class ReceiptGeminiSettings(
     val apiKey: String,
     val model: String,
-    val maxRequestsPerMinute: Int = DEFAULT_MAX_REQUESTS_PER_MINUTE
+    val maxRequestsPerMinute: Int = DEFAULT_MAX_REQUESTS_PER_MINUTE,
+    /** Asked when [model] is overloaded or failing; blank = retry [model] itself once instead. */
+    val fallbackModel: String = "",
+    /** Pause before the second attempt, so a momentary spike has a moment to pass. */
+    val retryDelayMillis: Long = DEFAULT_RETRY_DELAY_MILLIS,
+    /**
+     * Gemini 3 `thinkingLevel` ("low", "high"...). Reading a receipt needs little reasoning, and the default level
+     * can take longer than the timeout on an image. Blank = leave the model's default (for models without it).
+     * It is sent to [fallbackModel] too, so both must accept it: a model that does not (e.g. a 2.5 one) answers
+     * 400 and the fallback never helps.
+     */
+    val thinkingLevel: String = ""
 ) {
     init {
         require(maxRequestsPerMinute > 0) { "maxRequestsPerMinute must be positive" }
+        require(retryDelayMillis >= 0) { "retryDelayMillis must not be negative" }
     }
 
     companion object {
         const val DEFAULT_MAX_REQUESTS_PER_MINUTE = 30
+        const val DEFAULT_RETRY_DELAY_MILLIS = 1_000L
     }
 }
 
@@ -35,7 +48,11 @@ data class ReceiptGeminiSettings(
  *
  * - The reply is constrained by a response schema whose `category` is an enum of [EntryCategory.ALL] and is
  *   checked again here.
- * - Only 5xx and transport errors are retried, once. A 429 is answered as [ReceiptFailure.BUSY] straight away.
+ * - At most two attempts. When the model answers 5xx ("high demand") or cannot be reached, the second one goes to
+ *   [ReceiptGeminiSettings.fallbackModel] (or the same model again when there is none), after a short pause. A 429
+ *   is only worth asking another model (quotas are per model), so without a fallback it is [ReceiptFailure.BUSY]
+ *   straight away, and so is a timeout (one more full wait on the same model would rarely help). A 4xx is not
+ *   retried.
  * - The file and the reply are never logged; the key goes in a header, never in the URL.
  */
 class GeminiReceiptExtractor(
@@ -58,6 +75,9 @@ class GeminiReceiptExtractor(
     private sealed interface Attempt {
         class Success(val body: String) : Attempt
         class Retry(val reason: ReceiptFailure) : Attempt
+
+        /** Rate limited (429): another model may still answer, the same one will not. */
+        data object Busy : Attempt
         class GiveUp(val reason: ReceiptFailure) : Attempt
     }
 
@@ -67,23 +87,59 @@ class GeminiReceiptExtractor(
             log.warn("Receipt request budget used up for this minute")
             ReceiptReading.Failed(ReceiptFailure.BUSY)
         }
-        else -> askWithRetry(buildRequest(base64Data, mimeType, today), today)
+        else -> askWithFallback(buildRequest(base64Data, mimeType, today), today)
     }
 
-    private fun askWithRetry(request: Map<String, Any>, today: LocalDate): ReceiptReading {
-        var attempt = attemptOnce(request)
-        var tries = 1
-        while (attempt is Attempt.Retry && tries < MAX_ATTEMPTS) {
-            attempt = attemptOnce(request)
-            tries++
+    private fun askWithFallback(request: Map<String, Any>, today: LocalDate): ReceiptReading {
+        val first = attemptOnce(settings.model, request)
+        val secondModel = secondModelAfter(first)
+        return when {
+            secondModel == null -> outcome(first, today)
+            !pause() -> ReceiptReading.Failed(ReceiptFailure.UNAVAILABLE)
+            secondModel == settings.model -> outcome(attemptOnce(secondModel, request), today)
+            else -> {
+                log.info("Asking the fallback model {} for a receipt", secondModel)
+                val second = attemptOnce(secondModel, request)
+                // A fallback that rejects the request (say, a retired model id) says nothing about the receipt:
+                // report why the main model failed instead of a misleading AI_REJECTED.
+                val rejected = second is Attempt.GiveUp && second.reason == ReceiptFailure.REJECTED
+                outcome(if (rejected) first else second, today)
+            }
         }
-        return when (attempt) {
+    }
+
+    /** Waits before the second attempt; false if the thread was interrupted (the flag is kept for the caller). */
+    private fun pause(): Boolean {
+        if (settings.retryDelayMillis <= 0) return true
+        return try {
+            Thread.sleep(settings.retryDelayMillis)
+            true
+        } catch (_: InterruptedException) {
+            Thread.currentThread().interrupt()
+            false
+        }
+    }
+
+    private fun outcome(attempt: Attempt, today: LocalDate): ReceiptReading =
+        when (attempt) {
             is Attempt.Success -> replyParser.parse(attempt.body, today)
             is Attempt.GiveUp -> ReceiptReading.Failed(attempt.reason)
+            Attempt.Busy -> ReceiptReading.Failed(ReceiptFailure.BUSY)
             is Attempt.Retry -> {
                 log.warn("Gemini kept failing to read a receipt: {}", attempt.reason)
                 ReceiptReading.Failed(attempt.reason)
             }
+        }
+
+    /** Which model gets the second attempt, or null when there is none worth making. */
+    private fun secondModelAfter(first: Attempt): String? {
+        val fallback = settings.fallbackModel.takeIf { it.isNotBlank() && it != settings.model }
+        return when (first) {
+            is Attempt.Retry -> fallback ?: settings.model
+            // Busy or slow: another model may answer; the same one is unlikely to, and the wait would double.
+            Attempt.Busy -> fallback
+            is Attempt.GiveUp -> fallback.takeIf { first.reason == ReceiptFailure.TIMEOUT }
+            else -> null
         }
     }
 
@@ -97,17 +153,20 @@ class GeminiReceiptExtractor(
                 )
             )
         ),
-        "generationConfig" to mapOf(
-            "temperature" to TEMPERATURE,
-            "responseMimeType" to "application/json",
-            "responseSchema" to RESPONSE_SCHEMA
-        )
+        "generationConfig" to buildMap {
+            put("temperature", TEMPERATURE)
+            put("responseMimeType", "application/json")
+            put("responseSchema", RESPONSE_SCHEMA)
+            if (settings.thinkingLevel.isNotBlank()) {
+                put("thinkingConfig", mapOf("thinkingLevel" to settings.thinkingLevel))
+            }
+        }
     )
 
-    private fun attemptOnce(request: Map<String, Any>): Attempt = try {
+    private fun attemptOnce(model: String, request: Map<String, Any>): Attempt = try {
         Attempt.Success(
             restClient.post()
-                .uri("/v1beta/models/{model}:generateContent", settings.model)
+                .uri("/v1beta/models/{model}:generateContent", model)
                 .header(API_KEY_HEADER, settings.apiKey)
                 .contentType(MediaType.APPLICATION_JSON)
                 .body(request)
@@ -117,21 +176,55 @@ class GeminiReceiptExtractor(
         )
     } catch (e: RestClientResponseException) {
         when {
-            e.statusCode.value() == TOO_MANY_REQUESTS -> Attempt.GiveUp(ReceiptFailure.BUSY)
-            e.statusCode.is5xxServerError -> Attempt.Retry(ReceiptFailure.UNAVAILABLE)
+            e.statusCode.value() == TOO_MANY_REQUESTS -> {
+                log.warn("Gemini ({}) rate limited a receipt: {}", model, googleError(e))
+                Attempt.Busy
+            }
+            e.statusCode.is5xxServerError -> {
+                log.warn("Gemini ({}) answered HTTP {} to a receipt: {}", model, e.statusCode.value(), googleError(e))
+                Attempt.Retry(ReceiptFailure.UNAVAILABLE)
+            }
             else -> {
-                log.warn("Gemini answered HTTP {} to a receipt", e.statusCode.value())
+                log.warn("Gemini ({}) answered HTTP {} to a receipt: {}", model, e.statusCode.value(), googleError(e))
                 Attempt.GiveUp(ReceiptFailure.REJECTED)
             }
         }
     } catch (e: ResourceAccessException) {
         if (e.isTimeout()) {
+            log.warn("Gemini ({}) did not answer a receipt in time", model)
             Attempt.GiveUp(ReceiptFailure.TIMEOUT)
         } else {
-            log.debug("Gemini unreachable ({})", e.cause?.javaClass?.simpleName)
+            val cause = generateSequence<Throwable>(e) { it.cause }.last()
+            log.warn(
+                "Gemini ({}) unreachable for a receipt: {} caused by {}: {}",
+                model,
+                e.javaClass.simpleName,
+                cause.javaClass.simpleName,
+                cause.message.orEmpty().forLog()
+            )
             Attempt.Retry(ReceiptFailure.UNAVAILABLE)
         }
     }
+
+    /**
+     * Google's own `status` and `message` from an error reply (e.g. "UNAVAILABLE: The model is overloaded"), cut
+     * short. Error replies describe the request, never the file, so this is safe to log; the body itself is not.
+     */
+    // Runs inside a catch block: whatever the body holds, it must not throw and change the outcome.
+    @Suppress("TooGenericExceptionCaught")
+    private fun googleError(e: RestClientResponseException): String {
+        val error = try {
+            objectMapper.readTree(e.responseBodyAsString).path("error")
+        } catch (_: Exception) {
+            null
+        }
+        val status = error?.path("status")?.asText().orEmpty()
+        val message = error?.path("message")?.asText().orEmpty()
+        return "$status $message".trim().ifEmpty { "(no error details)" }.forLog()
+    }
+
+    /** One line (a reply's line breaks could forge log lines), cut short. */
+    private fun String.forLog(): String = replace(Regex("[\\r\\n]+"), " ").take(MAX_ERROR_LOG_LENGTH)
 
     private fun ResourceAccessException.isTimeout(): Boolean =
         generateSequence(cause) { it.cause }.any { it is HttpTimeoutException || it is SocketTimeoutException }
@@ -139,7 +232,7 @@ class GeminiReceiptExtractor(
     companion object {
         private const val API_KEY_HEADER = "x-goog-api-key"
         private const val TOO_MANY_REQUESTS = 429
-        private const val MAX_ATTEMPTS = 2
+        private const val MAX_ERROR_LOG_LENGTH = 300
         private const val TEMPERATURE = 0.1
 
         /** The prompt the app used to send, now kept here. "Today" is the user's date, for documents without one. */
