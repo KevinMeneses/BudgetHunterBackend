@@ -222,7 +222,8 @@ Package `billing/`. Google Play / App Store sell the subscription, RevenueCat tr
   `UserRepository.updatePlan` (only the plan columns, so it cannot undo a concurrent preference change).
   `POST /api/billing/sync` does the same on demand, for right after a purchase or a restore (5 per account per
   minute, then 429: each call spends the shared secret key's RevenueCat quota, which the webhook needs too).
-  An event refreshes at most 5 ids, one after another (5 s timeout each), all or nothing. Two refreshes of one account
+  An event refreshes at most 5 ids, one after another (5 s timeout each); a failure answers 503 and the retry
+  refreshes them all again. Two refreshes of one account
   at once (a sync and a webhook) are last-write-wins; both wrote RevenueCat's state of a moment ago, and the next
   event or sync heals a stale one.
 - **Expiry:** `plan_expires_at` = the entitlement's `expires_date`, or its `grace_period_expires_date` if later;

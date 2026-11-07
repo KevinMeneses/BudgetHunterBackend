@@ -47,8 +47,8 @@ class BillingService(
      * @return how many accounts were refreshed
      */
     fun onWebhook(body: JsonNode): Int {
-        // All or nothing: if RevenueCat fails for one account the whole event answers 503 and is retried, and
-        // refreshing the others again then is harmless.
+        // If RevenueCat fails for one account the event answers 503 and RevenueCat retries it. The accounts
+        // refreshed before the failure stay written; refreshing them again on the retry is harmless.
         val event = body.path("event")
         val type = event.path("type").asText("")
         val users = userRepository.findByBillingIdIn(appUserIdsIn(event))
