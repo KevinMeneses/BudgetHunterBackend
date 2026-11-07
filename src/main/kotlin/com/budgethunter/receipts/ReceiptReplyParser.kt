@@ -57,11 +57,14 @@ internal class ReceiptReplyParser(private val objectMapper: ObjectMapper) {
 
     private fun JsonNode.toPositiveAmount(): BigDecimal? {
         val value = when {
+            // A number too big for a double arrives as Infinity, which decimalValue() cannot convert (it throws)
+            isFloatingPointNumber && !doubleValue().isFinite() -> null
             isNumber -> decimalValue()
             isTextual -> asText().trim().toBigDecimalOrNull()
             else -> null
         }
-        return value?.takeIf { it.signum() > 0 }?.plain()
+        // The magnitude check comes first: plain() pads a value like 1E+999999999 out to a billion digits.
+        return value?.takeIf { it.signum() > 0 && it.precision() - it.scale() <= MAX_AMOUNT_INTEGER_DIGITS }?.plain()
     }
 
     /**
@@ -89,6 +92,9 @@ internal class ReceiptReplyParser(private val objectMapper: ObjectMapper) {
 
     private companion object {
         const val MAX_DESCRIPTION_LENGTH = 255
+
+        // Far above any real receipt total (a thousand trillion), far below what would hurt to write out.
+        const val MAX_AMOUNT_INTEGER_DIGITS = 15
         val ISO_DATE = Regex("""\d{4}-\d{2}-\d{2}""")
         val BLOCKED_FINISH_REASONS = setOf("SAFETY", "PROHIBITED_CONTENT", "BLOCKLIST", "SPII", "RECITATION")
         val INVALID = ReceiptReading.Failed(ReceiptFailure.INVALID_RESPONSE)
