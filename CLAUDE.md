@@ -199,6 +199,8 @@ asks Gemini (`GeminiReceiptExtractor`, prompt kept here) and answers what it rea
   `RECEIPTS_GEMINI_TIMEOUT_SECONDS` (30), `RECEIPTS_MAX_REQUESTS_PER_MINUTE`, `RECEIPTS_ENABLED`; defaults in `ReceiptConfig`.
   Shares `GEMINI_API_KEY` (empty = every scan answers 503 and is given back). Counter: `receipts.scans`.
 - Nginx needs `client_max_body_size 20m` on that path (see `setup-ssl.sh`, DEPLOYMENT.md).
+- The Gemini client for receipts is pinned to HTTP/1.1 (`ReceiptConfig`): large bodies could stall on the JDK
+  client's default HTTP/2 until the read timeout.
 
 ## Deployment
 

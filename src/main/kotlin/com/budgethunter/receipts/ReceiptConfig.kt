@@ -44,7 +44,15 @@ class ReceiptConfig {
         require(timeoutSeconds > 0) { "receipts.gemini.timeout-seconds must be positive" }
         if (apiKey.isBlank()) log.info("Receipt reading has no GEMINI_API_KEY; every scan will answer AI_UNAVAILABLE")
         val timeout = Duration.ofSeconds(timeoutSeconds)
-        val requestFactory = JdkClientHttpRequestFactory(HttpClient.newBuilder().connectTimeout(timeout).build())
+        // HTTP/1.1 on purpose: the JDK client negotiates HTTP/2 by default, and large request bodies (a receipt is
+        // megabytes of Base64) can stall on HTTP/2 flow control until the read timeout. Scans timed out after
+        // exactly 30 s from the server while the same model answered from the phone; one request per call loses
+        // nothing that HTTP/2 multiplexing would have given here.
+        val httpClient = HttpClient.newBuilder()
+            .version(HttpClient.Version.HTTP_1_1)
+            .connectTimeout(timeout)
+            .build()
+        val requestFactory = JdkClientHttpRequestFactory(httpClient)
             .apply { setReadTimeout(timeout) }
         val restClient = restClientBuilder.baseUrl(baseUrl).requestFactory(requestFactory).build()
         return GeminiReceiptExtractor(
