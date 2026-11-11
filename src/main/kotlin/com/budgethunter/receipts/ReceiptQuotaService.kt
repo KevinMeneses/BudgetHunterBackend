@@ -73,7 +73,8 @@ class ReceiptQuotaService(
         aiUsageRepository.releaseReceiptScan(reservation.email, reservation.period)
     }
 
-    private fun planOf(email: String): Plan = userRepository.findById(email).map { it.plan }.orElse(Plan.FREE)
+    private fun planOf(email: String): Plan =
+        userRepository.findById(email).map { it.planAt(clock.instant()) }.orElse(Plan.FREE)
 
     private fun used(email: String, period: String) =
         aiUsageRepository.findById(AiUsageId(email, period)).map { it.receiptScans }.orElse(0)

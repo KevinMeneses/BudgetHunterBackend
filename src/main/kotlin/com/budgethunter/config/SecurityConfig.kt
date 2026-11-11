@@ -35,6 +35,8 @@ class SecurityConfig(
                         "/api/users/sign_in",
                         "/api/users/refresh_token",
                         "/api/users/sign_in_with_google",
+                        // Authenticated by its own shared secret (RevenueCatWebhookController), not a JWT.
+                        "/api/webhooks/revenuecat",
                         "/h2-console/**",
                         "/swagger-ui/**",
                         "/v3/api-docs/**",
