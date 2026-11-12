@@ -281,6 +281,7 @@ class BudgetServiceDateTest {
         val userBudgetId = UserBudgetId(budgetId = budgetId, userEmail = testUserEmail)
         val entrySlot = slot<BudgetEntry>()
 
+        every { budgetRepository.existsById(budgetId) } returns true
         every { userBudgetRepository.existsById(userBudgetId) } returns true
         every { userRepository.findById(testUserEmail) } returns Optional.of(testUser)
         every { budgetEntryRepository.findById(entryId) } returns Optional.of(existingEntry)
@@ -323,6 +324,7 @@ class BudgetServiceDateTest {
         val userBudgetId = UserBudgetId(budgetId = budgetId, userEmail = testUserEmail)
         val entrySlot = slot<BudgetEntry>()
 
+        every { budgetRepository.existsById(budgetId) } returns true
         every { userBudgetRepository.existsById(userBudgetId) } returns true
         every { userRepository.findById(testUserEmail) } returns Optional.of(testUser)
         every { budgetEntryRepository.findById(entryId) } returns Optional.of(existingEntry)

@@ -159,7 +159,7 @@ class BudgetController(
             ),
             ApiResponse(
                 responseCode = "403",
-                description = "Forbidden - user does not have access to this budget",
+                description = "Forbidden - the budget exists but the user is not a collaborator on it",
                 content = [Content()]
             ),
             ApiResponse(
@@ -204,12 +204,12 @@ class BudgetController(
             ),
             ApiResponse(
                 responseCode = "403",
-                description = "Forbidden - user does not have access to this budget",
+                description = "Forbidden - the budget exists but the user is not a collaborator on it",
                 content = [Content()]
             ),
             ApiResponse(
                 responseCode = "404",
-                description = "Budget not found or collaborator user not found",
+                description = "Budget not found, or no account with the collaborator's email",
                 content = [Content()]
             ),
             ApiResponse(
@@ -249,7 +249,7 @@ class BudgetController(
             ),
             ApiResponse(
                 responseCode = "403",
-                description = "Forbidden - user does not have access to this budget",
+                description = "Forbidden - the budget exists but the user is not a collaborator on it",
                 content = [Content()]
             ),
             ApiResponse(
@@ -298,7 +298,7 @@ class BudgetController(
             ),
             ApiResponse(
                 responseCode = "403",
-                description = "Forbidden - user does not have access to this budget",
+                description = "Forbidden - the budget exists but the user is not a collaborator on it",
                 content = [Content()]
             ),
             ApiResponse(
@@ -347,12 +347,13 @@ class BudgetController(
             ),
             ApiResponse(
                 responseCode = "403",
-                description = "Forbidden - user does not have access to this budget",
+                description = "Forbidden - the budget exists but the user is not a collaborator on it",
                 content = [Content()]
             ),
             ApiResponse(
                 responseCode = "404",
-                description = "Budget or entry not found",
+                description = "Budget not found, or no entry with this id in this budget " +
+                    "(deleted, or it belongs to another budget)",
                 content = [Content()]
             )
         ]
@@ -389,7 +390,7 @@ class BudgetController(
             ),
             ApiResponse(
                 responseCode = "403",
-                description = "Forbidden - user does not have access to this budget",
+                description = "Forbidden - the budget exists but the user is not a collaborator on it",
                 content = [Content()]
             ),
             ApiResponse(
@@ -444,7 +445,7 @@ class BudgetController(
             ),
             ApiResponse(
                 responseCode = "403",
-                description = "Forbidden - user does not have access to this budget",
+                description = "Forbidden - the budget exists but the user is not a collaborator on it",
                 content = [Content()]
             ),
             ApiResponse(
@@ -462,14 +463,11 @@ class BudgetController(
     ): Flux<ServerSentEvent<BudgetEntryEvent>> {
         val userEmail = authentication.principal as String
 
-        // Verify access synchronously in a completed transaction
-        // before returning the reactive Flux
-        try {
-            budgetService.verifyUserHasAccessToBudget(budgetId, userEmail)
-        } catch (e: Exception) {
-            // If access check fails, return error as Flux
-            return Flux.error(e)
-        }
+        // Checked synchronously, in a completed transaction, and thrown rather than returned as
+        // Flux.error: an error inside the Flux only surfaces on the async dispatch, where the JWT
+        // filter does not run, so Spring Security answered 401 before the exception handler could
+        // map it to 404/403.
+        budgetService.verifyBudgetAccess(budgetId, userEmail)
 
         // Tell nginx (and any other proxy that honours it) not to buffer this response.
         // With the default `proxy_buffering on`, nginx holds back headers and small chunks
@@ -536,7 +534,7 @@ class BudgetController(
             ),
             ApiResponse(
                 responseCode = "403",
-                description = "Forbidden - user does not have access to this budget",
+                description = "Forbidden - the budget exists but the user is not a collaborator on it",
                 content = [Content()]
             ),
             ApiResponse(
@@ -575,12 +573,13 @@ class BudgetController(
             ),
             ApiResponse(
                 responseCode = "403",
-                description = "Forbidden - user does not have access to this budget",
+                description = "Forbidden - the budget exists but the user is not a collaborator on it",
                 content = [Content()]
             ),
             ApiResponse(
                 responseCode = "404",
-                description = "Budget or entry not found",
+                description = "Budget not found, or no entry with this id in this budget " +
+                    "(deleted, or it belongs to another budget)",
                 content = [Content()]
             )
         ]
@@ -616,12 +615,17 @@ class BudgetController(
             ),
             ApiResponse(
                 responseCode = "403",
-                description = "Forbidden - user does not have access to this budget",
+                description = "Forbidden - the budget exists but the user is not a collaborator on it",
                 content = [Content()]
             ),
             ApiResponse(
                 responseCode = "404",
-                description = "Budget not found or collaborator not found in budget",
+                description = "Budget not found, or the user is not a collaborator on it",
+                content = [Content()]
+            ),
+            ApiResponse(
+                responseCode = "409",
+                description = "The user is the budget's last collaborator and cannot be removed",
                 content = [Content()]
             )
         ]

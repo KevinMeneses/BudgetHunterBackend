@@ -141,7 +141,7 @@ class SseStreamDeliveryIntegrationTest {
         val response = openStream(token = otherUserToken)
         response.body().close()
 
-        assertEquals(EXPECTED_ACCESS_DENIED_STATUS, response.statusCode())
+        assertEquals(403, response.statusCode())
     }
 
     @Test
@@ -149,7 +149,7 @@ class SseStreamDeliveryIntegrationTest {
         val response = openStream(budgetId = 99999L)
         response.body().close()
 
-        assertEquals(EXPECTED_ACCESS_DENIED_STATUS, response.statusCode())
+        assertEquals(404, response.statusCode())
     }
 
     @Test
@@ -402,21 +402,5 @@ class SseStreamDeliveryIntegrationTest {
          * than the 15s heartbeat, so a keep-alive never gets mistaken for a data frame.
          */
         private val SELF_ECHO_WINDOW: Duration = Duration.ofSeconds(3)
-
-        /**
-         * Documents current behaviour, which is arguably wrong: a valid token without
-         * access to the budget gets **401**, not 403.
-         *
-         * `streamEntries` reports the failure by returning `Flux.error(ForbiddenAccessException)`,
-         * so the exception only surfaces on the async error dispatch. The JWT filter is a
-         * `OncePerRequestFilter` and does not re-run on that dispatch, so the SecurityContext
-         * is empty by then and Spring Security's entry point answers 401 before the
-         * `@ControllerAdvice` can map the exception to 403.
-         *
-         * Pre-existing and unrelated to the proxy-buffering fix, but asserted here so the
-         * quirk stays visible. Fixing it means throwing before returning the Flux (or
-         * verifying access in a filter/interceptor) rather than changing this constant.
-         */
-        private const val EXPECTED_ACCESS_DENIED_STATUS = 401
     }
 }
