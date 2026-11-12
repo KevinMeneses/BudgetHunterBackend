@@ -7,6 +7,7 @@ import com.budgethunter.model.UserBudgetId
 import org.springframework.data.domain.Page
 import org.springframework.data.domain.Pageable
 import org.springframework.data.jpa.repository.JpaRepository
+import org.springframework.data.jpa.repository.Modifying
 import org.springframework.data.jpa.repository.Query
 import org.springframework.data.repository.query.Param
 import org.springframework.stereotype.Repository
@@ -39,6 +40,10 @@ interface UserBudgetRepository : JpaRepository<UserBudget, UserBudgetId> {
     fun countByBudgetIds(@Param("budgetIds") budgetIds: Collection<Long>): List<BudgetCollaboratorCount>
 
     fun deleteByBudgetId(budgetId: Long)
+
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("DELETE FROM UserBudget ub WHERE ub.id.userEmail = :userEmail")
+    fun deleteByUserEmail(@Param("userEmail") userEmail: String): Int
 }
 
 /** Projection of [UserBudgetRepository.countByBudgetIds]. */

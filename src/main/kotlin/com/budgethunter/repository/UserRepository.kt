@@ -30,4 +30,19 @@ interface UserRepository : JpaRepository<User, String>, UserInsertRepository {
         @Param("plan") plan: Plan,
         @Param("expiresAt") expiresAt: Instant?
     ): Int
+
+    /**
+     * Locks the account's row until the transaction ends and returns its email, or null when there is no such
+     * account. Native `FOR UPDATE` on purpose: it is the lock that the foreign key checks of a new budget, entry or
+     * membership pointing at the account (`FOR KEY SHARE`) wait for, so nothing new can be attached to it while it
+     * is being deleted. `PESSIMISTIC_WRITE` would not do: on PostgreSQL Hibernate makes it `FOR NO KEY UPDATE`,
+     * which lets them through.
+     */
+    @Query(value = "SELECT email FROM users WHERE email = :email FOR UPDATE", nativeQuery = true)
+    fun lockForDeletion(@Param("email") email: String): String?
+
+    /** Bulk delete, so nothing is cascaded from the entity: the caller has already removed what points here. */
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("DELETE FROM User u WHERE u.email = :email")
+    fun deleteAccount(@Param("email") email: String): Int
 }

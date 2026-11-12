@@ -77,4 +77,19 @@ interface BudgetEntryRepository : JpaRepository<BudgetEntry, Long> {
         @Param("placeholder") placeholder: String,
         @Param("now") now: LocalDateTime
     ): Int
+
+    /**
+     * Forgets [email] as the author of entries, before that account is deleted: the entries stay in their budgets
+     * with no creator or editor, as `ON DELETE SET NULL` would leave them (spelled out here because the H2 schema
+     * the tests use has no such action).
+     */
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query(
+        value = "UPDATE budget_entries SET " +
+            "created_by = CASE WHEN created_by = :email THEN NULL ELSE created_by END, " +
+            "updated_by = CASE WHEN updated_by = :email THEN NULL ELSE updated_by END " +
+            "WHERE created_by = :email OR updated_by = :email",
+        nativeQuery = true
+    )
+    fun forgetAuthor(@Param("email") email: String): Int
 }

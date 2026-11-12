@@ -175,6 +175,18 @@ This document tracks the implementation progress of API endpoints and features a
 
 ---
 
+## Account Deletion
+
+### DELETE /api/users/me
+**Status: ✅ COMPLETE**
+- ✅ Deletes the caller's account (`AccountDeletionService`), all in one transaction
+- ✅ Owned budgets go to another member (oldest entry's creator, else lowest email), or are deleted if nobody else is in them
+- ✅ Leaves every other budget; the entries it wrote stay without an author; AI usage is deleted
+- ✅ Tokens stop working at once (the JWT filter only accepts existing accounts)
+- ✅ Integration tests (`AccountDeletionIntegrationTest`)
+
+---
+
 ## Budget Deletion Endpoints
 
 ### DELETE /api/budgets/{budgetId}

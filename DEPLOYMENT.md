@@ -89,10 +89,11 @@ You should see: `users`, `budget`, `user_budget`, `budget_entry`
 
 ### 4. Deleting an account
 
-The API has no endpoint for it, so accounts are deleted by hand. Do not run a bare `DELETE FROM users`:
-the foreign key on `budgets.owner_email` refuses it while the account still owns budgets. Run
-`database/delete_account.sql`, which first hands each budget the account owns to another member (or
-deletes it when nobody else is in it), then deletes the account, all in one transaction:
+Users delete their own account from the app (`DELETE /api/users/me`). To delete one by hand, for instance
+for someone who asks by email and no longer has the app, do not run a bare `DELETE FROM users`: the foreign
+key on `budgets.owner_email` refuses it while the account still owns budgets. Run
+`database/delete_account.sql`, which does what the endpoint does: hands each budget the account owns to
+another member (or deletes it when nobody else is in it), then deletes the account, all in one transaction:
 
 ```bash
 psql "$DATABASE_URL" -v email=someone@example.com -f database/delete_account.sql
