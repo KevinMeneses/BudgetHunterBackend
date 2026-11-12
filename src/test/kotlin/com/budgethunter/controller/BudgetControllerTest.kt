@@ -12,6 +12,8 @@ import com.budgethunter.dto.CreateBudgetRequest
 import com.budgethunter.dto.UpdateBudgetEntryRequest
 import com.budgethunter.dto.UpdateBudgetRequest
 import com.budgethunter.dto.UserEventInfo
+import com.budgethunter.exception.ForbiddenAccessException
+import com.budgethunter.exception.ResourceNotFoundException
 import com.budgethunter.model.EntryType
 import com.budgethunter.service.BudgetService
 import com.budgethunter.service.ReactiveSseService
@@ -28,8 +30,10 @@ import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.assertThrows
 import org.springframework.http.HttpStatus
 import org.springframework.mock.web.MockHttpServletResponse
+import org.springframework.security.authentication.BadCredentialsException
 import org.springframework.security.core.Authentication
 import reactor.core.publisher.Flux
 import reactor.test.StepVerifier
@@ -102,10 +106,10 @@ class BudgetControllerTest {
             amount = BigDecimal("1000.00")
         )
 
-        every { budgetService.createBudget(request, testUserEmail) } throws IllegalArgumentException("User not found")
+        every { budgetService.createBudget(request, testUserEmail) } throws BadCredentialsException("User not found")
 
         // When & Then
-        val exception = org.junit.jupiter.api.assertThrows<IllegalArgumentException> {
+        val exception = assertThrows<BadCredentialsException> {
             budgetController.createBudget(request, authentication)
         }
 
@@ -196,10 +200,10 @@ class BudgetControllerTest {
         )
 
         every { budgetService.updateBudget(budgetId, request, testUserEmail) } throws
-            IllegalArgumentException("Budget not found with id: $budgetId")
+            ResourceNotFoundException("Budget not found with id: $budgetId")
 
         // When & Then
-        val exception = org.junit.jupiter.api.assertThrows<IllegalArgumentException> {
+        val exception = assertThrows<ResourceNotFoundException> {
             budgetController.updateBudget(budgetId, request, authentication)
         }
 
@@ -217,10 +221,10 @@ class BudgetControllerTest {
         )
 
         every { budgetService.updateBudget(budgetId, request, testUserEmail) } throws
-            IllegalArgumentException("You don't have access to budget with id: $budgetId")
+            ForbiddenAccessException("You don't have access to budget with id: $budgetId")
 
         // When & Then
-        val exception = org.junit.jupiter.api.assertThrows<IllegalArgumentException> {
+        val exception = assertThrows<ForbiddenAccessException> {
             budgetController.updateBudget(budgetId, request, authentication)
         }
 
@@ -266,10 +270,10 @@ class BudgetControllerTest {
         )
 
         every { budgetService.addCollaborator(1L, request, testUserEmail) } throws
-            IllegalArgumentException("You don't have access to budget with id: 1")
+            ForbiddenAccessException("You don't have access to budget with id: 1")
 
         // When & Then
-        val exception = org.junit.jupiter.api.assertThrows<IllegalArgumentException> {
+        val exception = assertThrows<ForbiddenAccessException> {
             budgetController.addCollaborator(1L, request, authentication)
         }
 
@@ -290,7 +294,7 @@ class BudgetControllerTest {
             IllegalStateException("User existing@example.com is already a collaborator on budget 1")
 
         // When & Then
-        val exception = org.junit.jupiter.api.assertThrows<IllegalStateException> {
+        val exception = assertThrows<IllegalStateException> {
             budgetController.addCollaborator(budgetId, request, authentication)
         }
 
@@ -327,10 +331,10 @@ class BudgetControllerTest {
         val budgetId = 999L
 
         every { budgetService.getCollaboratorsByBudgetId(budgetId, testUserEmail) } throws
-            IllegalArgumentException("You don't have access to budget with id: $budgetId")
+            ForbiddenAccessException("You don't have access to budget with id: $budgetId")
 
         // When & Then
-        val exception = org.junit.jupiter.api.assertThrows<IllegalArgumentException> {
+        val exception = assertThrows<ForbiddenAccessException> {
             budgetController.getCollaborators(budgetId, authentication)
         }
 
@@ -411,10 +415,10 @@ class BudgetControllerTest {
         val budgetId = 999L
 
         every { budgetService.getEntriesByBudgetId(budgetId, testUserEmail) } throws
-            IllegalArgumentException("You don't have access to budget with id: $budgetId")
+            ForbiddenAccessException("You don't have access to budget with id: $budgetId")
 
         // When & Then
-        val exception = org.junit.jupiter.api.assertThrows<IllegalArgumentException> {
+        val exception = assertThrows<ForbiddenAccessException> {
             budgetController.getEntries(budgetId, null, null, "modificationDate", "desc", authentication)
         }
 
@@ -473,10 +477,10 @@ class BudgetControllerTest {
         )
 
         every { budgetService.createEntry(budgetId, request, testUserEmail) } throws
-            IllegalArgumentException("You don't have access to budget with id: $budgetId")
+            ForbiddenAccessException("You don't have access to budget with id: $budgetId")
 
         // When & Then
-        val exception = org.junit.jupiter.api.assertThrows<IllegalArgumentException> {
+        val exception = assertThrows<ForbiddenAccessException> {
             budgetController.createEntry(budgetId, request, authentication)
         }
 
@@ -537,10 +541,10 @@ class BudgetControllerTest {
         )
 
         every { budgetService.updateEntry(budgetId, entryId, request, testUserEmail) } throws
-            IllegalArgumentException("You don't have access to budget with id: $budgetId")
+            ForbiddenAccessException("You don't have access to budget with id: $budgetId")
 
         // When & Then
-        val exception = org.junit.jupiter.api.assertThrows<IllegalArgumentException> {
+        val exception = assertThrows<ForbiddenAccessException> {
             budgetController.updateEntry(budgetId, entryId, request, authentication)
         }
 
@@ -561,10 +565,10 @@ class BudgetControllerTest {
         )
 
         every { budgetService.updateEntry(budgetId, entryId, request, testUserEmail) } throws
-            IllegalArgumentException("Budget entry not found with id: $entryId")
+            ResourceNotFoundException("Budget entry not found with id: $entryId")
 
         // When & Then
-        val exception = org.junit.jupiter.api.assertThrows<IllegalArgumentException> {
+        val exception = assertThrows<ResourceNotFoundException> {
             budgetController.updateEntry(budgetId, entryId, request, authentication)
         }
 
@@ -585,10 +589,10 @@ class BudgetControllerTest {
         )
 
         every { budgetService.updateEntry(budgetId, entryId, request, testUserEmail) } throws
-            IllegalArgumentException("Budget entry $entryId does not belong to budget $budgetId")
+            ResourceNotFoundException("Budget entry $entryId does not belong to budget $budgetId")
 
         // When & Then
-        val exception = org.junit.jupiter.api.assertThrows<IllegalArgumentException> {
+        val exception = assertThrows<ResourceNotFoundException> {
             budgetController.updateEntry(budgetId, entryId, request, authentication)
         }
 
@@ -604,14 +608,14 @@ class BudgetControllerTest {
         val budgetId = 1L
         val response = MockHttpServletResponse()
 
-        every { budgetService.verifyUserHasAccessToBudget(budgetId, testUserEmail) } just Runs
+        every { budgetService.verifyBudgetAccess(budgetId, testUserEmail) } just Runs
 
         // When
         val flux = budgetController.streamEntries(budgetId, authentication, response)
 
         // Then
         assertNotNull(flux)
-        verify(exactly = 1) { budgetService.verifyUserHasAccessToBudget(budgetId, testUserEmail) }
+        verify(exactly = 1) { budgetService.verifyBudgetAccess(budgetId, testUserEmail) }
     }
 
     @Test
@@ -620,7 +624,7 @@ class BudgetControllerTest {
         val budgetId = 1L
         val response = MockHttpServletResponse()
 
-        every { budgetService.verifyUserHasAccessToBudget(budgetId, testUserEmail) } just Runs
+        every { budgetService.verifyBudgetAccess(budgetId, testUserEmail) } just Runs
 
         // When
         budgetController.streamEntries(budgetId, authentication, response)
@@ -635,7 +639,7 @@ class BudgetControllerTest {
         val budgetId = 1L
         val response = MockHttpServletResponse()
 
-        every { budgetService.verifyUserHasAccessToBudget(budgetId, testUserEmail) } just Runs
+        every { budgetService.verifyBudgetAccess(budgetId, testUserEmail) } just Runs
         every { reactiveSseService.subscribeToEvents(budgetId) } returns Flux.never()
 
         // When
@@ -654,7 +658,7 @@ class BudgetControllerTest {
         val budgetId = 1L
         val ownEvents = BudgetEntryAction.entries.map { action -> event(action, testUserEmail) }
 
-        every { budgetService.verifyUserHasAccessToBudget(budgetId, testUserEmail) } just Runs
+        every { budgetService.verifyBudgetAccess(budgetId, testUserEmail) } just Runs
         every { reactiveSseService.subscribeToEvents(budgetId) } returns Flux.fromIterable(ownEvents)
 
         // When
@@ -676,7 +680,7 @@ class BudgetControllerTest {
         val otherEmail = "collaborator@example.com"
         val otherEvents = BudgetEntryAction.entries.map { action -> event(action, otherEmail) }
 
-        every { budgetService.verifyUserHasAccessToBudget(budgetId, testUserEmail) } just Runs
+        every { budgetService.verifyBudgetAccess(budgetId, testUserEmail) } just Runs
         every { reactiveSseService.subscribeToEvents(budgetId) } returns Flux.fromIterable(otherEvents)
 
         // When
@@ -700,7 +704,7 @@ class BudgetControllerTest {
             event(BudgetEntryAction.CREATED, "second@example.com")
         )
 
-        every { budgetService.verifyUserHasAccessToBudget(budgetId, testUserEmail) } just Runs
+        every { budgetService.verifyBudgetAccess(budgetId, testUserEmail) } just Runs
         every { reactiveSseService.subscribeToEvents(budgetId) } returns Flux.fromIterable(mixed)
 
         // When
@@ -727,39 +731,40 @@ class BudgetControllerTest {
         val budgetId = 999L
         val response = MockHttpServletResponse()
 
-        every { budgetService.verifyUserHasAccessToBudget(budgetId, testUserEmail) } throws
-            com.budgethunter.exception.ForbiddenAccessException("You don't have access to budget with id: $budgetId")
+        every { budgetService.verifyBudgetAccess(budgetId, testUserEmail) } throws
+            ForbiddenAccessException("You don't have access to budget with id: $budgetId")
 
         // When
-        budgetController.streamEntries(budgetId, authentication, response)
+        assertThrows<ForbiddenAccessException> { budgetController.streamEntries(budgetId, authentication, response) }
 
         // Then - the header belongs to the stream, not to the error response
         assertNull(response.getHeader(BudgetController.X_ACCEL_BUFFERING_HEADER))
     }
 
     @Test
-    fun `streamEntries should return error Flux when user has no access`() {
-        // Given
+    fun `streamEntries should throw before returning a Flux when user has no access`() {
+        // Thrown, not returned as Flux.error: only an exception on the original dispatch reaches the
+        // exception handler (an error inside the Flux surfaces on the async dispatch, which ends in a 401).
         val budgetId = 999L
-        val expectedException = com.budgethunter.exception.ForbiddenAccessException("You don't have access to budget with id: $budgetId")
+        every { budgetService.verifyBudgetAccess(budgetId, testUserEmail) } throws
+            ForbiddenAccessException("You don't have access to budget with id: $budgetId")
 
-        every { budgetService.verifyUserHasAccessToBudget(budgetId, testUserEmail) } throws expectedException
+        assertThrows<ForbiddenAccessException> {
+            budgetController.streamEntries(budgetId, authentication, MockHttpServletResponse())
+        }
+        verify(exactly = 0) { reactiveSseService.subscribeToEvents(any()) }
+    }
 
-        // When
-        val flux = budgetController.streamEntries(budgetId, authentication, MockHttpServletResponse())
+    @Test
+    fun `streamEntries should throw before returning a Flux when the budget does not exist`() {
+        val budgetId = 999L
+        every { budgetService.verifyBudgetAccess(budgetId, testUserEmail) } throws
+            ResourceNotFoundException("Budget not found with id: $budgetId")
 
-        // Then - Flux should be an error Flux containing the exception
-        assertNotNull(flux)
-        flux.subscribe(
-            { },
-            { error ->
-                // Verify the error is the expected exception
-                assertTrue(error is com.budgethunter.exception.ForbiddenAccessException)
-                assertTrue(error.message!!.contains("don't have access"))
-            }
-        )
-
-        verify(exactly = 1) { budgetService.verifyUserHasAccessToBudget(budgetId, testUserEmail) }
+        assertThrows<ResourceNotFoundException> {
+            budgetController.streamEntries(budgetId, authentication, MockHttpServletResponse())
+        }
+        verify(exactly = 0) { reactiveSseService.subscribeToEvents(any()) }
     }
 
     // DeleteBudget Tests
@@ -786,10 +791,10 @@ class BudgetControllerTest {
         val budgetId = 999L
 
         every { budgetService.deleteBudget(budgetId, testUserEmail) } throws
-            IllegalArgumentException("You don't have access to budget with id: $budgetId")
+            ForbiddenAccessException("You don't have access to budget with id: $budgetId")
 
         // When & Then
-        val exception = org.junit.jupiter.api.assertThrows<IllegalArgumentException> {
+        val exception = assertThrows<ForbiddenAccessException> {
             budgetController.deleteBudget(budgetId, authentication)
         }
 
@@ -803,10 +808,10 @@ class BudgetControllerTest {
         val budgetId = 999L
 
         every { budgetService.deleteBudget(budgetId, testUserEmail) } throws
-            IllegalArgumentException("Budget not found with id: $budgetId")
+            ResourceNotFoundException("Budget not found with id: $budgetId")
 
         // When & Then
-        val exception = org.junit.jupiter.api.assertThrows<IllegalArgumentException> {
+        val exception = assertThrows<ResourceNotFoundException> {
             budgetController.deleteBudget(budgetId, authentication)
         }
 
@@ -840,10 +845,10 @@ class BudgetControllerTest {
         val entryId = 5L
 
         every { budgetService.deleteEntry(budgetId, entryId, testUserEmail) } throws
-            IllegalArgumentException("You don't have access to budget with id: $budgetId")
+            ForbiddenAccessException("You don't have access to budget with id: $budgetId")
 
         // When & Then
-        val exception = org.junit.jupiter.api.assertThrows<IllegalArgumentException> {
+        val exception = assertThrows<ForbiddenAccessException> {
             budgetController.deleteEntry(budgetId, entryId, authentication)
         }
 
@@ -858,10 +863,10 @@ class BudgetControllerTest {
         val entryId = 999L
 
         every { budgetService.deleteEntry(budgetId, entryId, testUserEmail) } throws
-            IllegalArgumentException("Budget entry not found with id: $entryId")
+            ResourceNotFoundException("Budget entry not found with id: $entryId")
 
         // When & Then
-        val exception = org.junit.jupiter.api.assertThrows<IllegalArgumentException> {
+        val exception = assertThrows<ResourceNotFoundException> {
             budgetController.deleteEntry(budgetId, entryId, authentication)
         }
 
@@ -876,10 +881,10 @@ class BudgetControllerTest {
         val entryId = 5L
 
         every { budgetService.deleteEntry(budgetId, entryId, testUserEmail) } throws
-            IllegalArgumentException("Budget entry $entryId does not belong to budget $budgetId")
+            ResourceNotFoundException("Budget entry $entryId does not belong to budget $budgetId")
 
         // When & Then
-        val exception = org.junit.jupiter.api.assertThrows<IllegalArgumentException> {
+        val exception = assertThrows<ResourceNotFoundException> {
             budgetController.deleteEntry(budgetId, entryId, authentication)
         }
 
@@ -913,10 +918,10 @@ class BudgetControllerTest {
         val collaboratorEmail = "collaborator@example.com"
 
         every { budgetService.removeCollaborator(budgetId, collaboratorEmail, testUserEmail) } throws
-            IllegalArgumentException("You don't have access to budget with id: $budgetId")
+            ForbiddenAccessException("You don't have access to budget with id: $budgetId")
 
         // When & Then
-        val exception = org.junit.jupiter.api.assertThrows<IllegalArgumentException> {
+        val exception = assertThrows<ForbiddenAccessException> {
             budgetController.removeCollaborator(budgetId, collaboratorEmail, authentication)
         }
 
@@ -931,10 +936,10 @@ class BudgetControllerTest {
         val collaboratorEmail = "nonexistent@example.com"
 
         every { budgetService.removeCollaborator(budgetId, collaboratorEmail, testUserEmail) } throws
-            IllegalArgumentException("User $collaboratorEmail is not a collaborator on budget $budgetId")
+            ResourceNotFoundException("User $collaboratorEmail is not a collaborator on budget $budgetId")
 
         // When & Then
-        val exception = org.junit.jupiter.api.assertThrows<IllegalArgumentException> {
+        val exception = assertThrows<ResourceNotFoundException> {
             budgetController.removeCollaborator(budgetId, collaboratorEmail, authentication)
         }
 
@@ -951,7 +956,7 @@ class BudgetControllerTest {
             IllegalStateException("The owner cannot leave budget $budgetId; delete the budget instead")
 
         // When & Then
-        val exception = org.junit.jupiter.api.assertThrows<IllegalStateException> {
+        val exception = assertThrows<IllegalStateException> {
             budgetController.removeCollaborator(budgetId, testUserEmail, authentication)
         }
 

@@ -56,6 +56,7 @@ class BudgetServiceCategoryTest {
 
         every { userBudgetRepository.existsById(UserBudgetId(1L, email)) } returns true
         every { budgetRepository.findById(1L) } returns Optional.of(budget)
+        every { budgetRepository.existsById(1L) } returns true
         every { budgetEntryRepository.save(capture(saved)) } answers { saved.captured.copy(id = saved.captured.id ?: 10L) }
         every { userRepository.findById(email) } returns Optional.of(User(email = email, name = "Test User", password = "encoded"))
     }

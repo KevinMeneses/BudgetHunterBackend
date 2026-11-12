@@ -1,7 +1,6 @@
 package com.budgethunter.categorization
 
 import com.budgethunter.repository.BudgetEntryRepository
-import com.budgethunter.repository.BudgetRepository
 import com.budgethunter.repository.UserRepository
 import com.budgethunter.service.BudgetService
 import com.fasterxml.jackson.databind.ObjectMapper
@@ -71,18 +70,15 @@ class CategorizationConfig {
         CategoryResolver(RuleBasedClassifier(), cache, gemini, metrics)
 
     @Bean
-    @Suppress("LongParameterList") // Plain constructor wiring of the service's collaborators.
     fun budgetCategorizationService(
         resolver: CategoryResolver,
         budgetService: BudgetService,
-        budgetRepository: BudgetRepository,
         budgetEntryRepository: BudgetEntryRepository,
         userRepository: UserRepository,
         metrics: CategorizationMetrics
     ) = BudgetCategorizationService(
         resolver,
         budgetService,
-        budgetRepository,
         budgetEntryRepository,
         userRepository,
         metrics

@@ -18,6 +18,7 @@ import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.http.MediaType
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.ResultActions
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put
@@ -201,6 +202,28 @@ class BudgetCategorizationIntegrationTest {
     fun `needs access to the budget`() {
         setAiProcessing(stranger, true)
         categorize(strangerToken).andExpect(status().isForbidden)
+    }
+
+    @Test
+    fun `a deleted budget is not found, whatever the AI preference`() {
+        // Its user_budgets rows went with it: checking access first answered 403, which the app shows as
+        // "AI processing is off".
+        mockMvc.perform(delete("/api/budgets/$budgetId").header("Authorization", "Bearer $ownerToken"))
+            .andExpect(status().isNoContent)
+
+        listOf(true, false, null).forEach { preference ->
+            setAiProcessing(owner, preference)
+            categorize(ownerToken)
+                .andExpect(status().isNotFound)
+                .andExpect(jsonPath("$.message").value("Budget not found with id: $budgetId"))
+        }
+    }
+
+    @Test
+    fun `a budget that never existed is not found`() {
+        setAiProcessing(owner, true)
+        mockMvc.perform(post("/api/budgets/999999/entries/categorize").header("Authorization", "Bearer $ownerToken"))
+            .andExpect(status().isNotFound)
     }
 
     @Test

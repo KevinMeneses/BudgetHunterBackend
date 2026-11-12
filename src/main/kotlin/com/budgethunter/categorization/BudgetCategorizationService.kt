@@ -4,7 +4,6 @@ import com.budgethunter.dto.CategorizeEntriesResponse
 import com.budgethunter.exception.ForbiddenAccessException
 import com.budgethunter.model.EntryCategory
 import com.budgethunter.repository.BudgetEntryRepository
-import com.budgethunter.repository.BudgetRepository
 import com.budgethunter.repository.PendingCategorization
 import com.budgethunter.repository.UserRepository
 import com.budgethunter.service.BudgetService
@@ -29,7 +28,6 @@ import java.util.concurrent.ConcurrentHashMap
 class BudgetCategorizationService(
     private val resolver: CategoryResolver,
     private val budgetService: BudgetService,
-    private val budgetRepository: BudgetRepository,
     private val budgetEntryRepository: BudgetEntryRepository,
     private val userRepository: UserRepository,
     private val metrics: CategorizationMetrics = CategorizationMetrics()
@@ -41,8 +39,10 @@ class BudgetCategorizationService(
     private val running: MutableSet<Long> = ConcurrentHashMap.newKeySet()
 
     fun categorize(budgetId: Long, userEmail: String): CategorizeEntriesResponse {
-        budgetService.verifyUserHasAccessToBudget(budgetId, userEmail)
-        require(budgetRepository.existsById(budgetId)) { "Budget not found with id: $budgetId" }
+        // 404 for a missing budget, then 403 for no access, as on every budget route. Existence must come first:
+        // a deleted budget takes its user_budgets rows with it, so access-first answered 403, which the app reads
+        // as "AI processing is off". The app shows its generic "not found" message for a 404.
+        budgetService.verifyBudgetAccess(budgetId, userEmail)
         if (!userAllowsAi(userEmail)) {
             metrics.run(CategorizationMetrics.Run.AI_OFF)
             throw ForbiddenAccessException("AI processing is turned off for this account")

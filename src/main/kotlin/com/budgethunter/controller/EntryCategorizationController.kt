@@ -41,11 +41,16 @@ class EntryCategorizationController(
                 description = "Run finished; the counts say what changed and what is still waiting",
                 content = [Content(schema = Schema(implementation = CategorizeEntriesResponse::class))]
             ),
-            ApiResponse(responseCode = "400", description = "Budget not found", content = [Content()]),
             ApiResponse(responseCode = "401", description = "Missing or invalid access token", content = [Content()]),
             ApiResponse(
                 responseCode = "403",
-                description = "No access to this budget, or AI processing is turned off for the account",
+                description = "The budget exists but the user is not a collaborator on it, " +
+                    "or AI processing is turned off for the account",
+                content = [Content()]
+            ),
+            ApiResponse(
+                responseCode = "404",
+                description = "Budget not found (it never existed, or it was deleted)",
                 content = [Content()]
             ),
             ApiResponse(

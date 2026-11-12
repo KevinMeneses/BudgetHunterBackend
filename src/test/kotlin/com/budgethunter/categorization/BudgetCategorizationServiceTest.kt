@@ -1,9 +1,9 @@
 package com.budgethunter.categorization
 
 import com.budgethunter.exception.ForbiddenAccessException
+import com.budgethunter.exception.ResourceNotFoundException
 import com.budgethunter.model.User
 import com.budgethunter.repository.BudgetEntryRepository
-import com.budgethunter.repository.BudgetRepository
 import com.budgethunter.repository.PendingCategorization
 import com.budgethunter.repository.UserRepository
 import com.budgethunter.service.BudgetService
@@ -26,7 +26,6 @@ class BudgetCategorizationServiceTest {
     private class Pending(override val id: Long, override val description: String) : PendingCategorization
 
     private lateinit var budgetService: BudgetService
-    private lateinit var budgets: BudgetRepository
     private lateinit var entries: BudgetEntryRepository
     private lateinit var users: UserRepository
     private val asked = mutableListOf<List<String>>()
@@ -42,10 +41,8 @@ class BudgetCategorizationServiceTest {
     fun setup() {
         asked.clear()
         budgetService = mockk(relaxed = true)
-        budgets = mockk()
         entries = mockk()
         users = mockk()
-        every { budgets.existsById(budgetId) } returns true
         every { users.findById(email) } returns Optional.of(User(email = email, name = "A", aiProcessingEnabled = true))
         every { entries.applyAutoCategory(any(), any(), any(), any(), any()) } returns 1
         every { entries.countPendingCategorization(budgetId, "UNCATEGORIZED") } returns 0
@@ -63,7 +60,6 @@ class BudgetCategorizationServiceTest {
             }
         ),
         budgetService,
-        budgets,
         entries,
         users,
         metrics
@@ -133,17 +129,19 @@ class BudgetCategorizationServiceTest {
 
     @Test
     fun `needs access to the budget`() {
-        every { budgetService.verifyUserHasAccessToBudget(budgetId, email) } throws ForbiddenAccessException("no")
+        every { budgetService.verifyBudgetAccess(budgetId, email) } throws ForbiddenAccessException("no")
 
         assertThrows<ForbiddenAccessException> { service.categorize(budgetId, email) }
         verify(exactly = 0) { entries.findPendingCategorization(any(), any(), any()) }
     }
 
     @Test
-    fun `an unknown budget is a bad request`() {
-        every { budgets.existsById(budgetId) } returns false
+    fun `a missing budget is not found, before AI processing is looked at`() {
+        every { budgetService.verifyBudgetAccess(budgetId, email) } throws ResourceNotFoundException("gone")
 
-        assertThrows<IllegalArgumentException> { service.categorize(budgetId, email) }
+        assertThrows<ResourceNotFoundException> { service.categorize(budgetId, email) }
+        verify(exactly = 0) { users.findById(any()) }
+        verify(exactly = 0) { entries.findPendingCategorization(any(), any(), any()) }
     }
 
     @Test
