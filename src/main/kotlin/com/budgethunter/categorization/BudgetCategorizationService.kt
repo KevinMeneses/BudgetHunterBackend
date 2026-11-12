@@ -2,6 +2,7 @@ package com.budgethunter.categorization
 
 import com.budgethunter.dto.CategorizeEntriesResponse
 import com.budgethunter.exception.ForbiddenAccessException
+import com.budgethunter.exception.ResourceNotFoundException
 import com.budgethunter.model.EntryCategory
 import com.budgethunter.repository.BudgetEntryRepository
 import com.budgethunter.repository.BudgetRepository
@@ -41,8 +42,11 @@ class BudgetCategorizationService(
     private val running: MutableSet<Long> = ConcurrentHashMap.newKeySet()
 
     fun categorize(budgetId: Long, userEmail: String): CategorizeEntriesResponse {
+        // Access before existence, unlike the routes in BudgetController: the app reads this endpoint's 403 as
+        // "AI processing is off", and its handling of a 404 here has not been checked. Reached only when the
+        // budget is deleted between the two checks.
         budgetService.verifyUserHasAccessToBudget(budgetId, userEmail)
-        require(budgetRepository.existsById(budgetId)) { "Budget not found with id: $budgetId" }
+        if (!budgetRepository.existsById(budgetId)) throw ResourceNotFoundException("Budget not found with id: $budgetId")
         if (!userAllowsAi(userEmail)) {
             metrics.run(CategorizationMetrics.Run.AI_OFF)
             throw ForbiddenAccessException("AI processing is turned off for this account")

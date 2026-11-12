@@ -5,6 +5,7 @@ import com.budgethunter.receipts.AiQuotaExceededException
 import com.budgethunter.receipts.ReceiptException
 import org.slf4j.LoggerFactory
 import org.springframework.http.HttpStatus
+import org.springframework.http.MediaType
 import org.springframework.http.ResponseEntity
 import org.springframework.security.authentication.BadCredentialsException
 import org.springframework.web.bind.MethodArgumentNotValidException
@@ -69,7 +70,20 @@ class GlobalExceptionHandler {
             status = HttpStatus.FORBIDDEN.value(),
             message = ex.message ?: "Access denied"
         )
-        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(errorResponse)
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).contentType(MediaType.APPLICATION_JSON).body(errorResponse)
+    }
+
+    // 404 and 403 set their content type explicitly: the SSE stream's client sends
+    // `Accept: text/event-stream`, and without it the JSON body is "not acceptable", the request
+    // falls through to the /error dispatch and Spring Security answers 401 there instead.
+    @ExceptionHandler(ResourceNotFoundException::class)
+    fun handleResourceNotFoundException(ex: ResourceNotFoundException): ResponseEntity<ErrorResponse> {
+        logger.warn("Not found: ${ex.message}")
+        val errorResponse = ErrorResponse(
+            status = HttpStatus.NOT_FOUND.value(),
+            message = ex.message ?: "Not found"
+        )
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).contentType(MediaType.APPLICATION_JSON).body(errorResponse)
     }
 
     @ExceptionHandler(AiQuotaExceededException::class)

@@ -572,11 +572,11 @@ included, are never touched, so calling it again only looks at what is still unc
 asked yet because the AI provider's quota ran out. Call again later to retry them.
 
 **Errors:**
-- `400` the budget does not exist
 - `401` missing or invalid token
-- `403` no access to the budget, **or AI processing is off for the account** (turn it on in the app's settings,
+- `403` no access to the budget (a deleted budget included), **or AI processing is off for the account** (turn it on in the app's settings,
   stored as `aiProcessingEnabled` in `PUT /api/users/me/preferences`). Only entries whose creator has it on are
   considered, so a collaborator who turned it off keeps their entries out of it.
+- `404` the budget was deleted while the request was being checked
 - `409` a categorization of this budget is already running
 
 Requires `GEMINI_API_KEY` on the server for anything the built-in keyword rules do not recognise; without it

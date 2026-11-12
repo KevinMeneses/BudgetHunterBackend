@@ -9,6 +9,7 @@ import com.budgethunter.dto.SignInRequest
 import com.budgethunter.dto.SignInResponse
 import com.budgethunter.dto.SignUpRequest
 import com.budgethunter.dto.UpdateBudgetEntryRequest
+import com.budgethunter.dto.UpdateBudgetRequest
 import com.budgethunter.dto.UserResponse
 import com.budgethunter.model.Budget
 import com.budgethunter.model.EntryType
@@ -1221,4 +1222,214 @@ class BudgetManagementIntegrationTest {
         assertTrue(entries1.any { it.createdByEmail == user1Email })
         assertTrue(entries1.any { it.createdByEmail == user2Email })
     }
+
+    // Missing resources (404) versus no access (403)
+    //
+    // Every route under /api/budgets/{budgetId} checks that the budget exists first (404) and only then
+    // that the caller is on it (403). A deleted budget takes its user_budgets rows with it, so checking
+    // access first would answer 403 for it.
+
+    @Test
+    fun `deleting a budget that was already deleted is not found`() {
+        val budgetId = createBudget(user1AuthToken)
+        deleteBudget(user1AuthToken, budgetId).andExpect(status().isNoContent)
+
+        deleteBudget(user1AuthToken, budgetId)
+            .andExpect(status().isNotFound)
+            .andExpect(jsonPath("$.status").value(404))
+            .andExpect(jsonPath("$.message").value("Budget not found with id: $budgetId"))
+    }
+
+    @Test
+    fun `every route of a deleted budget is not found, also for its former collaborators`() {
+        val budgetId = createBudget(user1AuthToken)
+        val entryId = createEntry(user1AuthToken, budgetId)
+        addCollaborator(user1AuthToken, budgetId, user2Email)
+        deleteBudget(user1AuthToken, budgetId).andExpect(status().isNoContent)
+
+        listOf(user1AuthToken, user2AuthToken).forEach { token ->
+            budgetRoutes(budgetId, entryId).forEach { request ->
+                mockMvc.perform(request.header("Authorization", "Bearer $token"))
+                    .andExpect(status().isNotFound)
+            }
+        }
+    }
+
+    @Test
+    fun `a budget id that never existed is not found`() {
+        budgetRoutes(999_999L, 1L).forEach { request ->
+            mockMvc.perform(request.header("Authorization", "Bearer $user1AuthToken"))
+                .andExpect(status().isNotFound)
+        }
+    }
+
+    @Test
+    fun `an existing budget the user is not on is forbidden on every route`() {
+        val budgetId = createBudget(user1AuthToken)
+        val entryId = createEntry(user1AuthToken, budgetId)
+
+        budgetRoutes(budgetId, entryId).forEach { request ->
+            mockMvc.perform(request.header("Authorization", "Bearer $user2AuthToken"))
+                .andExpect(status().isForbidden)
+                .andExpect(jsonPath("$.status").value(403))
+        }
+
+        // Nothing changed behind the 403s
+        mockMvc.perform(get("/api/budgets/$budgetId/entries").header("Authorization", "Bearer $user1AuthToken"))
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.length()").value(1))
+    }
+
+    @Test
+    fun `deleting an entry that was already deleted is not found`() {
+        val budgetId = createBudget(user1AuthToken)
+        val entryId = createEntry(user1AuthToken, budgetId)
+        deleteEntry(user1AuthToken, budgetId, entryId).andExpect(status().isNoContent)
+
+        deleteEntry(user1AuthToken, budgetId, entryId)
+            .andExpect(status().isNotFound)
+            .andExpect(jsonPath("$.message").value("Budget entry not found with id: $entryId"))
+    }
+
+    @Test
+    fun `editing an entry that was deleted is not found`() {
+        val budgetId = createBudget(user1AuthToken)
+        val entryId = createEntry(user1AuthToken, budgetId)
+        deleteEntry(user1AuthToken, budgetId, entryId).andExpect(status().isNoContent)
+
+        updateEntry(user1AuthToken, budgetId, entryId)
+            .andExpect(status().isNotFound)
+            .andExpect(jsonPath("$.message").value("Budget entry not found with id: $entryId"))
+    }
+
+    @Test
+    fun `an entry of another budget is not found through this budget's path, and is left alone`() {
+        val budgetId = createBudget(user1AuthToken)
+        val otherBudgetId = createBudget(user1AuthToken, "Other Budget")
+        val otherEntryId = createEntry(user1AuthToken, otherBudgetId)
+
+        updateEntry(user1AuthToken, budgetId, otherEntryId).andExpect(status().isNotFound)
+        deleteEntry(user1AuthToken, budgetId, otherEntryId)
+            .andExpect(status().isNotFound)
+            .andExpect(jsonPath("$.message").value("Budget entry $otherEntryId does not belong to budget $budgetId"))
+
+        mockMvc.perform(get("/api/budgets/$otherBudgetId/entries").header("Authorization", "Bearer $user1AuthToken"))
+            .andExpect(jsonPath("$[0].id").value(otherEntryId))
+            .andExpect(jsonPath("$[0].description").value("Lunch"))
+    }
+
+    @Test
+    fun `an entry of a budget the user cannot access is not found through the user's own budget`() {
+        // Says nothing about the entry: the user cannot tell it apart from one that does not exist.
+        val strangerEntryId = createEntry(user1AuthToken, createBudget(user1AuthToken))
+        val ownBudgetId = createBudget(user2AuthToken)
+
+        deleteEntry(user2AuthToken, ownBudgetId, strangerEntryId).andExpect(status().isNotFound)
+        updateEntry(user2AuthToken, ownBudgetId, strangerEntryId).andExpect(status().isNotFound)
+    }
+
+    @Test
+    fun `removing a user who is not a collaborator is not found`() {
+        val budgetId = createBudget(user1AuthToken)
+
+        mockMvc.perform(
+            delete("/api/budgets/$budgetId/collaborators/$user2Email").header("Authorization", "Bearer $user1AuthToken")
+        ).andExpect(status().isNotFound)
+    }
+
+    @Test
+    fun `adding a collaborator without an account is not found`() {
+        val budgetId = createBudget(user1AuthToken)
+
+        mockMvc.perform(
+            post("/api/budgets/$budgetId/collaborators")
+                .header("Authorization", "Bearer $user1AuthToken")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(AddCollaboratorRequest(budgetId, "nobody@example.com")))
+        )
+            .andExpect(status().isNotFound)
+            .andExpect(jsonPath("$.message").value("User not found with email: nobody@example.com"))
+    }
+
+    @Test
+    fun `a token whose account no longer exists is unauthorized, not a missing budget`() {
+        // The JWT filter answers this one; the services throw the same 401 if the account goes in between.
+        val budgetId = createBudget(user1AuthToken)
+        userBudgetRepository.deleteByBudgetId(budgetId)
+        userRepository.deleteById(user1Email)
+
+        mockMvc.perform(
+            post("/api/budgets")
+                .header("Authorization", "Bearer $user1AuthToken")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(CreateBudgetRequest(name = "Ghost", amount = BigDecimal("1.00"))))
+        ).andExpect(status().isUnauthorized)
+    }
+
+    /** One request per route under /api/budgets/{budgetId} that checks the budget first. */
+    private fun budgetRoutes(budgetId: Long, entryId: Long) = listOf(
+        put("/api/budgets/$budgetId").contentType(MediaType.APPLICATION_JSON)
+            .content(objectMapper.writeValueAsString(UpdateBudgetRequest(name = "Renamed", amount = BigDecimal("5.00")))),
+        delete("/api/budgets/$budgetId"),
+        get("/api/budgets/$budgetId/collaborators"),
+        post("/api/budgets/$budgetId/collaborators").contentType(MediaType.APPLICATION_JSON)
+            .content(objectMapper.writeValueAsString(AddCollaboratorRequest(budgetId, user2Email))),
+        delete("/api/budgets/$budgetId/collaborators/$user1Email"),
+        get("/api/budgets/$budgetId/entries"),
+        get("/api/budgets/$budgetId/entries").param("page", "0").param("size", "10"),
+        post("/api/budgets/$budgetId/entries").contentType(MediaType.APPLICATION_JSON)
+            .content(objectMapper.writeValueAsString(entryRequest())),
+        put("/api/budgets/$budgetId/entries/$entryId").contentType(MediaType.APPLICATION_JSON)
+            .content(objectMapper.writeValueAsString(updateRequest())),
+        delete("/api/budgets/$budgetId/entries/$entryId")
+    )
+
+    private fun createBudget(token: String, name: String = "Budget"): Long {
+        val result = mockMvc.perform(
+            post("/api/budgets")
+                .header("Authorization", "Bearer $token")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(CreateBudgetRequest(name = name, amount = BigDecimal("100.00"))))
+        ).andExpect(status().isCreated).andReturn()
+        return objectMapper.readValue(result.response.contentAsString, BudgetResponse::class.java).id
+    }
+
+    private fun createEntry(token: String, budgetId: Long): Long {
+        val result = mockMvc.perform(
+            post("/api/budgets/$budgetId/entries")
+                .header("Authorization", "Bearer $token")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(entryRequest()))
+        ).andExpect(status().isCreated).andReturn()
+        return objectMapper.readValue(result.response.contentAsString, BudgetEntryResponse::class.java).id
+    }
+
+    private fun addCollaborator(token: String, budgetId: Long, email: String) {
+        mockMvc.perform(
+            post("/api/budgets/$budgetId/collaborators")
+                .header("Authorization", "Bearer $token")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(AddCollaboratorRequest(budgetId, email)))
+        ).andExpect(status().isCreated)
+    }
+
+    private fun deleteBudget(token: String, budgetId: Long) =
+        mockMvc.perform(delete("/api/budgets/$budgetId").header("Authorization", "Bearer $token"))
+
+    private fun deleteEntry(token: String, budgetId: Long, entryId: Long) =
+        mockMvc.perform(delete("/api/budgets/$budgetId/entries/$entryId").header("Authorization", "Bearer $token"))
+
+    private fun updateEntry(token: String, budgetId: Long, entryId: Long) =
+        mockMvc.perform(
+            put("/api/budgets/$budgetId/entries/$entryId")
+                .header("Authorization", "Bearer $token")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(updateRequest()))
+        )
+
+    private fun entryRequest() =
+        CreateBudgetEntryRequest(amount = BigDecimal("12.50"), description = "Lunch", type = EntryType.OUTCOME)
+
+    private fun updateRequest() =
+        UpdateBudgetEntryRequest(amount = BigDecimal("15.00"), description = "Dinner", type = EntryType.OUTCOME)
 }

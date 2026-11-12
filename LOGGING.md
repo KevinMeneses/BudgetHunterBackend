@@ -124,7 +124,7 @@ WARN - Validation failed: [email: must be a well-formed email address]
 ### 4. Business Logic Errors
 
 ```
-WARN - Bad request: Budget not found with id: 123
+WARN - Not found: Budget not found with id: 123
 WARN - Forbidden access: User user@example.com don't have access to budget 456
 ```
 

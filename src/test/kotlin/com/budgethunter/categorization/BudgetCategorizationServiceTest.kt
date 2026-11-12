@@ -1,6 +1,7 @@
 package com.budgethunter.categorization
 
 import com.budgethunter.exception.ForbiddenAccessException
+import com.budgethunter.exception.ResourceNotFoundException
 import com.budgethunter.model.User
 import com.budgethunter.repository.BudgetEntryRepository
 import com.budgethunter.repository.BudgetRepository
@@ -140,10 +141,10 @@ class BudgetCategorizationServiceTest {
     }
 
     @Test
-    fun `an unknown budget is a bad request`() {
+    fun `a budget gone after the access check is not found`() {
         every { budgets.existsById(budgetId) } returns false
 
-        assertThrows<IllegalArgumentException> { service.categorize(budgetId, email) }
+        assertThrows<ResourceNotFoundException> { service.categorize(budgetId, email) }
     }
 
     @Test
