@@ -1,6 +1,7 @@
 package com.budgethunter.integration
 
 import com.budgethunter.dto.AddCollaboratorRequest
+import com.budgethunter.dto.BudgetEntryResponse
 import com.budgethunter.dto.BudgetResponse
 import com.budgethunter.dto.CreateBudgetEntryRequest
 import com.budgethunter.dto.CreateBudgetRequest
@@ -8,6 +9,7 @@ import com.budgethunter.dto.RefreshTokenRequest
 import com.budgethunter.dto.SignInRequest
 import com.budgethunter.dto.SignInResponse
 import com.budgethunter.dto.SignUpRequest
+import com.budgethunter.dto.UpdateBudgetEntryRequest
 import com.budgethunter.model.EntryType
 import com.budgethunter.model.UserBudgetId
 import com.budgethunter.repository.AiUsageRepository
@@ -18,6 +20,7 @@ import com.budgethunter.repository.UserRepository
 import com.fasterxml.jackson.databind.ObjectMapper
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
+import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -31,6 +34,7 @@ import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilde
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
 import org.springframework.transaction.annotation.Transactional
@@ -127,6 +131,43 @@ class AccountDeletionIntegrationTest {
     }
 
     @Test
+    fun `every budget it owns is handed over in one go, each by its own rule`() {
+        val byEntry = createBudget(leaving)
+        addMember(byEntry, member, by = leaving)
+        addMember(byEntry, other, by = leaving)
+        createEntry(byEntry, other)
+        val byEmail = createBudget(leaving)
+        addMember(byEmail, other, by = leaving)
+        addMember(byEmail, member, by = leaving)
+        val alone = createBudget(leaving)
+        aiUsageRepository.createIfMissing(leaving, "2026-11")
+        aiUsageRepository.createIfMissing(member, "2026-11")
+
+        deleteAccount(leaving).andExpect(status().isNoContent)
+
+        assertEquals(other, budgetRepository.findById(byEntry).get().ownerEmail)
+        assertEquals(member, budgetRepository.findById(byEmail).get().ownerEmail)
+        assertFalse(budgetRepository.existsById(alone))
+        assertEquals(listOf(member), aiUsageRepository.findAll().map { it.id.userEmail })
+    }
+
+    @Test
+    fun `an entry it only edited keeps its creator and loses the editor`() {
+        val theirs = createBudget(member)
+        addMember(theirs, leaving, by = member)
+        val entryId = createEntry(theirs, member)
+        val edit = UpdateBudgetEntryRequest(amount = BigDecimal("2.00"), type = EntryType.OUTCOME)
+        perform(put("/api/budgets/$theirs/entries/$entryId").json(edit), leaving).andExpect(status().isOk)
+
+        deleteAccount(leaving).andExpect(status().isNoContent)
+
+        val entry = budgetEntryRepository.findById(entryId).get()
+        assertEquals(member, entry.createdBy?.email)
+        assertNull(entry.updatedBy)
+        assertEquals(BigDecimal("2.00"), entry.amount)
+    }
+
+    @Test
     fun `its tokens stop working and it cannot sign in again`() {
         val session = sessions.getValue(leaving)
 
@@ -190,9 +231,12 @@ class AccountDeletionIntegrationTest {
             .andExpect(status().isCreated)
     }
 
-    private fun createEntry(budgetId: Long, author: String) {
+    private fun createEntry(budgetId: Long, author: String): Long {
         val request = CreateBudgetEntryRequest(amount = BigDecimal("1.00"), description = "by $author", type = EntryType.OUTCOME)
-        perform(post("/api/budgets/$budgetId/entries").json(request), author).andExpect(status().isCreated)
+        val result = perform(post("/api/budgets/$budgetId/entries").json(request), author)
+            .andExpect(status().isCreated)
+            .andReturn()
+        return objectMapper.readValue(result.response.contentAsString, BudgetEntryResponse::class.java).id
     }
 
     private fun perform(request: MockHttpServletRequestBuilder, caller: String): ResultActions =

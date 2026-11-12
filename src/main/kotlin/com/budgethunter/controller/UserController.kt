@@ -217,7 +217,11 @@ class UserController(
     @ApiResponses(
         value = [
             ApiResponse(responseCode = "204", description = "Account deleted"),
-            ApiResponse(responseCode = "401", description = "Missing or invalid access token", content = [Content()])
+            ApiResponse(
+                responseCode = "401",
+                description = "Missing or invalid access token, including one of an account already deleted",
+                content = [Content()]
+            )
         ]
     )
     fun deleteAccount(authentication: Authentication): ResponseEntity<Void> {

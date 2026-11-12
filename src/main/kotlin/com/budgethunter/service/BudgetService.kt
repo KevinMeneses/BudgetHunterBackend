@@ -398,6 +398,7 @@ class BudgetService(
         budgetRepository.findIdsByOwnerEmail(userEmail).forEach { budgetId ->
             // Locked before choosing, so the member chosen cannot leave until this commits (leaving takes the
             // shared lock), and a member who left just before is no longer among the candidates.
+            // Gone or no longer theirs: changed by another transaction since the ids were read.
             if (budgetRepository.findByIdForOwnerChange(budgetId)?.ownerEmail != userEmail) return@forEach
             val successor = budgetRepository.findSuccessorOwner(budgetId, userEmail)
             if (successor == null) {
@@ -480,7 +481,6 @@ class BudgetService(
         }
     }
 
-    /** [verifyBudgetAccess] for callers that need the budget itself. */
     /** [findAccessibleBudget] for a change of membership: see [BudgetRepository.findByIdForMembershipChange]. */
     private fun findBudgetForMembershipChange(budgetId: Long, userEmail: String): Budget {
         val budget = budgetRepository.findByIdForMembershipChange(budgetId) ?: throw budgetNotFound(budgetId)
@@ -488,6 +488,7 @@ class BudgetService(
         return budget
     }
 
+    /** [verifyBudgetAccess] for callers that need the budget itself. */
     private fun findAccessibleBudget(budgetId: Long, userEmail: String): Budget {
         val budget = budgetRepository.findById(budgetId).orElseThrow { budgetNotFound(budgetId) }
         verifyUserHasAccessToBudget(budgetId, userEmail)
