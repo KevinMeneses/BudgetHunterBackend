@@ -44,13 +44,13 @@ class EntryCategorizationController(
             ApiResponse(responseCode = "401", description = "Missing or invalid access token", content = [Content()]),
             ApiResponse(
                 responseCode = "403",
-                description = "No access to this budget (including one that no longer exists), " +
+                description = "The budget exists but the user is not a collaborator on it, " +
                     "or AI processing is turned off for the account",
                 content = [Content()]
             ),
             ApiResponse(
                 responseCode = "404",
-                description = "Budget deleted while the request was being checked",
+                description = "Budget not found (it never existed, or it was deleted)",
                 content = [Content()]
             ),
             ApiResponse(

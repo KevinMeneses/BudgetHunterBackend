@@ -85,7 +85,8 @@ POST/PUT entry ──► BudgetService saves entry (no AI involved)
 
 app, metrics screen, AI toggle on, user confirms the dialog
 POST /api/budgets/{id}/entries/categorize ──► BudgetCategorizationService  (synchronous)
-   0. access to the budget; the caller's ai_processing_enabled must be true (else 403)
+   0. the budget exists (else 404), the caller is on it (else 403), and the caller's
+      ai_processing_enabled is true (else 403)
    1. waiting entries of the budget: UNCATEGORIZED + creator's flag true *now*   (max 500, oldest first)
    2. CategoryResolver: rules -> cache -> Gemini (one deduplicated, batched call)
    3. per entry, one conditional UPDATE (still UNCATEGORIZED, same description)  -> a person's edit always wins
@@ -153,8 +154,8 @@ category, so they are unaffected.
   no retry on 4xx, 429 cool-down (with and without `Retry-After`), blank key, request budget.
 
 ### Part 4 - On-demand categorization endpoint (done)
-- `POST /api/budgets/{budgetId}/entries/categorize` -> `{ categorized, pending }`. 200 ok; 400 unknown
-  budget; 401; 403 no access to the budget **or the caller's AI processing is off/never saved**; 409 a run
+- `POST /api/budgets/{budgetId}/entries/categorize` -> `{ categorized, pending }`. 200 ok; 404 unknown
+  or deleted budget; 401; 403 no access to the budget **or the caller's AI processing is off/never saved**; 409 a run
   for this budget is already in flight (a second tap or a collaborator's would only spend the quota twice).
   Switched by `categorization.enabled` (when off the endpoint does not exist).
 - `BudgetCategorizationService` (not transactional: an HTTP call must not hold a DB connection). Looks at

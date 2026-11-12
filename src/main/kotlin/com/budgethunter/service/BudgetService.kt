@@ -408,7 +408,7 @@ class BudgetService(
         verifyUserHasAccessToBudget(budgetId, userEmail)
     }
 
-    /** Access only, for a caller that has its own reason to answer 403 before 404 (categorization). */
+    /** Access only; routes call [verifyBudgetAccess], which checks that the budget exists first. */
     @Transactional(readOnly = true)
     fun verifyUserHasAccessToBudget(budgetId: Long, userEmail: String) {
         val userBudgetId = UserBudgetId(budgetId = budgetId, userEmail = userEmail)
