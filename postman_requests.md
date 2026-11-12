@@ -529,7 +529,7 @@ When you receive an event:
 
 **Expected Response (204 No Content):** Empty response with 204 status code
 
-**Note:** Removes a collaborator from a budget. The authenticated user must have access to the budget. Cannot remove the last collaborator from a budget.
+**Note:** Removes a collaborator from a budget. Only the budget's owner can remove other members (403 otherwise); nobody can remove the owner. Passing your own email, or `me` (`DELETE /api/budgets/1/collaborators/me`), leaves the budget; the owner cannot leave (409) and deletes the budget instead. A member who is not the owner calling `DELETE /api/budgets/1` leaves it too, without deleting it for anyone else.
 
 ---
 

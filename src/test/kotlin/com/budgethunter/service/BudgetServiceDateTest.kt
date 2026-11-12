@@ -53,7 +53,8 @@ class BudgetServiceDateTest {
     private val testBudget = Budget(
         id = 1L,
         name = "Test Budget",
-        amount = BigDecimal("1000.00")
+        amount = BigDecimal("1000.00"),
+        ownerEmail = testUserEmail
     )
 
     @BeforeEach
@@ -140,7 +141,8 @@ class BudgetServiceDateTest {
             id = budgetId,
             name = "Old Budget Name",
             amount = BigDecimal("2000.00"),
-            date = LocalDate.of(2025, 1, 1)
+            date = LocalDate.of(2025, 1, 1),
+            ownerEmail = testUserEmail
         )
         val userBudgetId = UserBudgetId(budgetId = budgetId, userEmail = testUserEmail)
         val budgetSlot = slot<Budget>()
@@ -172,7 +174,8 @@ class BudgetServiceDateTest {
             id = budgetId,
             name = "Old Budget Name",
             amount = BigDecimal("2000.00"),
-            date = storedDate
+            date = storedDate,
+            ownerEmail = testUserEmail
         )
         val userBudgetId = UserBudgetId(budgetId = budgetId, userEmail = testUserEmail)
         val budgetSlot = slot<Budget>()

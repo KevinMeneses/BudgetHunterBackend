@@ -23,6 +23,7 @@ import io.mockk.verify
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertDoesNotThrow
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -49,7 +50,8 @@ class BudgetServiceTest {
     private val testBudget = Budget(
         id = 1L,
         name = "Test Budget",
-        amount = BigDecimal("1000.00")
+        amount = BigDecimal("1000.00"),
+        ownerEmail = testUserEmail
     )
 
     @BeforeEach
@@ -85,7 +87,8 @@ class BudgetServiceTest {
         val savedBudget = Budget(
             id = 1L,
             name = request.name,
-            amount = request.amount
+            amount = request.amount,
+            ownerEmail = testUserEmail
         )
 
         every { userRepository.findById(testUserEmail) } returns Optional.of(testUser)
@@ -137,8 +140,8 @@ class BudgetServiceTest {
     fun `getBudgetsByUserEmail should return list of budgets`() {
         // Given
         val budgets = listOf(
-            Budget(id = 1L, name = "Budget 1", amount = BigDecimal("1000.00")),
-            Budget(id = 2L, name = "Budget 2", amount = BigDecimal("2000.00"))
+            Budget(id = 1L, name = "Budget 1", amount = BigDecimal("1000.00"), ownerEmail = testUserEmail),
+            Budget(id = 2L, name = "Budget 2", amount = BigDecimal("2000.00"), ownerEmail = testUserEmail)
         )
 
         every { userBudgetRepository.findBudgetsByUserEmail(testUserEmail) } returns budgets
@@ -189,7 +192,8 @@ class BudgetServiceTest {
         val existingBudget = Budget(
             id = budgetId,
             name = "Old Budget Name",
-            amount = BigDecimal("2000.00")
+            amount = BigDecimal("2000.00"),
+            ownerEmail = testUserEmail
         )
         val updatedBudget = existingBudget.copy(
             name = request.name,
@@ -410,7 +414,7 @@ class BudgetServiceTest {
         )
 
         every { userBudgetRepository.existsById(userBudgetId) } returns true
-        every { budgetRepository.existsById(budgetId) } returns true
+        every { budgetRepository.findById(budgetId) } returns Optional.of(testBudget)
         every { userBudgetRepository.findUsersByBudgetId(budgetId) } returns collaborators
 
         // When
@@ -420,6 +424,8 @@ class BudgetServiceTest {
         assertEquals(2, result.size)
         assertEquals(collaborators[0].email, result[0].email)
         assertEquals(collaborators[0].name, result[0].name)
+        assertTrue(result[0].isOwner) // testBudget is owned by testUserEmail
+        assertFalse(result[1].isOwner)
 
         verify(exactly = 1) { userBudgetRepository.findUsersByBudgetId(budgetId) }
     }
@@ -447,7 +453,7 @@ class BudgetServiceTest {
         val userBudgetId = UserBudgetId(budgetId = budgetId, userEmail = testUserEmail)
 
         every { userBudgetRepository.existsById(userBudgetId) } returns true
-        every { budgetRepository.existsById(budgetId) } returns false
+        every { budgetRepository.findById(budgetId) } returns Optional.empty()
 
         // When & Then
         val exception = assertThrows<IllegalArgumentException> {
@@ -630,7 +636,7 @@ class BudgetServiceTest {
     @Test
     fun `putEntry should throw exception when entry does not belong to budget`() {
         // Given
-        val differentBudget = Budget(id = 2L, name = "Different Budget", amount = BigDecimal("1000.00"))
+        val differentBudget = Budget(id = 2L, name = "Different Budget", amount = BigDecimal("1000.00"), ownerEmail = testUserEmail)
         val existingEntry = BudgetEntry(
             id = 1L,
             budget = differentBudget,

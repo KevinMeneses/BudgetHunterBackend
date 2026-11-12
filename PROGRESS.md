@@ -168,7 +168,8 @@ This document tracks the implementation progress of API endpoints and features a
 - ✅ Repository layer enhanced (UserBudgetRepository.countByBudgetId)
 - ✅ Validates user has access to budget
 - ✅ Validates collaborator exists on budget
-- ✅ Business rule: Prevents removing last collaborator
+- ✅ Business rule: only the owner removes others; nobody removes the owner; own email = leave
+- ✅ `DELETE /api/budgets/{budgetId}/collaborators/me` to leave (owner gets 409)
 - ✅ Returns HTTP 204 No Content
 - ✅ Comprehensive unit tests (4 tests)
 
@@ -182,6 +183,7 @@ This document tracks the implementation progress of API endpoints and features a
 - ✅ Service layer implemented (BudgetService.deleteBudget)
 - ✅ Repository layer enhanced (BudgetEntryRepository.deleteByBudgetId, UserBudgetRepository.deleteByBudgetId)
 - ✅ Validates user has access to budget
+- ✅ Owner deletes for everyone; any other member only leaves (same 204, for installed apps)
 - ✅ Cascade deletion: entries → user-budgets → budget
 - ✅ Proper foreign key constraint handling
 - ✅ Returns HTTP 204 No Content

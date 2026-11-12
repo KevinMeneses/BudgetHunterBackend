@@ -37,7 +37,7 @@ class BudgetServiceCategoryTest {
     private lateinit var budgetService: BudgetService
 
     private val email = "test@example.com"
-    private val budget = Budget(id = 1L, name = "Test Budget", amount = BigDecimal("1000.00"))
+    private val budget = Budget(id = 1L, name = "Test Budget", amount = BigDecimal("1000.00"), ownerEmail = "owner@example.com")
     private val saved = slot<BudgetEntry>()
 
     @BeforeEach
