@@ -87,6 +87,17 @@ psql -U budgethunter_user -d budgethunter -c "\dt"
 
 You should see: `users`, `budget`, `user_budget`, `budget_entry`
 
+### 4. Deleting an account
+
+The API has no endpoint for it, so accounts are deleted by hand. Do not run a bare `DELETE FROM users`:
+the foreign key on `budgets.owner_email` refuses it while the account still owns budgets. Run
+`database/delete_account.sql`, which first hands each budget the account owns to another member (or
+deletes it when nobody else is in it), then deletes the account, all in one transaction:
+
+```bash
+psql "$DATABASE_URL" -v email=someone@example.com -f database/delete_account.sql
+```
+
 ---
 
 ## Application Configuration

@@ -4,6 +4,7 @@ import com.budgethunter.dto.AddCollaboratorRequest
 import com.budgethunter.dto.BudgetEntryAction
 import com.budgethunter.dto.BudgetEntryEvent
 import com.budgethunter.dto.BudgetEntryResponse
+import com.budgethunter.dto.BudgetMemberResponse
 import com.budgethunter.dto.BudgetResponse
 import com.budgethunter.dto.CollaboratorResponse
 import com.budgethunter.dto.CreateBudgetEntryRequest
@@ -11,7 +12,6 @@ import com.budgethunter.dto.CreateBudgetRequest
 import com.budgethunter.dto.UpdateBudgetEntryRequest
 import com.budgethunter.dto.UpdateBudgetRequest
 import com.budgethunter.dto.UserEventInfo
-import com.budgethunter.dto.UserResponse
 import com.budgethunter.exception.ForbiddenAccessException
 import com.budgethunter.exception.ResourceNotFoundException
 import com.budgethunter.model.EntryType
@@ -309,8 +309,8 @@ class BudgetControllerTest {
         // Given
         val budgetId = 1L
         val expectedCollaborators = listOf(
-            UserResponse(email = "user1@example.com", name = "User 1"),
-            UserResponse(email = "user2@example.com", name = "User 2")
+            BudgetMemberResponse(email = "user1@example.com", name = "User 1", isOwner = true),
+            BudgetMemberResponse(email = "user2@example.com", name = "User 2", isOwner = false)
         )
 
         every { budgetService.getCollaboratorsByBudgetId(budgetId, testUserEmail) } returns expectedCollaborators
@@ -948,20 +948,33 @@ class BudgetControllerTest {
     }
 
     @Test
-    fun `removeCollaborator should propagate exception when trying to remove last collaborator`() {
+    fun `removeCollaborator should propagate exception when the owner removes themselves`() {
         // Given
         val budgetId = 1L
-        val collaboratorEmail = "last@example.com"
 
-        every { budgetService.removeCollaborator(budgetId, collaboratorEmail, testUserEmail) } throws
-            IllegalStateException("Cannot remove the last collaborator from budget $budgetId")
+        every { budgetService.removeCollaborator(budgetId, testUserEmail, testUserEmail) } throws
+            IllegalStateException("The owner cannot leave budget $budgetId; delete the budget instead")
 
         // When & Then
         val exception = assertThrows<IllegalStateException> {
-            budgetController.removeCollaborator(budgetId, collaboratorEmail, authentication)
+            budgetController.removeCollaborator(budgetId, testUserEmail, authentication)
         }
 
-        assertTrue(exception.message!!.contains("Cannot remove the last collaborator"))
-        verify(exactly = 1) { budgetService.removeCollaborator(budgetId, collaboratorEmail, testUserEmail) }
+        assertTrue(exception.message!!.contains("The owner cannot leave"))
+        verify(exactly = 1) { budgetService.removeCollaborator(budgetId, testUserEmail, testUserEmail) }
+    }
+
+    @Test
+    fun `leaveBudget should return no content status when the caller left`() {
+        // Given
+        val budgetId = 1L
+        every { budgetService.leaveBudget(budgetId, testUserEmail) } just Runs
+
+        // When
+        val response = budgetController.leaveBudget(budgetId, authentication)
+
+        // Then
+        assertEquals(HttpStatus.NO_CONTENT, response.statusCode)
+        verify(exactly = 1) { budgetService.leaveBudget(budgetId, testUserEmail) }
     }
 }

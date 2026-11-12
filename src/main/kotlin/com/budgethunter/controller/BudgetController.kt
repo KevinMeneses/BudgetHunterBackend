@@ -3,13 +3,13 @@ package com.budgethunter.controller
 import com.budgethunter.dto.AddCollaboratorRequest
 import com.budgethunter.dto.BudgetEntryEvent
 import com.budgethunter.dto.BudgetEntryResponse
+import com.budgethunter.dto.BudgetMemberResponse
 import com.budgethunter.dto.BudgetResponse
 import com.budgethunter.dto.CollaboratorResponse
 import com.budgethunter.dto.CreateBudgetEntryRequest
 import com.budgethunter.dto.CreateBudgetRequest
 import com.budgethunter.dto.UpdateBudgetEntryRequest
 import com.budgethunter.dto.UpdateBudgetRequest
-import com.budgethunter.dto.UserResponse
 import com.budgethunter.service.BudgetService
 import com.budgethunter.service.ReactiveSseService
 import io.swagger.v3.oas.annotations.Operation
@@ -62,7 +62,8 @@ class BudgetController(
     @PostMapping
     @Operation(
         summary = "Create a new budget",
-        description = "Creates a new budget with the specified name and amount. The authenticated user becomes the budget owner and is automatically added as a collaborator."
+        description = "Creates a new budget with the specified name and amount. The authenticated user becomes " +
+            "its owner (ownerEmail in the response) and its first member."
     )
     @ApiResponses(
         value = [
@@ -183,7 +184,8 @@ class BudgetController(
     @PostMapping("/{budgetId}/collaborators")
     @Operation(
         summary = "Add a collaborator to a budget",
-        description = "Adds a new collaborator to the budget by email. The user must exist in the system. Only users with access to the budget can add collaborators."
+        description = "Adds a new collaborator to the budget by email. The user must exist in the system. Any " +
+            "member of the budget can add collaborators, not only its owner."
     )
     @ApiResponses(
         value = [
@@ -233,14 +235,15 @@ class BudgetController(
     @GetMapping("/{budgetId}/collaborators")
     @Operation(
         summary = "Get all collaborators for a budget",
-        description = "Retrieves the list of all users who have access to the specified budget. Only users with access to the budget can view its collaborators."
+        description = "Retrieves the list of all users who have access to the specified budget, with isOwner " +
+            "set on its owner. Only users with access to the budget can view its collaborators."
     )
     @ApiResponses(
         value = [
             ApiResponse(
                 responseCode = "200",
                 description = "Successfully retrieved collaborators list",
-                content = [Content(schema = Schema(implementation = UserResponse::class))]
+                content = [Content(schema = Schema(implementation = BudgetMemberResponse::class))]
             ),
             ApiResponse(
                 responseCode = "401",
@@ -263,7 +266,7 @@ class BudgetController(
         @Parameter(description = "ID of the budget", required = true)
         @PathVariable budgetId: Long,
         authentication: Authentication
-    ): ResponseEntity<List<UserResponse>> {
+    ): ResponseEntity<List<BudgetMemberResponse>> {
         val userEmail = authentication.principal as String
         val collaborators = budgetService.getCollaboratorsByBudgetId(budgetId, userEmail)
         return ResponseEntity.ok(collaborators)
@@ -517,14 +520,17 @@ class BudgetController(
 
     @DeleteMapping("/{budgetId}")
     @Operation(
-        summary = "Delete a budget",
-        description = "Permanently deletes a budget and all its associated entries and collaborator relationships. Only users with access to the budget can delete it."
+        summary = "Delete a budget (owner) or leave it (any other member)",
+        description = "Called by the budget's owner, permanently deletes the budget for everyone, with all its " +
+            "entries and collaborator relationships. Called by any other member, deletes nothing: the caller " +
+            "leaves the budget, exactly like DELETE /{budgetId}/collaborators/me, and the budget disappears from " +
+            "their list only. Both answer 204, so app versions that predate ownership keep working."
     )
     @ApiResponses(
         value = [
             ApiResponse(
                 responseCode = "204",
-                description = "Budget successfully deleted",
+                description = "Budget deleted (owner) or left (any other member)",
                 content = [Content()]
             ),
             ApiResponse(
@@ -596,10 +602,54 @@ class BudgetController(
         return ResponseEntity.noContent().build()
     }
 
+    // A literal segment beats a path variable in Spring's matching, so "me" never reaches removeCollaborator.
+    @DeleteMapping("/{budgetId}/collaborators/me")
+    @Operation(
+        summary = "Leave a budget",
+        description = "Removes the authenticated user from the budget. The owner cannot leave (409): they delete " +
+            "the budget instead (DELETE /{budgetId})."
+    )
+    @ApiResponses(
+        value = [
+            ApiResponse(responseCode = "204", description = "Left the budget", content = [Content()]),
+            ApiResponse(
+                responseCode = "401",
+                description = "Unauthorized - missing or invalid JWT token",
+                content = [Content()]
+            ),
+            ApiResponse(
+                responseCode = "403",
+                description = "Forbidden - the budget exists but the user is not a collaborator on it",
+                content = [Content()]
+            ),
+            ApiResponse(
+                responseCode = "404",
+                description = "Budget not found",
+                content = [Content()]
+            ),
+            ApiResponse(
+                responseCode = "409",
+                description = "The caller owns the budget, and the owner cannot leave it",
+                content = [Content()]
+            )
+        ]
+    )
+    fun leaveBudget(
+        @Parameter(description = "ID of the budget", required = true)
+        @PathVariable budgetId: Long,
+        authentication: Authentication
+    ): ResponseEntity<Void> {
+        val userEmail = authentication.principal as String
+        budgetService.leaveBudget(budgetId, userEmail)
+        return ResponseEntity.noContent().build()
+    }
+
     @DeleteMapping("/{budgetId}/collaborators/{collaboratorEmail}")
     @Operation(
         summary = "Remove a collaborator from a budget",
-        description = "Removes a user's access to the budget by their email. Only users with access to the budget can remove collaborators."
+        description = "Removes a user's access to the budget by their email. Only the budget's owner can remove " +
+            "other members. Any member can pass their own email, which is the same as leaving " +
+            "(DELETE /{budgetId}/collaborators/me). Nobody can remove the owner."
     )
     @ApiResponses(
         value = [
@@ -615,7 +665,8 @@ class BudgetController(
             ),
             ApiResponse(
                 responseCode = "403",
-                description = "Forbidden - the budget exists but the user is not a collaborator on it",
+                description = "Forbidden - the user is not a collaborator on the budget, or removes someone " +
+                    "else without owning it",
                 content = [Content()]
             ),
             ApiResponse(
@@ -625,7 +676,7 @@ class BudgetController(
             ),
             ApiResponse(
                 responseCode = "409",
-                description = "The user is the budget's last collaborator and cannot be removed",
+                description = "The owner passed their own email: the owner cannot leave the budget",
                 content = [Content()]
             )
         ]

@@ -4,6 +4,7 @@ import com.budgethunter.dto.AddCollaboratorRequest
 import com.budgethunter.dto.BudgetEntryAction
 import com.budgethunter.dto.BudgetEntryEvent
 import com.budgethunter.dto.BudgetEntryResponse
+import com.budgethunter.dto.BudgetMemberResponse
 import com.budgethunter.dto.BudgetResponse
 import com.budgethunter.dto.CollaboratorResponse
 import com.budgethunter.dto.CreateBudgetEntryRequest
@@ -13,7 +14,6 @@ import com.budgethunter.dto.PutEntryRequest
 import com.budgethunter.dto.UpdateBudgetEntryRequest
 import com.budgethunter.dto.UpdateBudgetRequest
 import com.budgethunter.dto.UserEventInfo
-import com.budgethunter.dto.UserResponse
 import com.budgethunter.exception.ForbiddenAccessException
 import com.budgethunter.exception.ResourceNotFoundException
 import com.budgethunter.model.Budget
@@ -51,7 +51,8 @@ class BudgetService(
         val budget = Budget(
             name = request.name,
             amount = request.amount,
-            date = request.date ?: LocalDate.now()
+            date = request.date ?: LocalDate.now(),
+            ownerEmail = userEmail
         )
 
         val savedBudget = budgetRepository.save(budget)
@@ -72,7 +73,8 @@ class BudgetService(
             name = savedBudget.name,
             amount = savedBudget.amount,
             date = savedBudget.date,
-            collaboratorCount = 1
+            collaboratorCount = 1,
+            ownerEmail = savedBudget.ownerEmail
         )
     }
 
@@ -115,10 +117,15 @@ class BudgetService(
             name = savedBudget.name,
             amount = savedBudget.amount,
             date = savedBudget.date,
-            collaboratorCount = userBudgetRepository.countByBudgetId(budgetId).toInt()
+            collaboratorCount = userBudgetRepository.countByBudgetId(budgetId).toInt(),
+            ownerEmail = savedBudget.ownerEmail
         )
     }
 
+    /**
+     * Any member may add others, not only the owner: that is how it has always worked and what the installed
+     * apps offer every member, and an addition destroys nothing - the owner can remove anyone added.
+     */
     @Transactional
     fun addCollaborator(budgetId: Long, request: AddCollaboratorRequest, authenticatedUserEmail: String): CollaboratorResponse {
         val budget = findAccessibleBudget(budgetId, authenticatedUserEmail)
@@ -147,19 +154,21 @@ class BudgetService(
             budgetId = budget.id!!,
             budgetName = budget.name,
             collaboratorEmail = collaborator.email,
-            collaboratorName = collaborator.name
+            collaboratorName = collaborator.name,
+            isOwner = collaborator.email == budget.ownerEmail
         )
     }
 
     @Transactional(readOnly = true)
-    fun getCollaboratorsByBudgetId(budgetId: Long, authenticatedUserEmail: String): List<UserResponse> {
-        verifyBudgetAccess(budgetId, authenticatedUserEmail)
+    fun getCollaboratorsByBudgetId(budgetId: Long, authenticatedUserEmail: String): List<BudgetMemberResponse> {
+        val budget = findAccessibleBudget(budgetId, authenticatedUserEmail)
 
         val users = userBudgetRepository.findUsersByBudgetId(budgetId)
         return users.map { user ->
-            UserResponse(
+            BudgetMemberResponse(
                 email = user.email,
-                name = user.name
+                name = user.name,
+                isOwner = user.email == budget.ownerEmail
             )
         }
     }
@@ -329,7 +338,8 @@ class BudgetService(
         name = name,
         amount = amount,
         date = date,
-        collaboratorCount = counts[id] ?: 0
+        collaboratorCount = counts[id] ?: 0,
+        ownerEmail = ownerEmail
     )
 
     private fun BudgetEntry.toResponse() = BudgetEntryResponse(
@@ -346,17 +356,60 @@ class BudgetService(
         date = this.date
     )
 
+    /**
+     * `DELETE /api/budgets/{id}`. The owner deletes the budget for everyone. Any other member only leaves it
+     * (see [leaveBudget]) and gets the same 204: the installed apps call this endpoint whenever a user deletes
+     * a budget, shared or not, and all they need is for it to be gone from that user's list - which it is,
+     * without taking it away from everybody else.
+     */
     @Transactional
     fun deleteBudget(budgetId: Long, authenticatedUserEmail: String) {
-        verifyBudgetAccess(budgetId, authenticatedUserEmail)
+        val budget = findAccessibleBudget(budgetId, authenticatedUserEmail)
 
-        // Delete all budget entries first (due to foreign key constraints)
+        if (budget.ownerEmail != authenticatedUserEmail) {
+            userBudgetRepository.deleteById(UserBudgetId(budgetId = budgetId, userEmail = authenticatedUserEmail))
+            return
+        }
+
+        deleteForEveryone(budgetId)
+    }
+
+    /** The caller stops being a member. The owner cannot: they delete the budget instead (409). */
+    @Transactional
+    fun leaveBudget(budgetId: Long, authenticatedUserEmail: String) {
+        val budget = findAccessibleBudget(budgetId, authenticatedUserEmail)
+
+        check(budget.ownerEmail != authenticatedUserEmail) {
+            "The owner cannot leave budget $budgetId; delete the budget instead"
+        }
+
+        userBudgetRepository.deleteById(UserBudgetId(budgetId = budgetId, userEmail = authenticatedUserEmail))
+    }
+
+    /**
+     * Hands over every budget [userEmail] owns, to be called right before their account is deleted: each one
+     * goes to another member ([BudgetRepository.findSuccessorOwner]: whoever created its oldest entry, else the
+     * lowest email) or, when nobody else is left in it, is deleted. The foreign key on `budgets.owner_email`
+     * refuses to delete an account that still owns budgets, so skipping this fails loudly instead of leaving
+     * budgets without an owner. Their memberships are left alone: deleting the account removes them.
+     */
+    @Transactional
+    fun handOverOwnedBudgets(userEmail: String) {
+        budgetRepository.findByOwnerEmail(userEmail).forEach { budget ->
+            val budgetId = budget.id!!
+            val successor = budgetRepository.findSuccessorOwner(budgetId, userEmail)
+            if (successor == null) {
+                deleteForEveryone(budgetId)
+            } else {
+                budgetRepository.updateOwner(budgetId, successor)
+            }
+        }
+    }
+
+    private fun deleteForEveryone(budgetId: Long) {
+        // Entries and memberships first, for the foreign keys.
         budgetEntryRepository.deleteByBudgetId(budgetId)
-
-        // Delete all user-budget associations
         userBudgetRepository.deleteByBudgetId(budgetId)
-
-        // Finally delete the budget itself
         budgetRepository.deleteById(budgetId)
     }
 
@@ -373,20 +426,28 @@ class BudgetService(
         broadcastBudgetEntryEvent(entry, user, BudgetEntryAction.DELETED)
     }
 
+    /**
+     * Removes [collaboratorEmail] from the budget. Removing yourself is leaving ([leaveBudget]); removing
+     * anyone else is for the owner only (403). Nobody can remove the owner: others are not allowed to remove
+     * anyone, and the owner removing themselves is the owner leaving (409). Since the owner always stays a
+     * member, a budget can no longer lose its last one.
+     */
     @Transactional
     fun removeCollaborator(budgetId: Long, collaboratorEmail: String, authenticatedUserEmail: String) {
-        verifyBudgetAccess(budgetId, authenticatedUserEmail)
+        if (collaboratorEmail == authenticatedUserEmail) {
+            leaveBudget(budgetId, authenticatedUserEmail)
+            return
+        }
+
+        val budget = findAccessibleBudget(budgetId, authenticatedUserEmail)
+        if (budget.ownerEmail != authenticatedUserEmail) {
+            throw ForbiddenAccessException("Only the owner of budget $budgetId can remove its members")
+        }
 
         val userBudgetId = UserBudgetId(budgetId = budgetId, userEmail = collaboratorEmail)
 
         if (!userBudgetRepository.existsById(userBudgetId)) {
             throw ResourceNotFoundException("User $collaboratorEmail is not a collaborator on budget $budgetId")
-        }
-
-        // Check if this is the last collaborator
-        val collaboratorsCount = userBudgetRepository.countByBudgetId(budgetId)
-        if (collaboratorsCount <= 1) {
-            throw IllegalStateException("Cannot remove the last collaborator from budget $budgetId")
         }
 
         userBudgetRepository.deleteById(userBudgetId)

@@ -83,7 +83,7 @@ The application uses a relational database with the following core entities:
 
 2. **Budget** - Represents a budget that can be shared among multiple users
    - PK: `id` (Long, auto-generated)
-   - Fields: `name`, `amount` (BigDecimal)
+   - Fields: `name`, `amount` (BigDecimal), `ownerEmail` (FK to users, not null; see "Budget ownership")
    - Relationships: One-to-many with `UserBudget` and `BudgetEntry`
 
 3. **UserBudget** - Junction table for many-to-many relationship between User and Budget
@@ -151,6 +151,22 @@ src/main/kotlin/com/budgethunter/
 ├── receipts/                      # AI receipt reading and the monthly scans per plan (see below)
 └── billing/                       # store purchases through RevenueCat (see "Store purchases")
 ```
+
+## Budget ownership
+
+`budgets.owner_email` (`V6__add_budget_owner.sql`) is the budget's creator and is always a member too.
+
+- **Owner:** the only one who deletes the budget for everyone (`DELETE /api/budgets/{id}`) or removes other
+  members (`DELETE .../collaborators/{email}`, 403 for anyone else). Cannot leave (409); nobody can remove them.
+- **Any other member:** leaves with `DELETE .../collaborators/me` (or their own email). Their
+  `DELETE /api/budgets/{id}` is also leaving, with the same 204: installed apps send it whenever a user "deletes"
+  a budget, shared or not. Any member may add collaborators.
+- Responses: `BudgetResponse.ownerEmail`, `isOwner` on the collaborators list (`BudgetMemberResponse`) and on
+  `CollaboratorResponse`. All optional for clients.
+- **Accounts:** the FK has no ON DELETE action, so an owner's account cannot be deleted until its budgets are
+  handed over (`BudgetService.handOverOwnedBudgets`, or `database/delete_account.sql` by hand): to the member who
+  created the oldest entry, else the lowest email; deleted if nobody else is in it. The same rule V6 used for
+  budgets that predate ownership (`database/reports/budget_owner_preview.sql` counts them per rule).
 
 ## Automatic categorization
 

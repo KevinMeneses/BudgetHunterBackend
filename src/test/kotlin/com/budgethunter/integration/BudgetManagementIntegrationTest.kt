@@ -238,13 +238,13 @@ class BudgetManagementIntegrationTest {
         val user1 = userRepository.findById(user1Email).get()
 
         val olderBudget = budgetRepository.save(
-            Budget(name = "Older Budget", amount = BigDecimal("100.00"), date = LocalDate.now().minusDays(5))
+            Budget(name = "Older Budget", amount = BigDecimal("100.00"), date = LocalDate.now().minusDays(5), ownerEmail = user1Email)
         )
         val newerBudget = budgetRepository.save(
-            Budget(name = "Newer Budget", amount = BigDecimal("200.00"), date = LocalDate.now())
+            Budget(name = "Newer Budget", amount = BigDecimal("200.00"), date = LocalDate.now(), ownerEmail = user1Email)
         )
         val datelessBudget = budgetRepository.save(
-            Budget(name = "Dateless Budget", amount = BigDecimal("300.00"), date = null)
+            Budget(name = "Dateless Budget", amount = BigDecimal("300.00"), date = null, ownerEmail = user1Email)
         )
 
         listOf(olderBudget, newerBudget, datelessBudget).forEach { budget ->
@@ -932,8 +932,8 @@ class BudgetManagementIntegrationTest {
     }
 
     @Test
-    fun `should not allow removing last collaborator`() {
-        // Given - User 1 creates budget (is the only collaborator)
+    fun `should not allow the owner to remove themselves`() {
+        // Given - User 1 creates budget (its owner and only collaborator)
         val createBudgetRequest = CreateBudgetRequest(name = "Solo Budget", amount = BigDecimal("1000.00"))
 
         val budgetResult = mockMvc.perform(
@@ -945,7 +945,7 @@ class BudgetManagementIntegrationTest {
 
         val budget = objectMapper.readValue(budgetResult.response.contentAsString, BudgetResponse::class.java)
 
-        // When - Try to remove User 1 (the only collaborator)
+        // When - User 1 tries to remove themselves: the owner cannot leave (BudgetOwnershipIntegrationTest)
         mockMvc.perform(
             delete("/api/budgets/${budget.id}/collaborators/$user1Email")
                 .header("Authorization", "Bearer $user1AuthToken")

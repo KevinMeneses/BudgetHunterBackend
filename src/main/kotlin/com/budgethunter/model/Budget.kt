@@ -38,5 +38,13 @@ data class Budget(
     // predate this column only get an approximation (the date of their earliest entry) and stay
     // NULL when they have no entries - see database/migrations/002_add_entity_dates.sql.
     @field:Column(name = "date")
-    val date: LocalDate? = null
+    val date: LocalDate? = null,
+
+    // The member who created the budget: the only one who may delete it for everyone or remove other
+    // members. Always a member as well (the owner can neither leave nor be removed), and never null:
+    // a plain column on the budget, not a role on user_budgets, so "exactly one owner" holds by
+    // construction and the foreign key (V6) stops an account from being deleted while it still owns
+    // budgets. Existing budgets got theirs from a heuristic, see V6__add_budget_owner.sql.
+    @field:Column(name = "owner_email", nullable = false)
+    val ownerEmail: String
 )

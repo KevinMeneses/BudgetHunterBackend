@@ -59,7 +59,11 @@ CREATE TABLE IF NOT EXISTS budgets (
     amount DECIMAL(19, 2) NOT NULL,
     -- Nullable: the user-facing calendar date the app shows for this budget. NULL means it
     -- predates this column and no local date is known for it yet.
-    date DATE
+    date DATE,
+    -- The member who may delete the budget and remove others; see V6__add_budget_owner.sql. No ON DELETE
+    -- action on purpose: an account that still owns budgets cannot be deleted until they are handed over.
+    owner_email VARCHAR(255) NOT NULL,
+    CONSTRAINT fk_budgets_owner FOREIGN KEY (owner_email) REFERENCES users(email)
 );
 
 -- User-Budget junction table (many-to-many relationship)
@@ -104,6 +108,7 @@ CREATE INDEX IF NOT EXISTS idx_users_google_subject ON users(google_subject) WHE
 -- Index on user_budgets for faster user lookup
 CREATE INDEX IF NOT EXISTS idx_user_budgets_user_email ON user_budgets(user_email);
 CREATE INDEX IF NOT EXISTS idx_user_budgets_budget_id ON user_budgets(budget_id);
+CREATE INDEX IF NOT EXISTS idx_budgets_owner_email ON budgets(owner_email);
 
 -- Indexes on budget_entries for faster queries
 CREATE INDEX IF NOT EXISTS idx_budget_entries_budget_id ON budget_entries(budget_id);
@@ -132,5 +137,6 @@ COMMENT ON COLUMN users.refresh_token_expiry IS 'Expiration timestamp for the re
 COMMENT ON COLUMN budget_entries.type IS 'Entry type: INCOME or OUTCOME';
 COMMENT ON COLUMN budget_entries.created_by IS 'User email who created this entry (nullable for audit trail)';
 COMMENT ON COLUMN budget_entries.updated_by IS 'User email who last updated this entry (nullable for audit trail)';
+COMMENT ON COLUMN budgets.owner_email IS 'Member who owns the budget: the only one who can delete it or remove other members';
 COMMENT ON COLUMN budgets.date IS 'User-facing calendar date shown in the app; NULL for rows that predate this column';
 COMMENT ON COLUMN budget_entries.date IS 'User-facing calendar date shown in the app; NULL for rows that predate this column';
