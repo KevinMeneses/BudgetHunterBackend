@@ -52,4 +52,8 @@ interface AiUsageRepository : JpaRepository<AiUsage, AiUsageId> {
             "WHERE u.id.userEmail = :email AND u.id.period = :period AND u.receiptScans > 0"
     )
     fun releaseReceiptScan(@Param("email") email: String, @Param("period") period: String): Int
+
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("DELETE FROM AiUsage u WHERE u.id.userEmail = :email")
+    fun deleteByUserEmail(@Param("email") email: String): Int
 }

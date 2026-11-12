@@ -8,6 +8,7 @@ import com.budgethunter.dto.SignInRequest
 import com.budgethunter.dto.SignInResponse
 import com.budgethunter.dto.SignUpRequest
 import com.budgethunter.dto.UserResponse
+import com.budgethunter.service.AccountDeletionService
 import com.budgethunter.service.UserService
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.media.Content
@@ -20,6 +21,7 @@ import jakarta.validation.Valid
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.security.core.Authentication
+import org.springframework.web.bind.annotation.DeleteMapping
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestBody
@@ -30,7 +32,8 @@ import org.springframework.web.bind.annotation.RestController
 @RequestMapping("/api/users")
 @Tag(name = "User Management", description = "Endpoints for user registration, authentication, and token management")
 class UserController(
-    private val userService: UserService
+    private val userService: UserService,
+    private val accountDeletionService: AccountDeletionService
 ) {
 
     @PostMapping("/sign_up")
@@ -200,6 +203,25 @@ class UserController(
     ): ResponseEntity<Void> {
         val userEmail = authentication.principal as String
         userService.setPassword(userEmail, request)
+        return ResponseEntity.noContent().build()
+    }
+
+    @DeleteMapping("/me")
+    @Operation(
+        summary = "Delete the authenticated account",
+        description = "Deletes the account for good. Each budget it owns goes to another member (the one who " +
+            "created its oldest entry, else the lowest email), or is deleted when nobody else is in it; it leaves " +
+            "the other budgets, and the entries it wrote stay in them without an author. The access and refresh " +
+            "tokens stop working at once. A store subscription is not cancelled: only the store can do that."
+    )
+    @ApiResponses(
+        value = [
+            ApiResponse(responseCode = "204", description = "Account deleted"),
+            ApiResponse(responseCode = "401", description = "Missing or invalid access token", content = [Content()])
+        ]
+    )
+    fun deleteAccount(authentication: Authentication): ResponseEntity<Void> {
+        accountDeletionService.deleteAccount(authentication.principal as String)
         return ResponseEntity.noContent().build()
     }
 }

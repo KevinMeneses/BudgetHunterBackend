@@ -1,7 +1,9 @@
 package com.budgethunter.repository
 
 import com.budgethunter.model.Budget
+import jakarta.persistence.LockModeType
 import org.springframework.data.jpa.repository.JpaRepository
+import org.springframework.data.jpa.repository.Lock
 import org.springframework.data.jpa.repository.Modifying
 import org.springframework.data.jpa.repository.Query
 import org.springframework.data.repository.query.Param
@@ -10,7 +12,22 @@ import org.springframework.stereotype.Repository
 @Repository
 interface BudgetRepository : JpaRepository<Budget, Long> {
 
-    fun findByOwnerEmail(ownerEmail: String): List<Budget>
+    @Query("SELECT b.id FROM Budget b WHERE b.ownerEmail = :ownerEmail")
+    fun findIdsByOwnerEmail(@Param("ownerEmail") ownerEmail: String): List<Long>
+
+    /**
+     * The budget, with its row locked until the transaction ends: shared, for a change of membership that depends
+     * on who owns it (a member leaving, the owner removing someone), so that it cannot interleave with an owner
+     * change, which takes the exclusive lock ([findByIdForOwnerChange]).
+     */
+    @Lock(LockModeType.PESSIMISTIC_READ)
+    @Query("SELECT b FROM Budget b WHERE b.id = :budgetId")
+    fun findByIdForMembershipChange(@Param("budgetId") budgetId: Long): Budget?
+
+    /** The budget, with its row locked exclusively until the transaction ends; see [findByIdForMembershipChange]. */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT b FROM Budget b WHERE b.id = :budgetId")
+    fun findByIdForOwnerChange(@Param("budgetId") budgetId: Long): Budget?
 
     /**
      * Who takes a budget over from [leavingEmail]: among its other members, the one who created its oldest

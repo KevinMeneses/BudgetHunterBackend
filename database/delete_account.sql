@@ -1,6 +1,6 @@
--- Deletes one account by hand, which is the only way accounts are deleted today (the API has no endpoint for
--- it). Run it instead of a bare DELETE FROM users, which the foreign key on budgets.owner_email refuses while
--- the account still owns budgets:
+-- Deletes one account by hand, for when it cannot be done from the app (DELETE /api/users/me,
+-- AccountDeletionService), with the same result. Run it instead of a bare DELETE FROM users, which the foreign
+-- key on budgets.owner_email refuses while the account still owns budgets:
 --
 --   psql "$DATABASE_URL" -v email=someone@example.com -f database/delete_account.sql
 --
@@ -8,7 +8,7 @@
 -- BudgetService.handOverOwnedBudgets (the member who created its oldest entry, else the lowest email); one
 -- with no other member is deleted with its entries. Then the account goes, and with it (ON DELETE CASCADE)
 -- its memberships and AI usage; the entries it wrote stay, with created_by/updated_by set to NULL.
--- All or nothing.
+-- All or nothing. Keep it in step with AccountDeletionService.
 
 \set ON_ERROR_STOP on
 BEGIN;

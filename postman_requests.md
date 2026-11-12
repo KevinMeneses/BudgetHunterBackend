@@ -544,11 +544,30 @@ When you receive an event:
 
 **Expected Response (204 No Content):** Empty response with 204 status code
 
-**Note:** Deletes a budget and all associated entries and collaborator relationships. The authenticated user must have access to the budget. This operation cannot be undone.
+**Note:** From the budget's owner, deletes it for everyone with all its entries; this cannot be undone. From any
+other member it only leaves the budget (same 204), which is what installed apps send.
 
 ---
 
-## 16. Categorize Budget Entries
+## 16. Delete Account
+
+**Method:** DELETE
+**URL:** `http://localhost:8080/api/users/me`
+**Headers:**
+- Authorization: Bearer YOUR_JWT_TOKEN_HERE
+
+**Body:** None
+
+**Expected Response (204 No Content):** Empty response with 204 status code
+
+**Note:** Deletes the caller's account for good. Each budget it owns goes to another member (whoever created its
+oldest entry, else the lowest email), or is deleted when nobody else is in it. It leaves the other budgets, and
+the entries it wrote stay there without an author. The access and refresh tokens stop working at once (`401`
+afterwards). A store subscription is **not** cancelled: the app must tell the user to cancel it in the store.
+
+---
+
+## 17. Categorize Budget Entries
 
 Gives an automatic category to the budget's entries that have none (`UNCATEGORIZED`), from their descriptions
 only. Done before the response returns. Entries that already have a category, whoever chose it and `OTHER`
@@ -712,6 +731,12 @@ curl -X DELETE http://localhost:8080/api/budgets/1/collaborators/collaborator@ex
 ### Delete Budget
 ```bash
 curl -X DELETE http://localhost:8080/api/budgets/1 \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN"
+```
+
+### Delete Account
+```bash
+curl -X DELETE http://localhost:8080/api/users/me \
   -H "Authorization: Bearer YOUR_JWT_TOKEN"
 ```
 

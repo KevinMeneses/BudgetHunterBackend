@@ -167,6 +167,19 @@ src/main/kotlin/com/budgethunter/
   handed over (`BudgetService.handOverOwnedBudgets`, or `database/delete_account.sql` by hand): to the member who
   created the oldest entry, else the lowest email; deleted if nobody else is in it. The same rule V6 used for
   budgets that predate ownership (`database/reports/budget_owner_preview.sql` counts them per rule).
+- **Locks:** a change of membership that depends on the owner (leave, remove, a member's DELETE) locks the budget
+  row shared (`findByIdForMembershipChange`); handing over locks it exclusively, so the member chosen cannot be
+  leaving at the same moment.
+
+## Account deletion
+
+`DELETE /api/users/me` (`AccountDeletionService`), one transaction: lock the user row with a native `FOR UPDATE`
+(so nothing new is attached to the account meanwhile; `PESSIMISTIC_WRITE` is `FOR NO KEY UPDATE` on PostgreSQL), hand over its budgets, clear it as author of entries (`created_by`/`updated_by` NULL),
+delete its memberships and `ai_usage`, then the user. Each step is explicit rather than left to production's
+`ON DELETE` actions, which the H2 schema of the tests lacks. The JWT filter only accepts tokens of existing
+accounts, so its sessions end at once. No re-authentication beyond the access token: the app confirms first.
+A store subscription is not cancelled (only the store can); the app must tell PREMIUM users to cancel it there.
+`database/delete_account.sql` does the same by hand; keep the two in step.
 
 ## Automatic categorization
 

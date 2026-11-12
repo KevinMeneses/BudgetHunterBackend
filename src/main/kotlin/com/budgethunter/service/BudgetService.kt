@@ -364,7 +364,7 @@ class BudgetService(
      */
     @Transactional
     fun deleteBudget(budgetId: Long, authenticatedUserEmail: String) {
-        val budget = findAccessibleBudget(budgetId, authenticatedUserEmail)
+        val budget = findBudgetForMembershipChange(budgetId, authenticatedUserEmail)
 
         if (budget.ownerEmail != authenticatedUserEmail) {
             userBudgetRepository.deleteById(UserBudgetId(budgetId = budgetId, userEmail = authenticatedUserEmail))
@@ -377,7 +377,7 @@ class BudgetService(
     /** The caller stops being a member. The owner cannot: they delete the budget instead (409). */
     @Transactional
     fun leaveBudget(budgetId: Long, authenticatedUserEmail: String) {
-        val budget = findAccessibleBudget(budgetId, authenticatedUserEmail)
+        val budget = findBudgetForMembershipChange(budgetId, authenticatedUserEmail)
 
         check(budget.ownerEmail != authenticatedUserEmail) {
             "The owner cannot leave budget $budgetId; delete the budget instead"
@@ -395,8 +395,10 @@ class BudgetService(
      */
     @Transactional
     fun handOverOwnedBudgets(userEmail: String) {
-        budgetRepository.findByOwnerEmail(userEmail).forEach { budget ->
-            val budgetId = budget.id!!
+        budgetRepository.findIdsByOwnerEmail(userEmail).forEach { budgetId ->
+            // Locked before choosing, so the member chosen cannot leave until this commits (leaving takes the
+            // shared lock), and a member who left just before is no longer among the candidates.
+            if (budgetRepository.findByIdForOwnerChange(budgetId)?.ownerEmail != userEmail) return@forEach
             val successor = budgetRepository.findSuccessorOwner(budgetId, userEmail)
             if (successor == null) {
                 deleteForEveryone(budgetId)
@@ -439,7 +441,7 @@ class BudgetService(
             return
         }
 
-        val budget = findAccessibleBudget(budgetId, authenticatedUserEmail)
+        val budget = findBudgetForMembershipChange(budgetId, authenticatedUserEmail)
         if (budget.ownerEmail != authenticatedUserEmail) {
             throw ForbiddenAccessException("Only the owner of budget $budgetId can remove its members")
         }
@@ -479,6 +481,13 @@ class BudgetService(
     }
 
     /** [verifyBudgetAccess] for callers that need the budget itself. */
+    /** [findAccessibleBudget] for a change of membership: see [BudgetRepository.findByIdForMembershipChange]. */
+    private fun findBudgetForMembershipChange(budgetId: Long, userEmail: String): Budget {
+        val budget = budgetRepository.findByIdForMembershipChange(budgetId) ?: throw budgetNotFound(budgetId)
+        verifyUserHasAccessToBudget(budgetId, userEmail)
+        return budget
+    }
+
     private fun findAccessibleBudget(budgetId: Long, userEmail: String): Budget {
         val budget = budgetRepository.findById(budgetId).orElseThrow { budgetNotFound(budgetId) }
         verifyUserHasAccessToBudget(budgetId, userEmail)
