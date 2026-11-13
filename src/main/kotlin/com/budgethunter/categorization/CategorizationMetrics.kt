@@ -9,7 +9,8 @@ import io.micrometer.core.instrument.simple.SimpleMeterRegistry
  * and nothing about an entry, a budget or a user ever becomes a label.
  *
  * - `categorization.runs{outcome}`: requests to categorise a budget and how they ended.
- * - `categorization.entries{result}`: what happened to the entries a run looked at.
+ * - `categorization.entries{result}`: what happened to the entries a run looked at (`quota_exceeded`: left
+ *   waiting because the caller's monthly AI allowance ran out).
  * - `categorization.resolved{source}`: which layer answered a description (rules and cache are free; remote is
  *   the one that spends quota).
  * - `categorization.provider.requests{outcome}`: what Gemini did, or why it was not asked.
@@ -20,8 +21,11 @@ class CategorizationMetrics(private val registry: MeterRegistry = SimpleMeterReg
 
     enum class Run { COMPLETED, ALREADY_RUNNING, AI_OFF }
 
-    /** categorized: stored. dropped: a person changed the entry first. unplaced: nobody had an answer. */
-    enum class EntryResult { CATEGORIZED, DROPPED, UNPLACED }
+    /**
+     * categorized: stored. dropped: a person changed the entry first. unplaced: nobody had an answer.
+     * quota_exceeded: not sent to the AI because the caller's monthly allowance ran out.
+     */
+    enum class EntryResult { CATEGORIZED, DROPPED, UNPLACED, QUOTA_EXCEEDED }
 
     enum class Layer { RULES, CACHE, REMOTE }
 

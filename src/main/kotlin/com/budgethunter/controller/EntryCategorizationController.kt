@@ -32,7 +32,10 @@ class EntryCategorizationController(
             "(category UNCATEGORIZED, i.e. nobody chose one) and whose creator has AI processing turned on. The work is done " +
             "before the response returns. Entries a person categorised are never touched, and a second call " +
             "only looks at what is still waiting. Only the entries' descriptions are sent to the AI provider. " +
-            "Clients should sync their own unsynced entries first and refresh the budget's entries afterwards."
+            "Clients should sync their own unsynced entries first and refresh the budget's entries afterwards. " +
+            "What is sent to the AI counts against the caller's monthly allowance (one per distinct description; " +
+            "keyword rules and the cache are free). Past it the run still answers 200: the rules and the cache " +
+            "apply, the rest stays pending, and quotaExceeded is true. usage has the caller's count after the run."
     )
     @ApiResponses(
         value = [

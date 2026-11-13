@@ -287,6 +287,8 @@ docker-compose up -d
 | `GEMINI_MODEL` | Gemini model id. Google retires old ones, so check [the model list](https://ai.google.dev/gemini-api/docs/models) | `gemini-3.5-flash-lite` |
 | `GEMINI_MAX_REQUESTS_PER_MINUTE` | Requests to Gemini per minute, kept under the plan's quota | `10` |
 | `CATEGORIZATION_ENABLED` | `false` removes the categorize endpoint and the Gemini client altogether | `true` |
+| `CATEGORIZATION_FREE_MONTHLY_ENTRIES` | Distinct descriptions a `FREE` account may send to Gemini per UTC calendar month for automatic categorization (keyword rules and cache are free; charged to whoever asks for the run) | `50` |
+| `CATEGORIZATION_PREMIUM_MONTHLY_ENTRIES` | The same for a `PREMIUM` account (fair-use cap) | `1000` |
 | `RECEIPTS_GEMINI_MODEL` | Gemini model that reads receipts (multimodal; uses the same `GEMINI_API_KEY`). Check Google's deprecations page before changing it; `gemini-3.8-flash` answered 503 "high demand" to nearly every call in Nov 2026 | `gemini-3.5-flash-lite` |
 | `RECEIPTS_GEMINI_FALLBACK_MODEL` | Model asked when the main one is overloaded (503), failing, rate limited (429) or too slow. Empty = retry the main one once | `gemini-3.6-flash` |
 | `RECEIPTS_GEMINI_THINKING_LEVEL` | Gemini 3 `thinkingLevel` for receipts. The default level reasons long enough on an image to pass the timeout; empty = the model's default. Sent to both models, so a fallback that is not Gemini 3 needs it empty | `low` |
@@ -317,6 +319,11 @@ numbers), and only for entries whose creator has AI processing turned on.
    look at `categorization.provider.requests` (`ok` vs `http_error`) to confirm the model id still exists.
 4. The app must not send `UNCATEGORIZED` or call the endpoint until the backend with this feature is live: an
    older server would store the word as if it were a category.
+5. **Monthly allowance:** what is sent to Gemini counts against the caller's plan (`CATEGORIZATION_FREE_MONTHLY_ENTRIES`,
+   `CATEGORIZATION_PREMIUM_MONTHLY_ENTRIES`), one per distinct description, in `ai_usage.categorized_entries`
+   (migration `V7__add_categorization_usage.sql`, applied by Flyway on startup). Past it the endpoint still answers
+   200: rules and cache apply, the rest stays pending, and the response carries `quotaExceeded: true` with the usage.
+   `GET /api/ai/usage` returns both monthly counters (receipts and categorization) for the app's plan screen.
 
 ### Receipt reading (Gemini) and monthly scans
 

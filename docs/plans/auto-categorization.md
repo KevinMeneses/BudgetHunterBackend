@@ -196,6 +196,24 @@ category, so they are unaffected.
   the create/update entry endpoints.
 - The scheduled backfill that was planned is dropped: nothing runs without the user asking.
 
+### Part 6 - Monthly allowance per plan (done)
+- `ai_usage.categorized_entries` (`V7__add_categorization_usage.sql`), next to the receipt scans: FREE 50, PREMIUM
+  1000 per UTC month (`CATEGORIZATION_FREE_MONTHLY_ENTRIES`, `CATEGORIZATION_PREMIUM_MONTHLY_ENTRIES`), read with
+  `User.planAt(now)`, charged to whoever calls the endpoint (also in shared budgets).
+- **Unit: a distinct description sent to Gemini**, not an entry. Gemini is asked once per normalised text however
+  many entries carry it, so that is what the provider costs; counting entries would charge a user for 30 "Rappi"
+  entries what one question cost, and for a cache hit nothing. Rules and cache never count.
+- `CategoryResolver.resolve(descriptions, RemoteBudget)`: rules and cache first; then `CategorizationQuotaService`
+  grants up to the distinct texts still unknown (one conditional `UPDATE ... WHERE used + n <= limit`, retried
+  with what is left when another run won the race), only those are sent, and the units Gemini did not answer
+  (error, timeout, its own quota, no key) are given back. `OTHER` is an answer and counts.
+- Past the limit **no 402**: the run answers 200, rules and cache applied, the rest stays `UNCATEGORIZED`,
+  `quotaExceeded: true` and `usage` (plan, used, limit, remaining, resetsOn) let the app offer Premium. Both fields
+  have defaults, so older apps ignore them. Counter `categorization.entries{result=quota_exceeded}`.
+- `GET /api/ai/usage`: both monthly counters for the plan screen. A new route because `/api/receipts/usage`
+  belongs to the receipts feature (gone with `receipts.enabled=false`) and its shape is the scans' `usage`
+  object, which the app already parses; it is unchanged.
+
 ## Acceptance criteria
 - With the app's AI toggle off (or never saved), the endpoint answers 403 and no description of that user
   reaches Gemini, even for entries in a budget someone else triggers.

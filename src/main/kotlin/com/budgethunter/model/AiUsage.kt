@@ -21,7 +21,11 @@ class AiUsage(
     val id: AiUsageId = AiUsageId(),
 
     @field:Column(name = "receipt_scans", nullable = false)
-    val receiptScans: Int = 0
+    val receiptScans: Int = 0,
+
+    /** Distinct descriptions sent to the AI for automatic categorization (rules and cache are free). */
+    @field:Column(name = "categorized_entries", nullable = false)
+    val categorizedEntries: Int = 0
 )
 
 @Embeddable

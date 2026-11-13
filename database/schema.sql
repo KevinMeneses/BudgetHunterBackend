@@ -44,11 +44,14 @@ CREATE TABLE IF NOT EXISTS users (
     billing_id VARCHAR(36) NOT NULL UNIQUE DEFAULT gen_random_uuid()::text
 );
 
--- Paid AI used per account and UTC calendar month ('YYYY-MM'); see V4__add_plan_and_ai_usage.sql.
+-- Paid AI used per account and UTC calendar month ('YYYY-MM'); see V4__add_plan_and_ai_usage.sql
+-- and V7__add_categorization_usage.sql.
 CREATE TABLE IF NOT EXISTS ai_usage (
     user_email VARCHAR(255) NOT NULL REFERENCES users(email) ON DELETE CASCADE,
     period VARCHAR(7) NOT NULL,
     receipt_scans INTEGER NOT NULL DEFAULT 0,
+    -- Distinct descriptions sent to the AI for automatic categorization.
+    categorized_entries INTEGER NOT NULL DEFAULT 0,
     PRIMARY KEY (user_email, period)
 );
 
