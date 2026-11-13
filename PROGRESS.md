@@ -211,6 +211,7 @@ This document tracks the implementation progress of API endpoints and features a
 - ✅ DTO: CategorizeEntriesResponse (`categorized`, `pending`)
 - ✅ 403 when the caller's AI processing is off, 409 while a run of the same budget is in flight
 - ✅ Micrometer counters `categorization.*` (see MONITORING.md)
+- ✅ Monthly allowance of AI categorizations per plan (FREE 50 / PREMIUM 1000 distinct descriptions sent to Gemini; rules and cache free), `quotaExceeded` + `usage` in the response, `GET /api/ai/usage`, migration V7
 - ✅ `category` is optional when creating/updating entries; none means `UNCATEGORIZED` ("Sin categoría")
 - Plan and design notes: `docs/plans/auto-categorization.md`
 

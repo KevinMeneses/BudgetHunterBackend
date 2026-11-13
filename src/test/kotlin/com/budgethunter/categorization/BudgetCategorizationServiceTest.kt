@@ -1,5 +1,6 @@
 package com.budgethunter.categorization
 
+import com.budgethunter.dto.CategorizationUsageResponse
 import com.budgethunter.exception.ForbiddenAccessException
 import com.budgethunter.exception.ResourceNotFoundException
 import com.budgethunter.model.User
@@ -204,5 +205,111 @@ class BudgetCategorizationServiceTest {
 
         assertEquals(1.0, counted("categorization.runs", "outcome", "ai_off"))
         assertEquals(0.0, counted("categorization.runs", "outcome", "completed"))
+    }
+
+    /** A quota with [left] units for [email] that records what the run took. */
+    private fun quotaWith(left: Int): Pair<CategorizationQuotaService, MutableList<Int>> {
+        val taken = mutableListOf<Int>()
+        var remaining = left
+        val quota = mockk<CategorizationQuotaService>()
+        every { quota.budgetFor(email) } returns object : RemoteBudget {
+            override fun take(wanted: Int) = minOf(wanted, remaining).also {
+                remaining -= it
+                taken += it
+            }
+            override fun giveBack(unused: Int) {
+                remaining += unused
+            }
+        }
+        every { quota.usage(email) } answers {
+            CategorizationUsageResponse("FREE", "2026-11", left - remaining, left, remaining, "2026-12-01")
+        }
+        return quota to taken
+    }
+
+    private fun serviceWithQuota(quota: CategorizationQuotaService, answer: String? = "GROCERIES") =
+        BudgetCategorizationService(
+            CategoryResolver(
+                RuleBasedClassifier(),
+                CategoryCache(),
+                CategoryClassifier { list ->
+                    asked += list
+                    list.map { answer }
+                }
+            ),
+            budgetService,
+            entries,
+            users,
+            metrics,
+            quota
+        )
+
+    @Test
+    fun `past the allowance the rules still apply, what fits is sent and the rest waits`() {
+        waiting("Netflix", "shop a", "shop b", "shop c", "shop d")
+        every { entries.countPendingCategorization(budgetId, "UNCATEGORIZED") } returns 2
+        val (quota, taken) = quotaWith(2)
+
+        val result = serviceWithQuota(quota).categorize(budgetId, email)
+
+        assertEquals(listOf(listOf("shop a", "shop b")), asked)
+        assertEquals(listOf(2), taken)
+        assertEquals(3, result.categorized)
+        assertEquals(2, result.pending)
+        assertEquals(true, result.quotaExceeded)
+        assertEquals(CategorizationUsageResponse("FREE", "2026-11", 2, 2, 0, "2026-12-01"), result.usage)
+        verify(exactly = 0) { entries.applyAutoCategory(4L, any(), any(), any(), any()) }
+        verify(exactly = 0) { entries.applyAutoCategory(5L, any(), any(), any(), any()) }
+        assertEquals(2.0, counted("categorization.entries", "result", "quota_exceeded"))
+        assertEquals(0.0, counted("categorization.entries", "result", "unplaced"))
+        assertEquals(1.0, counted("categorization.runs", "outcome", "completed"))
+    }
+
+    @Test
+    fun `within the allowance the run says so and reports the usage`() {
+        waiting("shop a", "zzz", "")
+        val (quota, _) = quotaWith(10)
+
+        val result = serviceWithQuota(quota).categorize(budgetId, email)
+
+        assertEquals(false, result.quotaExceeded)
+        assertEquals(2, result.usage?.categorizedEntriesUsed)
+        assertEquals(1.0, counted("categorization.entries", "result", "unplaced"), "the blank one")
+        assertEquals(0.0, counted("categorization.entries", "result", "quota_exceeded"))
+    }
+
+    @Test
+    fun `charges the caller, never the entries' creators`() {
+        waiting("shop a")
+        val (quota, _) = quotaWith(10)
+
+        serviceWithQuota(quota).categorize(budgetId, email)
+
+        verify { quota.budgetFor(email) }
+        verify { quota.usage(email) }
+    }
+
+    @Test
+    fun `without a quota nothing is counted and the response keeps its defaults`() {
+        waiting("shop a")
+
+        val result = service.categorize(budgetId, email)
+
+        assertEquals(false, result.quotaExceeded)
+        assertEquals(null, result.usage)
+    }
+
+    @Test
+    fun `entries held back while the AI failed are not reported as the allowance running out`() {
+        waiting("shop a", "shop b", "shop c")
+        val (quota, taken) = quotaWith(2)
+
+        val result = serviceWithQuota(quota, answer = null).categorize(budgetId, email)
+
+        assertEquals(listOf(2), taken)
+        assertEquals(false, result.quotaExceeded, "the two units were given back, so two are still left")
+        assertEquals(2, result.usage?.categorizedEntriesRemaining)
+        assertEquals(3.0, counted("categorization.entries", "result", "unplaced"))
+        assertEquals(0.0, counted("categorization.entries", "result", "quota_exceeded"))
     }
 }

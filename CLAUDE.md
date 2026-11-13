@@ -199,8 +199,21 @@ screen) categorizes the budget's `UNCATEGORIZED` entries before it returns. Desi
 - **Safe by construction:** each result is one conditional `UPDATE` (`BudgetEntryRepository.applyAutoCategory`)
   that matches only while the entry is still `UNCATEGORIZED` with the same description, so a concurrent edit by
   a person wins. The service is deliberately not `@Transactional` (it makes an HTTP call).
+- **Monthly allowance** (`CategorizationQuotaService`, `ai_usage.categorized_entries`, V7): FREE 50, PREMIUM 1000
+  (fair use) per UTC month, plan read with `User.planAt(now)`. The unit is a distinct normalised description *sent
+  to Gemini* (Gemini is asked once per text, however many entries carry it); rules and cache are free. Charged to
+  the **caller**, not the entries' creators. `CategoryResolver.resolve(descriptions, RemoteBudget)` reserves
+  before asking, with a conditional `UPDATE ... WHERE used + n <= limit` (retried with what is left when it loses
+  a race), sends only what was granted (first come, oldest entries first), and gives back descriptions Gemini did
+  not answer (error, timeout, its quota, no key); an `OTHER` counts. Past the limit there is **no 402**: the run
+  answers 200 with the rest pending, `quotaExceeded: true` (only if still used up after the give-backs, so a
+  Gemini failure is not reported as "out of quota") and `usage` (both optional for clients); counter
+  `categorization.entries{result=quota_exceeded}`.
+- **Usage:** `GET /api/ai/usage` (`AiUsageController`) has both monthly counters (receipt fields named as in
+  `AiUsageResponse`, null for a feature turned off). `GET /api/receipts/usage` is unchanged (the app uses it).
 - **Config:** `GEMINI_API_KEY` (empty = the server never calls Gemini), `GEMINI_MODEL`,
-  `GEMINI_MAX_REQUESTS_PER_MINUTE`, `CATEGORIZATION_ENABLED`; defaults live in `CategorizationConfig`, so nothing
+  `GEMINI_MAX_REQUESTS_PER_MINUTE`, `CATEGORIZATION_ENABLED`, `CATEGORIZATION_FREE_MONTHLY_ENTRIES` (50),
+  `CATEGORIZATION_PREMIUM_MONTHLY_ENTRIES` (1000); defaults live in `CategorizationConfig`, so nothing
   needs mirroring in the test `application.properties`. Counters: `categorization.*` (see MONITORING.md).
 - `CategoryGuide` holds the one-line category meanings both prompts use (categorization and receipts).
 
@@ -212,7 +225,7 @@ asks Gemini (`GeminiReceiptExtractor`, prompt kept here) and answers what it rea
 - **Plans:** `users.plan` is `FREE` or `PREMIUM` (`model/Plan.kt`); everyone starts `FREE`. The store purchase
   (RevenueCat, see "Store purchases" below) is what sets `PREMIUM`. Always read the plan through
   `User.planAt(now)`: a `PREMIUM` past `plan_expires_at` is `FREE`.
-- **Quota:** `ai_usage` holds receipt scans per account and UTC month ('YYYY-MM'), one row per month, so nothing
+- **Quota:** `ai_usage` holds receipt scans (and AI categorizations, see above) per account and UTC month ('YYYY-MM'), one row per month, so nothing
   resets. The row is created with a native `INSERT ... WHERE NOT EXISTS`, never by saving the entity (a merge
   could write 0 over a counter another request just raised). `ReceiptQuotaService` takes a scan *before* asking the AI with a conditional `UPDATE ... WHERE
   receipt_scans < limit` (no race) and gives it back when the AI fails on its side (`ReceiptFailure`). A file

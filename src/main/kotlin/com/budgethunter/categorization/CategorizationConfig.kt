@@ -1,5 +1,6 @@
 package com.budgethunter.categorization
 
+import com.budgethunter.repository.AiUsageRepository
 import com.budgethunter.repository.BudgetEntryRepository
 import com.budgethunter.repository.UserRepository
 import com.budgethunter.service.BudgetService
@@ -69,19 +70,35 @@ class CategorizationConfig {
     fun categoryResolver(cache: CategoryCache, gemini: GeminiCategoryClassifier, metrics: CategorizationMetrics) =
         CategoryResolver(RuleBasedClassifier(), cache, gemini, metrics)
 
+    /** What each plan may send to Gemini per UTC month; rules and cache are free. */
     @Bean
+    fun categorizationQuotaService(
+        aiUsageRepository: AiUsageRepository,
+        userRepository: UserRepository,
+        @Value("\${categorization.free-monthly-entries:$DEFAULT_FREE_MONTHLY_ENTRIES}") freeMonthlyEntries: Int,
+        @Value("\${categorization.premium-monthly-entries:$DEFAULT_PREMIUM_MONTHLY_ENTRIES}") premiumMonthlyEntries: Int
+    ) = CategorizationQuotaService(
+        aiUsageRepository,
+        userRepository,
+        CategorizationAllowance(freeMonthlyEntries, premiumMonthlyEntries)
+    )
+
+    @Bean
+    @Suppress("LongParameterList") // One collaborator per layer; all are beans defined above or by the app.
     fun budgetCategorizationService(
         resolver: CategoryResolver,
         budgetService: BudgetService,
         budgetEntryRepository: BudgetEntryRepository,
         userRepository: UserRepository,
-        metrics: CategorizationMetrics
+        metrics: CategorizationMetrics,
+        quota: CategorizationQuotaService
     ) = BudgetCategorizationService(
         resolver,
         budgetService,
         budgetEntryRepository,
         userRepository,
-        metrics
+        metrics,
+        quota
     )
 
     private companion object {
@@ -89,5 +106,10 @@ class CategorizationConfig {
         const val DEFAULT_MODEL = "gemini-3.5-flash-lite"
         const val DEFAULT_BASE_URL = "https://generativelanguage.googleapis.com"
         const val DEFAULT_TIMEOUT_SECONDS = 10L
+
+        // Distinct descriptions sent to Gemini per account and UTC month. Premium's is a fair-use cap, so a leaked
+        // token or a script cannot run up the bill; a person categorising by hand stays far below either.
+        const val DEFAULT_FREE_MONTHLY_ENTRIES = 50
+        const val DEFAULT_PREMIUM_MONTHLY_ENTRIES = 1000
     }
 }

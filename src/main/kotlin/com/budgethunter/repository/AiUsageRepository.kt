@@ -37,8 +37,8 @@ interface AiUsageRepository : JpaRepository<AiUsage, AiUsageId> {
     @Modifying
     @Transactional
     @Query(
-        value = "INSERT INTO ai_usage (user_email, period, receipt_scans) " +
-            "SELECT :email, :period, 0 WHERE NOT EXISTS " +
+        value = "INSERT INTO ai_usage (user_email, period, receipt_scans, categorized_entries) " +
+            "SELECT :email, :period, 0, 0 WHERE NOT EXISTS " +
             "(SELECT 1 FROM ai_usage WHERE user_email = :email AND period = :period)",
         nativeQuery = true
     )
@@ -52,6 +52,40 @@ interface AiUsageRepository : JpaRepository<AiUsage, AiUsageId> {
             "WHERE u.id.userEmail = :email AND u.id.period = :period AND u.receiptScans > 0"
     )
     fun releaseReceiptScan(@Param("email") email: String, @Param("period") period: String): Int
+
+    /**
+     * Takes exactly [amount] categorizations from the month's allowance, only if that many are left. Returns 1
+     * when they were taken and 0 otherwise (nothing is taken then). One statement, like
+     * [tryConsumeReceiptScan], so concurrent runs cannot go over [limit] between them; the caller asks again
+     * for what is left when this answers 0.
+     */
+    @Modifying
+    @Transactional
+    @Query(
+        "UPDATE AiUsage u SET u.categorizedEntries = u.categorizedEntries + :amount " +
+            "WHERE u.id.userEmail = :email AND u.id.period = :period " +
+            "AND u.categorizedEntries + :amount <= :limit"
+    )
+    fun tryConsumeCategorizations(
+        @Param("email") email: String,
+        @Param("period") period: String,
+        @Param("amount") amount: Int,
+        @Param("limit") limit: Int
+    ): Int
+
+    /** Gives back categorizations taken for descriptions the AI then did not answer (its failure, not the user's). */
+    @Modifying
+    @Transactional
+    @Query(
+        "UPDATE AiUsage u SET u.categorizedEntries = " +
+            "CASE WHEN u.categorizedEntries > :amount THEN u.categorizedEntries - :amount ELSE 0 END " +
+            "WHERE u.id.userEmail = :email AND u.id.period = :period"
+    )
+    fun releaseCategorizations(
+        @Param("email") email: String,
+        @Param("period") period: String,
+        @Param("amount") amount: Int
+    ): Int
 
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query("DELETE FROM AiUsage u WHERE u.id.userEmail = :email")
