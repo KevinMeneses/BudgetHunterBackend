@@ -33,6 +33,10 @@ interface UserBudgetRepository : JpaRepository<UserBudget, UserBudgetId> {
     @Query("SELECT COUNT(ub) FROM UserBudget ub WHERE ub.id.budgetId = :budgetId")
     fun countByBudgetId(@Param("budgetId") budgetId: Long): Long
 
+    /** Members of the budget besides [ownerEmail]: its collaborators, for the sharing limits. */
+    @Query("SELECT COUNT(ub) FROM UserBudget ub WHERE ub.id.budgetId = :budgetId AND ub.id.userEmail <> :ownerEmail")
+    fun countOthersThanOwner(@Param("budgetId") budgetId: Long, @Param("ownerEmail") ownerEmail: String): Long
+
     @Query(
         "SELECT ub.id.budgetId AS budgetId, COUNT(ub) AS total FROM UserBudget ub " +
             "WHERE ub.id.budgetId IN :budgetIds GROUP BY ub.id.budgetId"

@@ -7,5 +7,10 @@ data class BillingStatusResponse(
     /** FREE or PREMIUM, as in force right now. */
     val plan: String,
     /** End of the paid period (ISO-8601, UTC), or null when FREE or when it does not run out. */
-    val premiumUntil: String?
+    val premiumUntil: String?,
+    /**
+     * What the account can share as a budget owner (null limits = unlimited). Null only where the server does not
+     * fill it in; `GET /status` and `POST /sync` always do.
+     */
+    val sharing: SharingStatusResponse? = null
 )

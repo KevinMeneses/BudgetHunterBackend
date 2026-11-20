@@ -2,7 +2,9 @@ package com.budgethunter.repository
 
 import com.budgethunter.model.Plan
 import com.budgethunter.model.User
+import jakarta.persistence.LockModeType
 import org.springframework.data.jpa.repository.JpaRepository
+import org.springframework.data.jpa.repository.Lock
 import org.springframework.data.jpa.repository.Modifying
 import org.springframework.data.jpa.repository.Query
 import org.springframework.data.repository.query.Param
@@ -41,8 +43,33 @@ interface UserRepository : JpaRepository<User, String>, UserInsertRepository {
     @Query(value = "SELECT email FROM users WHERE email = :email FOR UPDATE", nativeQuery = true)
     fun lockForDeletion(@Param("email") email: String): String?
 
+    /**
+     * The account, with its row locked until the transaction ends, so that additions of members counted against
+     * it as a budget owner run one at a time (see [com.budgethunter.sharing.SharingLimitService]). On PostgreSQL
+     * this is `FOR NO KEY UPDATE`, which still lets foreign key checks of new entries and memberships through.
+     */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT u FROM User u WHERE u.email = :email")
+    fun lockForSharingChange(@Param("email") email: String): User?
+
+    /**
+     * The plan columns as they are in the database now. A query for the entity would hand back the instance
+     * already in the persistence context, with whatever plan it was read with.
+     */
+    @Query("SELECT u.plan AS plan, u.planExpiresAt AS planExpiresAt FROM User u WHERE u.email = :email")
+    fun findPlanColumns(@Param("email") email: String): PlanColumns?
+
     /** Bulk delete, so nothing is cascaded from the entity: the caller has already removed what points here. */
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query("DELETE FROM User u WHERE u.email = :email")
     fun deleteAccount(@Param("email") email: String): Int
 }
+
+/** Projection of [UserRepository.findPlanColumns]. */
+interface PlanColumns {
+    val plan: Plan
+    val planExpiresAt: Instant?
+}
+
+/** The plan in force at [now]; see [com.budgethunter.model.User.planAt]. An extension: a proxy implements the interface. */
+fun PlanColumns.planAt(now: Instant): Plan = Plan.inForce(plan, planExpiresAt, now)

@@ -13,6 +13,8 @@ import com.budgethunter.dto.SignInResponse
 import com.budgethunter.dto.SignUpRequest
 import com.budgethunter.dto.UpdateBudgetEntryRequest
 import com.budgethunter.model.EntryType
+import com.budgethunter.model.Plan
+import com.budgethunter.repository.UserRepository
 import com.fasterxml.jackson.databind.ObjectMapper
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNull
@@ -65,6 +67,9 @@ class SseStreamDeliveryIntegrationTest {
     @Autowired
     private lateinit var objectMapper: ObjectMapper
 
+    @Autowired
+    private lateinit var userRepository: UserRepository
+
     private val userEmail = "sse-stream-delivery@example.com"
     private val userPassword = "Password123!"
     private val userName = "SSE Stream Delivery User"
@@ -75,6 +80,8 @@ class SseStreamDeliveryIntegrationTest {
     @BeforeEach
     fun setup() {
         authToken = createAndAuthenticateUser()
+        // PREMIUM: some tests share the budget with several people, which FREE owners cannot (see SharingLimitIntegrationTest).
+        userRepository.updatePlan(userEmail, Plan.PREMIUM, null)
         budgetId = createTestBudget()
     }
 

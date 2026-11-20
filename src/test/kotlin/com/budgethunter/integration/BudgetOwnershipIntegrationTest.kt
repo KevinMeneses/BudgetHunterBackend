@@ -8,10 +8,12 @@ import com.budgethunter.dto.SignInRequest
 import com.budgethunter.dto.SignInResponse
 import com.budgethunter.dto.SignUpRequest
 import com.budgethunter.model.EntryType
+import com.budgethunter.model.Plan
 import com.budgethunter.model.UserBudgetId
 import com.budgethunter.repository.BudgetEntryRepository
 import com.budgethunter.repository.BudgetRepository
 import com.budgethunter.repository.UserBudgetRepository
+import com.budgethunter.repository.UserRepository
 import com.budgethunter.service.BudgetService
 import com.fasterxml.jackson.databind.ObjectMapper
 import org.junit.jupiter.api.Assertions.assertEquals
@@ -60,6 +62,9 @@ class BudgetOwnershipIntegrationTest {
     @Autowired
     private lateinit var budgetEntryRepository: BudgetEntryRepository
 
+    @Autowired
+    private lateinit var userRepository: UserRepository
+
     private val owner = "owner@example.com"
     private val member = "member@example.com"
     private val other = "other@example.com"
@@ -70,6 +75,8 @@ class BudgetOwnershipIntegrationTest {
     @BeforeEach
     fun setup() {
         listOf(owner, member, other, outsider).forEach { tokens[it] = signUpAndIn(it) }
+        // PREMIUM: these tests share budgets with several people, which FREE owners cannot (see SharingLimitIntegrationTest).
+        tokens.keys.forEach { userRepository.updatePlan(it, Plan.PREMIUM, null) }
     }
 
     // --- Who owns what, and what the responses say
