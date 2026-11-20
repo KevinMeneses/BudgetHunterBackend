@@ -11,6 +11,7 @@ import com.budgethunter.dto.SignInResponse
 import com.budgethunter.dto.SignUpRequest
 import com.budgethunter.dto.UpdateBudgetEntryRequest
 import com.budgethunter.model.EntryType
+import com.budgethunter.model.Plan
 import com.budgethunter.model.UserBudgetId
 import com.budgethunter.repository.AiUsageRepository
 import com.budgethunter.repository.BudgetEntryRepository
@@ -76,6 +77,8 @@ class AccountDeletionIntegrationTest {
     @BeforeEach
     fun setup() {
         listOf(leaving, member, other).forEach { sessions[it] = signUpAndIn(it) }
+        // PREMIUM: these tests share budgets with several people, which FREE owners cannot (see SharingLimitIntegrationTest).
+        sessions.keys.forEach { userRepository.updatePlan(it, Plan.PREMIUM, null) }
     }
 
     @Test

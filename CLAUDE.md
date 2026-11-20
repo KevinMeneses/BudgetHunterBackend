@@ -149,6 +149,7 @@ src/main/kotlin/com/budgethunter/
 │   └── BudgetEntry.kt            # also EntryCategory (the closed category list, OTHER, UNCATEGORIZED)
 ├── categorization/                # automatic entry categorization (see below)
 ├── receipts/                      # AI receipt reading and the monthly scans per plan (see below)
+├── sharing/                       # shared-budget limits per plan (see "Sharing limits")
 └── billing/                       # store purchases through RevenueCat (see "Store purchases")
 ```
 
@@ -163,6 +164,7 @@ src/main/kotlin/com/budgethunter/
   a budget, shared or not. Any member may add collaborators.
 - Responses: `BudgetResponse.ownerEmail`, `isOwner` on the collaborators list (`BudgetMemberResponse`) and on
   `CollaboratorResponse`. All optional for clients.
+- **Sharing limits:** additions count against the owner's plan; see "Sharing limits".
 - **Accounts:** the FK has no ON DELETE action, so an owner's account cannot be deleted until its budgets are
   handed over (`BudgetService.handOverOwnedBudgets`, or `database/delete_account.sql` by hand): to the member who
   created the oldest entry, else the lowest email; deleted if nobody else is in it. The same rule V6 used for
@@ -170,6 +172,26 @@ src/main/kotlin/com/budgethunter/
 - **Locks:** a change of membership that depends on the owner (leave, remove, a member's DELETE) locks the budget
   row shared (`findByIdForMembershipChange`); handing over locks it exclusively, so the member chosen cannot be
   leaving at the same moment.
+
+## Sharing limits (per plan)
+
+Package `sharing/` (`SharingLimitService`). No table of its own: everything is counted from `user_budgets` and
+`budgets.owner_email`. Plan decisions and reasons: `docs/plans/sharing-limits.md`.
+
+- **Whose plan:** the budget **owner's**, read with `User.planAt(now)`, whoever adds (any member still may).
+  FREE: `SHARING_FREE_SHARED_BUDGETS` (1) shared budgets, each with `SHARING_FREE_COLLABORATORS_PER_BUDGET` (1)
+  members besides the owner. PREMIUM: no limit. Defaults in `SharingConfig`.
+- **Shared** = a budget one *owns* with any member besides the owner. Budgets one is invited to never count.
+- **Only additions are stopped** (`addCollaborator`, after its 404/409 checks): `402` `SharingErrorResponse`, code
+  `SHARING_LIMIT_REACHED`, `sharing.limitType` `SHARED_BUDGETS` | `COLLABORATORS_PER_BUDGET`, `plan` (owner's),
+  `limit`, `used`, `callerIsOwner`. Nothing is ever taken away: what was shared before, while PREMIUM, or handed
+  over on account deletion stays, even past the limit; removing and leaving always work.
+- **Concurrency:** `checkCanAddMember` locks the owner's `users` row (`PESSIMISTIC_WRITE`, `FOR NO KEY UPDATE` on
+  PostgreSQL, so FK checks still pass) before counting, then the budget row shared; same order as account
+  deletion. All additions against one owner, from any budget or member, run one at a time.
+- **Status:** `GET /api/billing/status` (and `POST /sync`) carry `sharing` (`SharingStatusResponse`):
+  `sharedBudgetsLimit`, `sharedBudgetsUsed`, `collaboratorsPerBudgetLimit`, `plan`; a **null limit = unlimited**.
+  Optional for clients.
 
 ## Account deletion
 

@@ -51,6 +51,7 @@ class BudgetServiceCategoryTest {
             userBudgetRepository,
             userRepository,
             budgetEntryRepository,
+            mockk(relaxed = true),
             mockk(relaxed = true)
         )
 

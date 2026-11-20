@@ -16,6 +16,7 @@ import com.budgethunter.repository.BudgetEntryRepository
 import com.budgethunter.repository.BudgetRepository
 import com.budgethunter.repository.UserBudgetRepository
 import com.budgethunter.repository.UserRepository
+import com.budgethunter.sharing.SharingLimitService
 import io.mockk.Runs
 import io.mockk.clearAllMocks
 import io.mockk.every
@@ -69,7 +70,8 @@ class BudgetServiceTest {
             userBudgetRepository,
             userRepository,
             budgetEntryRepository,
-            reactiveSseService
+            reactiveSseService,
+            mockk<SharingLimitService>(relaxed = true)
         )
     }
 

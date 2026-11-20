@@ -8,6 +8,7 @@ import com.budgethunter.dto.BudgetResponse
 import com.budgethunter.dto.CollaboratorResponse
 import com.budgethunter.dto.CreateBudgetEntryRequest
 import com.budgethunter.dto.CreateBudgetRequest
+import com.budgethunter.dto.SharingErrorResponse
 import com.budgethunter.dto.UpdateBudgetEntryRequest
 import com.budgethunter.dto.UpdateBudgetRequest
 import com.budgethunter.service.BudgetService
@@ -185,7 +186,8 @@ class BudgetController(
     @Operation(
         summary = "Add a collaborator to a budget",
         description = "Adds a new collaborator to the budget by email. The user must exist in the system. Any " +
-            "member of the budget can add collaborators, not only its owner."
+            "member of the budget can add collaborators, not only its owner, within the sharing limits of the " +
+            "OWNER's plan (FREE: by default one shared budget with one person besides the owner; PREMIUM: none)."
     )
     @ApiResponses(
         value = [
@@ -203,6 +205,12 @@ class BudgetController(
                 responseCode = "401",
                 description = "Unauthorized - missing or invalid JWT token",
                 content = [Content()]
+            ),
+            ApiResponse(
+                responseCode = "402",
+                description = "The owner's plan allows no more: code SHARING_LIMIT_REACHED, with sharing.limitType " +
+                    "SHARED_BUDGETS or COLLABORATORS_PER_BUDGET, the owner's plan, the limit and how much is used",
+                content = [Content(schema = Schema(implementation = SharingErrorResponse::class))]
             ),
             ApiResponse(
                 responseCode = "403",

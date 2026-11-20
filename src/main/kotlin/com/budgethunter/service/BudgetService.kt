@@ -26,6 +26,7 @@ import com.budgethunter.repository.BudgetEntryRepository
 import com.budgethunter.repository.BudgetRepository
 import com.budgethunter.repository.UserBudgetRepository
 import com.budgethunter.repository.UserRepository
+import com.budgethunter.sharing.SharingLimitService
 import org.springframework.data.domain.Page
 import org.springframework.data.domain.PageRequest
 import org.springframework.data.domain.Sort
@@ -41,7 +42,8 @@ class BudgetService(
     private val userBudgetRepository: UserBudgetRepository,
     private val userRepository: UserRepository,
     private val budgetEntryRepository: BudgetEntryRepository,
-    private val reactiveSseService: ReactiveSseService
+    private val reactiveSseService: ReactiveSseService,
+    private val sharingLimitService: SharingLimitService
 ) {
 
     @Transactional
@@ -125,6 +127,9 @@ class BudgetService(
     /**
      * Any member may add others, not only the owner: that is how it has always worked and what the installed
      * apps offer every member, and an addition destroys nothing - the owner can remove anyone added.
+     *
+     * Whoever adds, the limits are those of the budget owner's plan ([SharingLimitService.checkCanAddMember],
+     * 402 past them), checked last so that a missing account or an existing member still answers 404 or 409.
      */
     @Transactional
     fun addCollaborator(budgetId: Long, request: AddCollaboratorRequest, authenticatedUserEmail: String): CollaboratorResponse {
@@ -141,6 +146,8 @@ class BudgetService(
         if (userBudgetRepository.existsById(userBudgetId)) {
             throw IllegalStateException("User ${request.email} is already a collaborator on budget $budgetId")
         }
+
+        sharingLimitService.checkCanAddMember(budgetId, authenticatedUserEmail)
 
         val userBudget = UserBudget(
             id = userBudgetId,

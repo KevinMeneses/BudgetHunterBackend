@@ -299,6 +299,8 @@ docker-compose up -d
 | `RECEIPTS_MAX_SCANS_PER_USER_PER_MINUTE` | Scans one account may start per minute; above it `429 TOO_MANY_SCANS` | `6` |
 | `RECEIPTS_MAX_CONCURRENT_SCANS` | Scans in flight at once on the server; above it `503 AI_BUSY` (bounds memory and threads) | `8` |
 | `RECEIPTS_ENABLED` | `false` removes the receipt endpoints altogether | `true` |
+| `SHARING_FREE_SHARED_BUDGETS` | Budgets a `FREE` account may share as their owner (budgets it is invited to do not count). Past it, adding a collaborator answers `402 SHARING_LIMIT_REACHED`; nothing already shared is removed. `PREMIUM` has no limit | `1` |
+| `SHARING_FREE_COLLABORATORS_PER_BUDGET` | Members besides the owner that each budget of a `FREE` owner may have (whoever adds them: the owner's plan decides) | `1` |
 | `REVENUECAT_SECRET_API_KEY` | RevenueCat secret key (`sk_...`); the server reads each account's entitlement with it. Empty = plans never leave `FREE` and `/api/billing/sync` answers 503 | empty |
 | `REVENUECAT_WEBHOOK_AUTHORIZATION` | Exact `Authorization` header value configured on RevenueCat's webhook. Empty = every webhook answers 401 | empty |
 | `REVENUECAT_ENTITLEMENT_ID` | The entitlement the premium products unlock, as named in RevenueCat | `premium` |

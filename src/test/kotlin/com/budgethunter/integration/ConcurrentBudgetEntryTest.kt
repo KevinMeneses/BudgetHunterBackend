@@ -11,6 +11,8 @@ import com.budgethunter.dto.SignInResponse
 import com.budgethunter.dto.SignUpRequest
 import com.budgethunter.dto.UpdateBudgetEntryRequest
 import com.budgethunter.model.EntryType
+import com.budgethunter.model.Plan
+import com.budgethunter.repository.UserRepository
 import com.budgethunter.service.ReactiveSseService
 import com.fasterxml.jackson.databind.ObjectMapper
 import org.junit.jupiter.api.Assertions.assertEquals
@@ -56,6 +58,9 @@ class ConcurrentBudgetEntryTest {
     @Autowired
     private lateinit var reactiveSseService: ReactiveSseService
 
+    @Autowired
+    private lateinit var userRepository: UserRepository
+
     private val user1Email = "concurrent-user1@example.com"
     private val user2Email = "concurrent-user2@example.com"
     private val user3Email = "concurrent-user3@example.com"
@@ -72,6 +77,9 @@ class ConcurrentBudgetEntryTest {
         user1AuthToken = createAndAuthenticateUser(user1Email, "User One", userPassword)
         user2AuthToken = createAndAuthenticateUser(user2Email, "User Two", userPassword)
         user3AuthToken = createAndAuthenticateUser(user3Email, "User Three", userPassword)
+
+        // PREMIUM: the budget is shared with several people, which FREE owners cannot (see SharingLimitIntegrationTest).
+        userRepository.updatePlan(user1Email, Plan.PREMIUM, null)
 
         // Create a shared budget with all users as collaborators
         budgetId = createBudgetAndAddCollaborators()

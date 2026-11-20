@@ -15,6 +15,18 @@ interface BudgetRepository : JpaRepository<Budget, Long> {
     @Query("SELECT b.id FROM Budget b WHERE b.ownerEmail = :ownerEmail")
     fun findIdsByOwnerEmail(@Param("ownerEmail") ownerEmail: String): List<Long>
 
+    /** Read as a scalar, so it is the row as it is now even when the budget is already in the persistence context. */
+    @Query("SELECT b.ownerEmail FROM Budget b WHERE b.id = :budgetId")
+    fun findOwnerEmail(@Param("budgetId") budgetId: Long): String?
+
+    /** Budgets [ownerEmail] owns that have a member besides them: what counts against the sharing limits. */
+    @Query(
+        value = "SELECT COUNT(*) FROM budgets b WHERE b.owner_email = :ownerEmail AND EXISTS " +
+            "(SELECT 1 FROM user_budgets ub WHERE ub.budget_id = b.id AND ub.user_email <> b.owner_email)",
+        nativeQuery = true
+    )
+    fun countSharedBudgetsOwnedBy(@Param("ownerEmail") ownerEmail: String): Long
+
     /**
      * The budget, with its row locked until the transaction ends: shared, for a change of membership that depends
      * on who owns it (a member leaving, the owner removing someone), so that it cannot interleave with an owner
