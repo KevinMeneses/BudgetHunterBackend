@@ -37,20 +37,20 @@ class WebMvcConfig(
 ) : WebMvcConfigurer {
 
     /**
-     * Register interceptors to be called for incoming requests
-     *
-     * @param registry The interceptor registry where we add our interceptors
-     */
-    /**
      * Public pages served as static files (src/main/resources/static): the privacy policy and the account deletion
-     * page, linked from the Play Store listing and the app. Served at a path without ".html" so the published URL stays the same if the
-     * page is ever generated differently.
+     * page, linked from the Play Store listing and the app. Served at a path without ".html" so the published URL
+     * stays the same if the page is ever generated differently.
      */
     override fun addViewControllers(registry: ViewControllerRegistry) {
         registry.addViewController("/privacidad").setViewName("forward:/privacidad.html")
         registry.addViewController("/eliminar-cuenta").setViewName("forward:/eliminar-cuenta.html")
     }
 
+    /**
+     * Register interceptors to be called for incoming requests
+     *
+     * @param registry The interceptor registry where we add our interceptors
+     */
     override fun addInterceptors(registry: InterceptorRegistry) {
         // REQUEST LOGGING: Log all incoming requests and responses
         // This runs BEFORE rate limiting so we can see rate-limited requests in logs
