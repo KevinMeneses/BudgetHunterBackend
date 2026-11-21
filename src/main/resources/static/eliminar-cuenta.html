@@ -1,0 +1,230 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<title>Eliminar tu cuenta · BudgetHunter</title>
+<style>
+  :root { color-scheme: light dark; --fg: #1f1b13; --muted: #5e5a4f; --bg: #fffbf2; --accent: #6b5d00; --line: #e6e0d0;
+          --danger: #a3261b; --ok: #2f6b1f; --field: #ffffff; }
+  @media (prefers-color-scheme: dark) { :root { --fg: #ece6d8; --muted: #b8b2a3; --bg: #16140f; --accent: #dccb5c; --line: #3a362c;
+          --danger: #ff8a7a; --ok: #9bd67f; --field: #211e17; } }
+  body { margin: 0; background: var(--bg); color: var(--fg); font: 16px/1.6 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  main { max-width: 760px; margin: 0 auto; padding: 32px 16px 64px; }
+  h1 { font-size: 1.8rem; margin: 0 0 4px; }
+  h2 { font-size: 1.2rem; margin: 32px 0 8px; padding-top: 16px; border-top: 1px solid var(--line); }
+  h3 { font-size: 1rem; margin: 20px 0 6px; }
+  .meta { color: var(--muted); margin: 0 0 24px; }
+  a { color: var(--accent); }
+  .summary { background: color-mix(in srgb, var(--accent) 10%, transparent); border-radius: 12px; padding: 12px 16px; }
+  .warning { background: color-mix(in srgb, var(--danger) 10%, transparent); border-radius: 12px; padding: 12px 16px; }
+  label { display: block; font-weight: 600; margin: 12px 0 4px; }
+  input[type=email], input[type=password] { box-sizing: border-box; width: 100%; padding: 10px 12px; font: inherit;
+          color: var(--fg); background: var(--field); border: 1px solid var(--line); border-radius: 8px; }
+  .check { display: flex; gap: 10px; align-items: flex-start; font-weight: 600; margin: 16px 0; }
+  .check input { margin-top: 5px; width: 18px; height: 18px; flex: none; }
+  button { margin-top: 16px; padding: 10px 18px; font: inherit; font-weight: 600; border: 0; border-radius: 8px;
+           background: var(--danger); color: #fff; cursor: pointer; }
+  button:disabled { opacity: .45; cursor: not-allowed; }
+  .error { color: var(--danger); font-weight: 600; min-height: 1.6em; margin: 8px 0 0; }
+  .done { border: 2px solid var(--ok); border-radius: 12px; padding: 12px 16px; }
+  .hint { color: var(--muted); font-size: .95rem; }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<main>
+<h1>Eliminar tu cuenta de BudgetHunter</h1>
+<p class="meta">BudgetHunter es una app de Kevin Felipe Meneses Palta, responsable del tratamiento de tus datos
+(ver la <a href="/privacidad">política de privacidad</a>).</p>
+
+<div class="summary">
+  <p>Puedes eliminar tu cuenta de BudgetHunter y sus datos de dos formas: desde la app o desde esta página, sin tener la
+  app instalada. La eliminación es inmediata y <strong>no se puede deshacer</strong>.</p>
+</div>
+
+<h2>Desde la app</h2>
+<p>Abre BudgetHunter, entra a <strong>Ajustes &gt; Eliminar cuenta</strong> y confirma.</p>
+
+<h2>Qué se borra y qué se conserva</h2>
+<ul>
+  <li><strong>Se borran</strong> tu cuenta (correo, nombre, contraseña o vínculo con Google, sesiones abiertas), tus
+  preferencias, tu plan, tu uso mensual de IA y tu participación en todos los presupuestos.</li>
+  <li><strong>Tus presupuestos compartidos</strong> pasan a otro miembro (quien registró su movimiento más antiguo) y
+  siguen existiendo para las demás personas. <strong>Los que no compartes con nadie</strong> se borran con todos sus
+  movimientos.</li>
+  <li><strong>Los movimientos que registraste en presupuestos de otras personas se conservan</strong> en esos
+  presupuestos, pero quedan sin autor: ya no están asociados a tu cuenta.</li>
+  <li>Los registros técnicos del servidor (fecha, ruta, correo e IP de cada solicitud) se borran automáticamente en un
+  máximo de 30 días.</li>
+</ul>
+<p class="warning"><strong>Eliminar tu cuenta NO cancela una suscripción Premium.</strong> Cancélala en
+<a href="https://play.google.com/store/account/subscriptions" rel="noopener">Google Play &gt; Suscripciones</a> para que no
+te sigan cobrando. El historial de compras queda en Google Play y en nuestro proveedor de suscripciones, asociado solo
+a un identificador aleatorio.</p>
+
+<h2>Eliminar la cuenta desde aquí</h2>
+
+<section id="forms">
+  <div class="warning">
+    <p><strong>Al eliminar la cuenta pierdes:</strong> el acceso a todos tus presupuestos, los presupuestos que no
+    compartes (con sus movimientos), tus preferencias, tu plan y tu historial de uso de IA. Lo que esté guardado solo
+    en tu teléfono (modo sin conexión, fotos de recibos) no se toca.</p>
+  </div>
+
+  <label class="check"><input type="checkbox" id="confirm">
+    <span>Entiendo que mi cuenta y los datos descritos se borrarán de forma permanente.</span></label>
+
+  <h3>Con tu correo y contraseña</h3>
+  <form id="password-form" autocomplete="on" novalidate>
+    <label for="email">Correo</label>
+    <input type="email" id="email" name="email" autocomplete="username" required>
+    <label for="password">Contraseña</label>
+    <input type="password" id="password" name="password" autocomplete="current-password" required>
+    <button type="submit" id="password-submit" disabled>Eliminar mi cuenta</button>
+    <p class="error" id="password-error" role="alert"></p>
+  </form>
+
+  <div id="google-section" hidden>
+    <h3>Con Google</h3>
+    <p class="hint">Si entras a BudgetHunter con Google y no tienes contraseña, usa este botón.</p>
+    <p class="hint" id="google-locked">Marca primero la casilla de arriba.</p>
+    <div id="google-button"></div>
+    <p class="error" id="google-error" role="alert"></p>
+  </div>
+</section>
+
+<section id="done" class="done" hidden>
+  <p><strong>Tu cuenta fue eliminada.</strong> Ya no puedes entrar con ella y las sesiones abiertas en la app se
+  cerraron.</p>
+  <p id="premium-note" hidden><strong>Tu cuenta tenía Premium. Eliminarla NO cancela la suscripción:</strong>
+  cancélala ahora en <a href="https://play.google.com/store/account/subscriptions" rel="noopener">Google Play &gt;
+  Suscripciones</a> para que no te sigan cobrando.</p>
+</section>
+
+<h2>Si no puedes iniciar sesión</h2>
+<p>Si olvidaste tu contraseña o no puedes entrar, escríbenos a <a href="mailto:kevmeneses@gmail.com">kevmeneses@gmail.com</a>
+<strong>desde el correo de tu cuenta</strong>, pidiendo que la eliminemos. Te responderemos en un máximo de 15 días
+hábiles.</p>
+</main>
+
+<script>
+(function () {
+  "use strict";
+  var MESSAGES = {
+    INVALID_CREDENTIALS: "Correo o contraseña incorrectos.",
+    TOO_MANY_ATTEMPTS: "Demasiados intentos. Espera una hora e inténtalo de nuevo, o escríbenos al correo de abajo.",
+    INVALID_GOOGLE_TOKEN: "No pudimos verificar tu cuenta de Google. Inténtalo de nuevo.",
+    NO_ACCOUNT: "No hay ninguna cuenta de BudgetHunter asociada a esa cuenta de Google."
+  };
+  var GENERIC = "No pudimos eliminar la cuenta. Inténtalo de nuevo más tarde.";
+
+  var confirmBox = document.getElementById("confirm");
+  var form = document.getElementById("password-form");
+  var submit = document.getElementById("password-submit");
+  var passwordError = document.getElementById("password-error");
+  var googleError = document.getElementById("google-error");
+  var googleClientId = null;
+  var googleRendered = false;
+  var busy = false;
+
+  function refresh() {
+    submit.disabled = busy || !confirmBox.checked;
+    if (confirmBox.checked && googleClientId) renderGoogleButton();
+    document.getElementById("google-locked").hidden = confirmBox.checked;
+    document.getElementById("google-button").hidden = !confirmBox.checked;
+  }
+  confirmBox.addEventListener("change", refresh);
+
+  function send(path, body, errorBox) {
+    busy = true;
+    refresh();
+    errorBox.textContent = "";
+    body.confirm = confirmBox.checked;
+    return fetch(path, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Accept": "application/json" },
+      body: JSON.stringify(body),
+      credentials: "omit"
+    }).then(function (response) {
+      return response.json().catch(function () { return {}; }).then(function (data) {
+        if (response.ok && data.deleted) {
+          document.getElementById("forms").hidden = true;
+          document.getElementById("premium-note").hidden = !data.cancelSubscriptionInStore;
+          document.getElementById("done").hidden = false;
+          document.getElementById("done").scrollIntoView();
+        } else {
+          errorBox.textContent = (data && MESSAGES[data.code]) ||
+            (response.status === 400 ? "Completa todos los campos y marca la casilla." : GENERIC);
+        }
+      });
+    }).catch(function () {
+      errorBox.textContent = GENERIC;
+    }).then(function () {
+      busy = false;
+      refresh();
+    });
+  }
+
+  form.addEventListener("submit", function (event) {
+    event.preventDefault();
+    if (!confirmBox.checked) { passwordError.textContent = "Marca la casilla para confirmar."; return; }
+    var email = document.getElementById("email").value.trim();
+    var password = document.getElementById("password").value;
+    if (!email || !password) { passwordError.textContent = "Escribe tu correo y tu contraseña."; return; }
+    send("/api/users/delete_with_credentials", { email: email, password: password }, passwordError)
+      .then(function () { document.getElementById("password").value = ""; });
+  });
+
+  // The email inside the Google ID token, only to name the account in the last confirmation.
+  function emailOf(idToken) {
+    try {
+      var payload = idToken.split(".")[1].replace(/-/g, "+").replace(/_/g, "/");
+      return JSON.parse(decodeURIComponent(escape(atob(payload)))).email || "";
+    } catch (e) { return ""; }
+  }
+
+  function onGoogleCredential(response) {
+    if (!confirmBox.checked) { googleError.textContent = "Marca la casilla para confirmar."; return; }
+    var email = emailOf(response.credential);
+    var question = "¿Eliminar de forma permanente la cuenta de BudgetHunter" + (email ? " de " + email : "") + "?";
+    if (!window.confirm(question)) return;
+    send("/api/users/delete_with_google", { idToken: response.credential }, googleError);
+  }
+
+  function renderGoogleButton() {
+    if (googleRendered || !window.google || !google.accounts || !google.accounts.id) return;
+    googleRendered = true;
+    google.accounts.id.initialize({
+      client_id: googleClientId,
+      callback: onGoogleCredential,
+      auto_select: false,
+      cancel_on_tap_outside: true
+    });
+    google.accounts.id.renderButton(document.getElementById("google-button"),
+      { type: "standard", theme: "outline", size: "large", text: "continue_with", locale: "es" });
+  }
+
+  // The Google button only exists when the server has a web client id.
+  fetch("/api/users/delete_account/config", { headers: { "Accept": "application/json" }, credentials: "omit" })
+    .then(function (response) { return response.ok ? response.json() : {}; })
+    .then(function (config) {
+      if (!config || !config.googleClientId) return;
+      googleClientId = config.googleClientId;
+      var script = document.createElement("script");
+      script.src = "https://accounts.google.com/gsi/client";
+      script.async = true;
+      script.onload = function () {
+        document.getElementById("google-section").hidden = false;
+        refresh();
+      };
+      document.head.appendChild(script);
+    })
+    .catch(function () { /* No Google button: the password form and the email still work. */ });
+
+  refresh();
+})();
+</script>
+</body>
+</html>
