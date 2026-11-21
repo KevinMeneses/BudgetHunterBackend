@@ -240,6 +240,22 @@ class SharingLimitIntegrationTest {
     }
 
     @Test
+    fun `the same person added many times at once is added once, and the rest are told they are a member`() {
+        val (owner, friend) = accounts("owner", "friend")
+        val budgetId = budgetService.createBudget(CreateBudgetRequest("Twice", BigDecimal.TEN), owner).id
+
+        val outcomes = inParallelOutcomes(
+            List(PARALLEL_REQUESTS) {
+                { budgetService.addCollaborator(budgetId, AddCollaboratorRequest(budgetId, friend), owner) }
+            }
+        )
+
+        // 409 (IllegalStateException), never 402: the person is not one more collaborator but the same one.
+        assertEquals(mapOf("added" to 1, "already a member" to PARALLEL_REQUESTS - 1), outcomes)
+        assertEquals(2, members(budgetId))
+    }
+
+    @Test
     fun `parallel additions to different budgets of one owner share one budget at most`() {
         val (owner) = accounts("owner")
         val people = (1..PARALLEL_REQUESTS).map { signUp("q$it") }
@@ -273,6 +289,28 @@ class SharingLimitIntegrationTest {
                 }
             }
             return pool.invokeAll(attempts).count { it.get() }
+        } finally {
+            pool.shutdown()
+        }
+    }
+
+    /** Like [inParallel], but counts how each call ended; any other exception fails the test. */
+    private fun inParallelOutcomes(calls: List<() -> Any>): Map<String, Int> {
+        val pool = Executors.newFixedThreadPool(calls.size)
+        try {
+            val attempts = calls.map { call ->
+                Callable {
+                    try {
+                        call()
+                        "added"
+                    } catch (_: SharingLimitExceededException) {
+                        "sharing limit"
+                    } catch (_: IllegalStateException) {
+                        "already a member"
+                    }
+                }
+            }
+            return pool.invokeAll(attempts).map { it.get() }.groupingBy { it }.eachCount()
         } finally {
             pool.shutdown()
         }

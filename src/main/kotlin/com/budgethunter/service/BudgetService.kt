@@ -130,6 +130,9 @@ class BudgetService(
      *
      * Whoever adds, the limits are those of the budget owner's plan ([SharingLimitService.checkCanAddMember],
      * 402 past them), checked last so that a missing account or an existing member still answers 404 or 409.
+     * The membership check runs after [SharingLimitService.lockForAddition]: two requests adding the same person
+     * at once then run one after the other, and the second sees the first one's member and answers 409, instead
+     * of counting them as a collaborator and answering 402.
      */
     @Transactional
     fun addCollaborator(budgetId: Long, request: AddCollaboratorRequest, authenticatedUserEmail: String): CollaboratorResponse {
@@ -143,11 +146,13 @@ class BudgetService(
             userEmail = request.email
         )
 
+        val ownerEmail = sharingLimitService.lockForAddition(budgetId)
+
         if (userBudgetRepository.existsById(userBudgetId)) {
             throw IllegalStateException("User ${request.email} is already a collaborator on budget $budgetId")
         }
 
-        sharingLimitService.checkCanAddMember(budgetId, authenticatedUserEmail)
+        sharingLimitService.checkCanAddMember(budgetId, ownerEmail, authenticatedUserEmail)
 
         val userBudget = UserBudget(
             id = userBudgetId,
