@@ -1,0 +1,179 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Política de privacidad · BudgetHunter</title>
+<style>
+  :root { color-scheme: light dark; --fg: #1f1b13; --muted: #5e5a4f; --bg: #fffbf2; --accent: #6b5d00; --line: #e6e0d0; }
+  @media (prefers-color-scheme: dark) { :root { --fg: #ece6d8; --muted: #b8b2a3; --bg: #16140f; --accent: #dccb5c; --line: #3a362c; } }
+  body { margin: 0; background: var(--bg); color: var(--fg); font: 16px/1.6 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  main { max-width: 760px; margin: 0 auto; padding: 32px 16px 64px; }
+  h1 { font-size: 1.8rem; margin: 0 0 4px; }
+  h2 { font-size: 1.2rem; margin: 32px 0 8px; padding-top: 16px; border-top: 1px solid var(--line); }
+  h3 { font-size: 1rem; margin: 20px 0 6px; }
+  .meta { color: var(--muted); margin: 0 0 24px; }
+  a { color: var(--accent); }
+  table { border-collapse: collapse; width: 100%; font-size: .95rem; }
+  th, td { text-align: left; vertical-align: top; padding: 8px; border-bottom: 1px solid var(--line); }
+  .summary { background: color-mix(in srgb, var(--accent) 10%, transparent); border-radius: 12px; padding: 12px 16px; }
+</style>
+</head>
+<body>
+<main>
+<h1>Política de privacidad de BudgetHunter</h1>
+<p class="meta">Última actualización: [FECHA DE PUBLICACIÓN]</p>
+
+<div class="summary">
+  <p><strong>En pocas palabras:</strong> BudgetHunter guarda lo necesario para que lleves tus presupuestos y los compartas
+  con quien tú elijas. Los mensajes de tu banco se leen en tu teléfono y solo se guarda el movimiento. No vendemos tus
+  datos, no mostramos publicidad y no usamos tus datos para perfiles comerciales. Puedes borrar tu cuenta cuando
+  quieras desde la app o desde <a href="/eliminar-cuenta">esta página</a>.</p>
+</div>
+
+<h2>1. Quién es responsable de tus datos</h2>
+<p>El responsable del tratamiento es <strong>[NOMBRE DEL RESPONSABLE]</strong>, con domicilio en [CIUDAD], Colombia.
+Para cualquier consulta, reclamo o solicitud sobre tus datos puedes escribir a <strong>[CORREO DE CONTACTO]</strong>.</p>
+<p>Esta política se rige por la Ley 1581 de 2012, el Decreto 1377 de 2013 (compilado en el Decreto 1074 de 2015) y
+las demás normas colombianas de protección de datos personales.</p>
+
+<h2>2. Qué datos tratamos</h2>
+
+<h3>Tu cuenta</h3>
+<ul>
+  <li>Correo electrónico y nombre.</li>
+  <li>Tu contraseña, guardada solo como un resumen cifrado (hash); nadie puede leerla. Si entras con Google, guardamos el
+  identificador que Google asigna a tu cuenta, no tu contraseña de Google.</li>
+  <li>Tus preferencias: si usas la lectura de mensajes, si usas la IA, tu presupuesto predeterminado y los bancos que
+  elegiste.</li>
+  <li>Tu plan (gratis o Premium), hasta cuándo dura Premium y cuántos escaneos de recibos y categorizaciones con IA
+  usaste este mes.</li>
+  <li>Un identificador aleatorio de facturación, que usamos con nuestro proveedor de pagos en lugar de tu correo.</li>
+</ul>
+
+<h3>Tus presupuestos</h3>
+<ul>
+  <li>Nombre, monto y fecha de cada presupuesto, y sus movimientos: monto, descripción, categoría, tipo (ingreso o gasto),
+  fecha y quién lo creó o modificó.</li>
+  <li>Las personas con las que compartes un presupuesto (su correo y nombre) y quién es el dueño. Quienes compartan un
+  presupuesto contigo ven sus movimientos y quién los registró.</li>
+</ul>
+<p>Si usas la app sin cuenta (modo sin conexión), tus presupuestos se quedan solo en tu teléfono y no nos llegan.</p>
+
+<h3>Mensajes y notificaciones de tus bancos (solo si lo activas)</h3>
+<ul>
+  <li>En Android, con tu permiso, la app lee los SMS que llegan de los bancos que elegiste, y, si activas el acceso a
+  notificaciones, las notificaciones de las apps de esos bancos y los avisos de correo de esos bancos en tu app de correo.</li>
+  <li>Esa lectura ocurre <strong>en tu teléfono</strong>. Los mensajes de otros remitentes se ignoran. Los mensajes
+  completos no se envían a nuestros servidores: la app solo crea el movimiento (monto, fecha y una descripción corta,
+  que es la primera frase del mensaje con el nombre del banco). Ese movimiento se sincroniza como cualquier otro si
+  tienes cuenta.</li>
+  <li>En iOS la app no puede leer mensajes; solo recibe el texto que tú le pasas con una automatización de Atajos que
+  configuras tú.</li>
+  <li>Puedes desactivarlo en cualquier momento en Ajustes de la app o retirando los permisos en tu teléfono.</li>
+</ul>
+
+<h3>Recibos y facturas</h3>
+<ul>
+  <li>Las fotos o PDF que adjuntas a un movimiento se guardan en tu teléfono.</li>
+  <li>Si pides leer un recibo con IA, el archivo se envía a nuestro servidor y de ahí al servicio de IA de Google
+  (Gemini) para extraer el monto, la fecha, la descripción y la categoría. <strong>Nuestro servidor no guarda el
+  archivo</strong>: lo procesa y lo descarta.</li>
+</ul>
+
+<h3>Categorización automática</h3>
+<p>Si usas la categorización con IA, enviamos a Gemini <strong>solo la descripción</strong> de los movimientos sin
+categoría (sin montos, nombres ni correos), y solo de personas que tengan la IA activada.</p>
+
+<h3>Compras</h3>
+<p>Las suscripciones se pagan con Google Play. Nunca vemos ni guardamos los datos de tu tarjeta: los maneja Google.
+Nuestro proveedor de suscripciones, RevenueCat, recibe la información de la compra junto con tu identificador aleatorio
+de facturación, para confirmarnos si tu plan Premium está activo.</p>
+
+<h3>Datos técnicos</h3>
+<p>Nuestro servidor registra cada solicitud (fecha, ruta, resultado y el correo de la cuenta) y la dirección IP desde la
+que se conecta, para seguridad, límites contra abuso y diagnóstico de errores. Estos registros se borran
+automáticamente en un máximo de 30 días. La app no usa herramientas de analítica ni de publicidad.</p>
+
+<h2>3. Para qué los usamos</h2>
+<ul>
+  <li>Prestarte el servicio: guardar y sincronizar tus presupuestos entre dispositivos y compartirlos con quien elijas.</li>
+  <li>Leer recibos y categorizar movimientos con IA, cuando lo pides.</li>
+  <li>Gestionar tu plan: saber si tienes Premium y llevar la cuenta de los usos mensuales de cada plan.</li>
+  <li>Proteger el servicio: evitar abusos, detectar fallas y responder a tus solicitudes.</li>
+</ul>
+<p>No vendemos ni alquilamos tus datos, no los usamos para publicidad y no tomamos decisiones automatizadas que te
+afecten legalmente.</p>
+
+<h2>4. Con quién los compartimos</h2>
+<p>Solo con los proveedores que necesitamos para que la app funcione, que actúan por cuenta nuestra:</p>
+<table>
+  <tr><th>Proveedor</th><th>Para qué</th><th>Qué recibe</th></tr>
+  <tr><td>DigitalOcean</td><td>Alojamiento del servidor y la base de datos</td><td>Los datos de tu cuenta y presupuestos, guardados en sus centros de datos ([REGIÓN DEL SERVIDOR])</td></tr>
+  <tr><td>Google (API de Gemini)</td><td>Leer recibos y categorizar movimientos</td><td>El recibo que pides leer; las descripciones a categorizar. Usamos el servicio de pago, en el que Google no usa ese contenido para entrenar ni mejorar sus productos.</td></tr>
+  <tr><td>Google (inicio de sesión)</td><td>Entrar con tu cuenta de Google, si lo eliges</td><td>La solicitud de inicio de sesión; nosotros recibimos tu correo, nombre e identificador de Google</td></tr>
+  <tr><td>Google Play</td><td>Cobrar las suscripciones</td><td>Los datos de pago, que tú le das directamente a Google</td></tr>
+  <tr><td>RevenueCat</td><td>Verificar el estado de tu suscripción</td><td>Tu identificador aleatorio de facturación, el historial de compras y datos técnicos del dispositivo necesarios para validar la compra</td></tr>
+</table>
+<p>También compartimos tus datos con las personas con las que tú compartes un presupuesto (ver punto 2), y con las
+autoridades cuando la ley lo exija.</p>
+
+<h2>5. Transferencia internacional</h2>
+<p>Nuestros servidores y los de nuestros proveedores pueden estar fuera de Colombia (por ejemplo, en Estados Unidos).
+Al usar BudgetHunter autorizas esa transferencia, que hacemos con proveedores que ofrecen niveles adecuados de
+protección.</p>
+
+<h2>6. Cuánto tiempo los guardamos</h2>
+<ul>
+  <li>Mientras tengas tu cuenta. Si la eliminas, borramos tu cuenta, tus preferencias, tu uso mensual de IA y tu
+  participación en presupuestos compartidos.</li>
+  <li>Tus presupuestos compartidos pasan a otro miembro; los que no compartes con nadie se borran con sus movimientos.
+  Los movimientos que registraste en presupuestos de otras personas se conservan en esos presupuestos, pero ya no quedan
+  asociados a tu cuenta.</li>
+  <li>Los registros técnicos se borran en un máximo de 30 días.</li>
+  <li>El historial de compras queda en Google Play y en RevenueCat, según sus propias políticas, asociado solo al
+  identificador aleatorio de facturación.</li>
+  <li><strong>Eliminar tu cuenta no cancela una suscripción Premium.</strong> Cancélala en Google Play para que no te
+  sigan cobrando.</li>
+</ul>
+
+<h2>7. Tus derechos</h2>
+<p>Como titular de tus datos puedes conocerlos, actualizarlos, rectificarlos, pedir que los eliminemos, revocar tu
+autorización, pedir prueba de ella y saber cómo los usamos. También puedes presentar quejas ante la Superintendencia de
+Industria y Comercio (SIC).</p>
+<p>Cómo ejercerlos:</p>
+<ul>
+  <li><strong>Eliminar tu cuenta:</strong> en la app, en Ajustes &gt; Eliminar cuenta, o desde
+  <a href="/eliminar-cuenta">la página para eliminar tu cuenta</a>.</li>
+  <li><strong>Ver o corregir tus datos:</strong> casi todos se editan desde la app. Para lo demás, escríbenos a
+  [CORREO DE CONTACTO].</li>
+</ul>
+<p>Respondemos las consultas en un máximo de 10 días hábiles y los reclamos en un máximo de 15 días hábiles, como
+indica la ley.</p>
+
+<h2>8. Seguridad</h2>
+<p>Toda la comunicación entre la app y nuestro servidor va cifrada (HTTPS). Las contraseñas se guardan como resúmenes
+cifrados. En tu teléfono, las credenciales de sesión se guardan cifradas (almacenamiento cifrado de Android, Llavero de
+iOS). Ningún sistema es infalible: si detectamos un incidente que afecte tus datos, te avisaremos y lo informaremos a la
+autoridad como exige la ley.</p>
+
+<h2>9. Permisos de la app en Android</h2>
+<table>
+  <tr><th>Permiso</th><th>Para qué</th></tr>
+  <tr><td>Recibir y leer SMS</td><td>Registrar los movimientos que te informa tu banco por SMS, si lo activas</td></tr>
+  <tr><td>Acceso a notificaciones</td><td>Registrar movimientos de las notificaciones de las apps de tus bancos o de los correos de tus bancos, si lo activas</td></tr>
+  <tr><td>Notificaciones</td><td>Avisarte cuando se registra un movimiento</td></tr>
+  <tr><td>Internet</td><td>Sincronizar tus presupuestos y usar las funciones con IA</td></tr>
+</table>
+<p>La cámara y los archivos se usan solo cuando tú tomas una foto o eliges un archivo para adjuntarlo.</p>
+
+<h2>10. Menores de edad</h2>
+<p>BudgetHunter no está dirigida a menores de edad. Si eres menor de 18 años, usa la app con la autorización y
+supervisión de tu madre, padre o representante legal.</p>
+
+<h2>11. Cambios a esta política</h2>
+<p>Si cambiamos esta política, publicaremos la nueva versión aquí con su fecha. Si el cambio es importante, te
+avisaremos en la app.</p>
+</main>
+</body>
+</html>

@@ -3,6 +3,7 @@ package com.budgethunter.config
 import com.budgethunter.interceptor.RateLimitInterceptor
 import org.springframework.context.annotation.Configuration
 import org.springframework.web.servlet.config.annotation.InterceptorRegistry
+import org.springframework.web.servlet.config.annotation.ViewControllerRegistry
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer
 
 /**
@@ -40,6 +41,15 @@ class WebMvcConfig(
      *
      * @param registry The interceptor registry where we add our interceptors
      */
+    /**
+     * Public pages served as static files (src/main/resources/static): the privacy policy, linked from the
+     * Play Store listing and the app. Served at a path without ".html" so the published URL stays the same if the
+     * page is ever generated differently.
+     */
+    override fun addViewControllers(registry: ViewControllerRegistry) {
+        registry.addViewController("/privacidad").setViewName("forward:/privacidad.html")
+    }
+
     override fun addInterceptors(registry: InterceptorRegistry) {
         // REQUEST LOGGING: Log all incoming requests and responses
         // This runs BEFORE rate limiting so we can see rate-limited requests in logs

@@ -196,6 +196,13 @@ Package `sharing/` (`SharingLimitService`). No table of its own: everything is c
   `sharedBudgetsLimit`, `sharedBudgetsUsed`, `collaboratorsPerBudgetLimit`, `plan`; a **null limit = unlimited**.
   Optional for clients.
 
+## Public pages
+
+`src/main/resources/static/privacidad.html` is the privacy policy (Spanish, Colombian law: Ley 1581 de 2012), served
+at `/privacidad` (`WebMvcConfig.addViewControllers`, public in `SecurityConfig`). The Play Store listing and the app
+link to it, so keep the URL. It describes what the app and this server really do with personal data: update it
+when that changes (a new provider, a new field sent to the AI, a longer log retention, ...).
+
 ## Account deletion
 
 `DELETE /api/users/me` (`AccountDeletionService`), one transaction: lock the user row with a native `FOR UPDATE`
