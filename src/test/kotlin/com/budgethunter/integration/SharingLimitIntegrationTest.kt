@@ -7,6 +7,7 @@ import com.budgethunter.dto.CreateBudgetRequest
 import com.budgethunter.dto.SignInRequest
 import com.budgethunter.dto.SignInResponse
 import com.budgethunter.dto.SignUpRequest
+import com.budgethunter.exception.AlreadyCollaboratorException
 import com.budgethunter.model.EntryType
 import com.budgethunter.model.Plan
 import com.budgethunter.repository.BudgetRepository
@@ -250,7 +251,7 @@ class SharingLimitIntegrationTest {
             }
         )
 
-        // 409 (IllegalStateException), never 402: the person is not one more collaborator but the same one.
+        // 409 (AlreadyCollaboratorException), never 402: the person is not one more collaborator but the same one.
         assertEquals(mapOf("added" to 1, "already a member" to PARALLEL_REQUESTS - 1), outcomes)
         assertEquals(2, members(budgetId))
     }
@@ -305,7 +306,7 @@ class SharingLimitIntegrationTest {
                         "added"
                     } catch (_: SharingLimitExceededException) {
                         "sharing limit"
-                    } catch (_: IllegalStateException) {
+                    } catch (_: AlreadyCollaboratorException) {
                         "already a member"
                     }
                 }

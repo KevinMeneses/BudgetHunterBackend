@@ -188,9 +188,10 @@ Package `sharing/` (`SharingLimitService`). No table of its own: everything is c
   over on account deletion stays, even past the limit; removing and leaving always work.
 - **Concurrency:** `lockForAddition` locks the owner's `users` row (`PESSIMISTIC_WRITE`, `FOR NO KEY UPDATE` on
   PostgreSQL, so FK checks still pass), then the budget row shared; same order as account deletion. All
-  additions against one owner, from any budget or member, run one at a time. `addCollaborator` checks "already a
-  member" (409) *after* that lock, so the same person added twice at once gets 409, not 402; then
-  `checkCanAddMember` counts.
+  additions against one owner, from any budget or member, run one at a time. It returns a `LockedOwner` (internal
+  constructor), which `checkCanAddMember` requires, so the count cannot run without the lock. In between,
+  `addCollaborator` checks "already a member" (`AlreadyCollaboratorException`, an `IllegalStateException`, so
+  409), so the same person added twice at once gets 409, not 402.
 - **Status:** `GET /api/billing/status` (and `POST /sync`) carry `sharing` (`SharingStatusResponse`):
   `sharedBudgetsLimit`, `sharedBudgetsUsed`, `collaboratorsPerBudgetLimit`, `plan`; a **null limit = unlimited**.
   Optional for clients.
