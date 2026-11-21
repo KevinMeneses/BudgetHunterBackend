@@ -90,21 +90,26 @@ class SharingLimitService(
      * Lock order is the owner's row, then the budget's (shared), the same order as account deletion (user row,
      * then each of its budgets), so the two cannot deadlock. The budget's lock keeps its owner from changing
      * until this commits; if it changed between reading it and locking it, the new owner is locked as well.
+     *
+     * Returns a [LockedOwner], which only this method can make and which [checkCanAddMember] requires, so the
+     * counting cannot be called without the locks.
      */
-    fun lockForAddition(budgetId: Long): String {
+    fun lockForAddition(budgetId: Long): LockedOwner {
         val firstOwner = ownerOf(budgetId)
         userRepository.lockForSharingChange(firstOwner)
         budgetRepository.findByIdForMembershipChange(budgetId) ?: throw budgetNotFound(budgetId)
         val owner = ownerOf(budgetId)
         if (owner != firstOwner) userRepository.lockForSharingChange(owner)
-        return owner
+        return LockedOwner(budgetId, owner)
     }
 
     /**
-     * Throws [SharingLimitExceededException] when one more member in [budgetId] would take [ownerEmail] past
-     * their plan's limits. Only meaningful after [lockForAddition], in the same transaction.
+     * Throws [SharingLimitExceededException] when one more member in the budget [locked] names would take its
+     * owner past their plan's limits. Takes the result of [lockForAddition], in the same transaction.
      */
-    fun checkCanAddMember(budgetId: Long, ownerEmail: String, callerEmail: String) {
+    fun checkCanAddMember(locked: LockedOwner, callerEmail: String) {
+        val budgetId = locked.budgetId
+        val ownerEmail = locked.ownerEmail
         // Read after the lock, and as columns: the entity may be in the persistence context with an older plan.
         val plan = userRepository.findPlanColumns(ownerEmail)?.planAt(clock.instant()) ?: Plan.FREE
         if (plan == Plan.PREMIUM) return
@@ -143,3 +148,10 @@ class SharingLimitService(
 
     private fun budgetNotFound(budgetId: Long) = ResourceNotFoundException("Budget not found with id: $budgetId")
 }
+
+/**
+ * Proof that [SharingLimitService.lockForAddition] locked [budgetId]'s owner in the current transaction; the only
+ * way to call [SharingLimitService.checkCanAddMember]. The constructor is internal, so only this module (that
+ * method, and tests) can make one.
+ */
+class LockedOwner internal constructor(val budgetId: Long, val ownerEmail: String)

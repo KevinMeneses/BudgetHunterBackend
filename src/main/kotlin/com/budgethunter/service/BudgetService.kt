@@ -14,6 +14,7 @@ import com.budgethunter.dto.PutEntryRequest
 import com.budgethunter.dto.UpdateBudgetEntryRequest
 import com.budgethunter.dto.UpdateBudgetRequest
 import com.budgethunter.dto.UserEventInfo
+import com.budgethunter.exception.AlreadyCollaboratorException
 import com.budgethunter.exception.ForbiddenAccessException
 import com.budgethunter.exception.ResourceNotFoundException
 import com.budgethunter.model.Budget
@@ -146,13 +147,13 @@ class BudgetService(
             userEmail = request.email
         )
 
-        val ownerEmail = sharingLimitService.lockForAddition(budgetId)
+        val lockedOwner = sharingLimitService.lockForAddition(budgetId)
 
         if (userBudgetRepository.existsById(userBudgetId)) {
-            throw IllegalStateException("User ${request.email} is already a collaborator on budget $budgetId")
+            throw AlreadyCollaboratorException(request.email, budgetId)
         }
 
-        sharingLimitService.checkCanAddMember(budgetId, ownerEmail, authenticatedUserEmail)
+        sharingLimitService.checkCanAddMember(lockedOwner, authenticatedUserEmail)
 
         val userBudget = UserBudget(
             id = userBudgetId,

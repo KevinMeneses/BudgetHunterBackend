@@ -4,6 +4,7 @@ import com.budgethunter.dto.AddCollaboratorRequest
 import com.budgethunter.dto.CreateBudgetRequest
 import com.budgethunter.dto.PutEntryRequest
 import com.budgethunter.dto.UpdateBudgetRequest
+import com.budgethunter.exception.AlreadyCollaboratorException
 import com.budgethunter.exception.ForbiddenAccessException
 import com.budgethunter.exception.ResourceNotFoundException
 import com.budgethunter.model.Budget
@@ -394,7 +395,7 @@ class BudgetServiceTest {
         every { userBudgetRepository.existsById(collaboratorBudgetId) } returns true
 
         // When & Then
-        val exception = assertThrows<IllegalStateException> {
+        val exception = assertThrows<AlreadyCollaboratorException> {
             budgetService.addCollaborator(request.budgetId, request, testUserEmail)
         }
 

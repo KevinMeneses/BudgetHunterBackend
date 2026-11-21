@@ -69,6 +69,12 @@ changing until the addition commits; if it changed between reading and locking, 
 adding the same person at once then run one after the other, and the second sees the first one's committed
 membership and answers 409. Checked before the lock, both passed it and the second, counting that person as a
 collaborator, answered 402 `COLLABORATORS_PER_BUDGET` to a FREE owner. `checkCanAddMember` counts last.
+The cost: a request for someone already in the budget waits for any addition in progress for the same owner
+(a few milliseconds) before its 409.
+
+The order is enforced, not only documented: `lockForAddition` returns a `LockedOwner`, whose constructor is
+internal, and `checkCanAddMember` takes one, so the count cannot be called without the locks. "Already a
+member" is its own `AlreadyCollaboratorException` (an `IllegalStateException`, so still 409 with the same body).
 
 Tests: `SharingLimitIntegrationTest` (rules, status, 20 parallel additions to one budget and to 20 budgets of one
 owner) and `SharingLimitMembersConcurrencyTest` (owner and members adding at once). Without the lock both
