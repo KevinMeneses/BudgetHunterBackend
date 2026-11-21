@@ -37,6 +37,9 @@ class SecurityConfig(
                         "/api/users/sign_in_with_google",
                         // Authenticated by its own shared secret (RevenueCatWebhookController), not a JWT.
                         "/api/webhooks/revenuecat",
+                        // Public pages (static files): the privacy policy
+                        "/privacidad",
+                        "/privacidad.html",
                         "/h2-console/**",
                         "/swagger-ui/**",
                         "/v3/api-docs/**",
