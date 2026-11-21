@@ -73,9 +73,10 @@ class SharingLimitService(
     }
 
     /**
-     * Throws [SharingLimitExceededException] when one more member in [budgetId] would take its owner past their
-     * plan's limits. Must run in the transaction that then adds the member (the locks need one, and they hold
-     * back other additions for the same owner until it commits).
+     * Locks what an addition of a member to [budgetId] depends on and returns the budget's owner, now stable. Call
+     * it first, in the transaction that then adds the member (the locks need one, and they hold back other
+     * additions for the same owner until it commits); then check anything that a parallel addition could have
+     * changed, such as whether the person is already a member, and then [checkCanAddMember].
      *
      * Concurrency: the owner's `users` row is locked (`PESSIMISTIC_WRITE`) before counting, so every addition
      * that counts against one owner - from any of their budgets, by any member, from any device - checks and
@@ -90,9 +91,20 @@ class SharingLimitService(
      * then each of its budgets), so the two cannot deadlock. The budget's lock keeps its owner from changing
      * until this commits; if it changed between reading it and locking it, the new owner is locked as well.
      */
-    fun checkCanAddMember(budgetId: Long, callerEmail: String) {
-        val ownerEmail = lockOwner(budgetId)
+    fun lockForAddition(budgetId: Long): String {
+        val firstOwner = ownerOf(budgetId)
+        userRepository.lockForSharingChange(firstOwner)
+        budgetRepository.findByIdForMembershipChange(budgetId) ?: throw budgetNotFound(budgetId)
+        val owner = ownerOf(budgetId)
+        if (owner != firstOwner) userRepository.lockForSharingChange(owner)
+        return owner
+    }
 
+    /**
+     * Throws [SharingLimitExceededException] when one more member in [budgetId] would take [ownerEmail] past
+     * their plan's limits. Only meaningful after [lockForAddition], in the same transaction.
+     */
+    fun checkCanAddMember(budgetId: Long, ownerEmail: String, callerEmail: String) {
         // Read after the lock, and as columns: the entity may be in the persistence context with an older plan.
         val plan = userRepository.findPlanColumns(ownerEmail)?.planAt(clock.instant()) ?: Plan.FREE
         if (plan == Plan.PREMIUM) return
@@ -107,16 +119,6 @@ class SharingLimitService(
                 callerIsOwner = callerEmail == ownerEmail
             )
         )
-    }
-
-    /** Locks the owner's row, then the budget's; see [checkCanAddMember]. Returns the owner, now stable. */
-    private fun lockOwner(budgetId: Long): String {
-        val firstOwner = ownerOf(budgetId)
-        userRepository.lockForSharingChange(firstOwner)
-        budgetRepository.findByIdForMembershipChange(budgetId) ?: throw budgetNotFound(budgetId)
-        val owner = ownerOf(budgetId)
-        if (owner != firstOwner) userRepository.lockForSharingChange(owner)
-        return owner
     }
 
     private data class LimitHit(val type: SharingLimitType, val limit: Int, val used: Int)

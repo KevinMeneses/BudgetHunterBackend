@@ -50,7 +50,7 @@ because that is what the app already reads to know the plan, and the limits are 
 
 ## Concurrency
 
-`SharingLimitService.checkCanAddMember` runs inside `addCollaborator`'s transaction and, before counting, locks
+`SharingLimitService.lockForAddition` runs inside `addCollaborator`'s transaction and, before anything is counted, locks
 the **owner's `users` row** (`PESSIMISTIC_WRITE`). That row is the one thing every addition counted against an
 owner has in common: locking the budget would not stop two additions to two *different* budgets of the same
 owner from both taking the last shared budget. On PostgreSQL the lock is `FOR NO KEY UPDATE`, so foreign-key
@@ -64,6 +64,11 @@ needs neither.
 Lock order: owner row, then the budget row (shared, `findByIdForMembershipChange`), the same order as account
 deletion (user row, then each budget it owns), so the two cannot deadlock. The budget lock keeps the owner from
 changing until the addition commits; if it changed between reading and locking, the new owner is locked too.
+
+`addCollaborator` checks whether the person is already a member (409) after that lock, not before: two requests
+adding the same person at once then run one after the other, and the second sees the first one's committed
+membership and answers 409. Checked before the lock, both passed it and the second, counting that person as a
+collaborator, answered 402 `COLLABORATORS_PER_BUDGET` to a FREE owner. `checkCanAddMember` counts last.
 
 Tests: `SharingLimitIntegrationTest` (rules, status, 20 parallel additions to one budget and to 20 budgets of one
 owner) and `SharingLimitMembersConcurrencyTest` (owner and members adding at once). Without the lock both
