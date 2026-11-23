@@ -77,6 +77,14 @@ class SseStreamDeliveryIntegrationTest {
     private lateinit var authToken: String
     private var budgetId: Long = 0
 
+    /**
+     * One client for the whole test, held in a field. `HttpClient.newHttpClient().send(...)` leaves nothing
+     * referencing the client while `send` blocks, so on JDK 17 the GC can collect it mid-request; its selector
+     * then closes the connection and the call fails with "HTTP/1.1 header parser received no bytes" (it did in CI,
+     * on the second of two streams).
+     */
+    private val httpClient: HttpClient = HttpClient.newHttpClient()
+
     @BeforeEach
     fun setup() {
         authToken = createAndAuthenticateUser()
@@ -350,7 +358,7 @@ class SseStreamDeliveryIntegrationTest {
             .GET()
             .build()
 
-        return HttpClient.newHttpClient().send(request, HttpResponse.BodyHandlers.ofInputStream())
+        return httpClient.send(request, HttpResponse.BodyHandlers.ofInputStream())
     }
 
     /**
