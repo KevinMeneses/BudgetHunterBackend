@@ -142,6 +142,10 @@ ufw --force enable
 echo "✅ Server updated and firewall configured"
 ```
 
+> **Port 8080 and Docker:** docker-compose publishes the app on `127.0.0.1:8080` only, because a port Docker
+> publishes bypasses ufw. To test it at `http://YOUR_DROPLET_IP:8080` before SSL is set up, add
+> `APP_BIND_ADDRESS=0.0.0.0` to the server's `.env`, and remove it once Nginx is in place (`setup-ssl.sh`).
+
 ---
 
 ## Step 3: Deploy BudgetHunter

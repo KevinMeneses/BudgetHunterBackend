@@ -37,12 +37,13 @@ class WebMvcConfig(
 ) : WebMvcConfigurer {
 
     /**
-     * Public pages served as static files (src/main/resources/static): the privacy policy, linked from the
-     * Play Store listing and the app. Served at a path without ".html" so the published URL stays the same if the
-     * page is ever generated differently.
+     * Public pages served as static files (src/main/resources/static): the privacy policy and the account deletion
+     * page, linked from the Play Store listing and the app. Served at a path without ".html" so the published URL
+     * stays the same if the page is ever generated differently.
      */
     override fun addViewControllers(registry: ViewControllerRegistry) {
         registry.addViewController("/privacidad").setViewName("forward:/privacidad.html")
+        registry.addViewController("/eliminar-cuenta").setViewName("forward:/eliminar-cuenta.html")
     }
 
     /**

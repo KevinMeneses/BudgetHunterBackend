@@ -89,8 +89,9 @@ You should see: `users`, `budget`, `user_budget`, `budget_entry`
 
 ### 4. Deleting an account
 
-Users delete their own account from the app (`DELETE /api/users/me`). To delete one by hand, for instance
-for someone who asks by email and no longer has the app, do not run a bare `DELETE FROM users`: the foreign
+Users delete their own account from the app (`DELETE /api/users/me`) or, without the app, from the public page
+`https://<domain>/eliminar-cuenta` (see "Public pages" below). To delete one by hand, for instance for someone who
+asks by email because they cannot sign in (the page tells them to write from the account's address), do not run a bare `DELETE FROM users`: the foreign
 key on `budgets.owner_email` refuses it while the account still owns budgets. Run
 `database/delete_account.sql`, which does what the endpoint does: hands each budget the account owns to
 another member (or deletes it when nobody else is in it), then deletes the account, all in one transaction:
@@ -298,6 +299,10 @@ docker-compose up -d
 | `RECEIPTS_PREMIUM_MONTHLY_SCANS` | Receipt scans a `PREMIUM` account gets per month (fair-use cap) | `200` |
 | `RECEIPTS_MAX_SCANS_PER_USER_PER_MINUTE` | Scans one account may start per minute; above it `429 TOO_MANY_SCANS` | `6` |
 | `RECEIPTS_MAX_CONCURRENT_SCANS` | Scans in flight at once on the server; above it `503 AI_BUSY` (bounds memory and threads) | `8` |
+| `GOOGLE_OAUTH_WEB_CLIENT_ID` | Client id of the "Sign in with Google" button on `/eliminar-cuenta`. Empty = the first id of `GOOGLE_OAUTH_CLIENT_IDS` (keep the web one first); no id at all hides the button | empty |
+| `ACCOUNT_DELETION_MAX_ATTEMPTS_PER_IP` | Deletion attempts per hour from one IP at `/eliminar-cuenta` (both forms); above it `429 TOO_MANY_ATTEMPTS` | `20` |
+| `APP_BIND_ADDRESS` | Host address docker-compose publishes port 8080 on. `127.0.0.1` keeps it behind Nginx (a published port bypasses ufw); `0.0.0.0` only before Nginx is set up | `127.0.0.1` |
+| `ACCOUNT_DELETION_MAX_ATTEMPTS_PER_EMAIL` | Deletion attempts per hour against one email with the password form, from any IP (the brute-force limit) | `5` |
 | `RECEIPTS_ENABLED` | `false` removes the receipt endpoints altogether | `true` |
 | `SHARING_FREE_SHARED_BUDGETS` | Budgets a `FREE` account may share as their owner (budgets it is invited to do not count). Past it, adding a collaborator answers `402 SHARING_LIMIT_REACHED`; nothing already shared is removed. `PREMIUM` has no limit | `1` |
 | `SHARING_FREE_COLLABORATORS_PER_BUDGET` | Members besides the owner that each budget of a `FREE` owner may have (whoever adds them: the owner's plan decides) | `1` |
@@ -370,6 +375,35 @@ counts as `FREE` even if the expiry webhook never arrived.
 To give an account premium by hand (a tester, a refund dispute): `UPDATE users SET plan = 'PREMIUM',
 plan_expires_at = NULL WHERE email = '...'`. Note that the next webhook or sync for that account writes what
 RevenueCat says again.
+
+### Public pages: privacy policy and account deletion
+
+The app serves two pages that the Play Store listing links to, with no account needed:
+`https://<domain>/privacidad` (privacy policy) and `https://<domain>/eliminar-cuenta`, where Google Play requires
+that users can delete their account without the app installed. Nginx's `location /` already proxies both.
+
+The deletion page deletes with the email and password (`POST /api/users/delete_with_credentials`) or with Google
+(`POST /api/users/delete_with_google`). For the Google button:
+
+1. **Authorized JavaScript origins:** in Google Cloud Console > APIs & Services > Credentials, open the **web**
+   OAuth client (the one in `GOOGLE_OAUTH_CLIENT_IDS` that Android uses as `serverClientId`) and add
+   `https://<domain>` (e.g. `https://budgethunter.duckdns.org`). Without it Google refuses to show the button. No
+   redirect URI is needed: the page uses the popup flow of Google Identity Services.
+2. **Which id:** the page gets it from `GET /api/users/delete_account/config`: `GOOGLE_OAUTH_WEB_CLIENT_ID`, or else
+   the first id of `GOOGLE_OAUTH_CLIENT_IDS`. With no id the page simply hides the Google button. An explicit
+   `GOOGLE_OAUTH_WEB_CLIENT_ID` must also be listed in `GOOGLE_OAUTH_CLIENT_IDS`: that list is what tokens are
+   verified against.
+3. **Content-Security-Policy:** `setup-ssl.sh` sets no CSP today (and Spring sets none), so nothing has to change.
+   If one is ever added, the page needs, besides `'self'` and its own inline `<style>` and `<script>`:
+   `script-src https://accounts.google.com/gsi/client`, `frame-src https://accounts.google.com/gsi/`,
+   `connect-src https://accounts.google.com/gsi/` and `style-src https://accounts.google.com/gsi/style`.
+
+**Attempt limits** (on in every profile, unlike the general limiter, which only covers `/api/**` in production at
+100 requests a minute): see the `ACCOUNT_DELETION_*` variables above. The per-email limit is the brute-force
+defence and does not depend on the client's IP. The per-IP one reads `X-Real-IP`, which Nginx overwrites with the
+connecting address; a client that reaches port 8080 directly could set it freely. docker-compose therefore publishes
+8080 on 127.0.0.1 only (`APP_BIND_ADDRESS`): ufw alone does not protect a Docker-published port, since Docker writes
+its own iptables rules. Set `APP_BIND_ADDRESS=0.0.0.0` only before Nginx is in place (DIGITALOCEAN_SETUP.md).
 
 ### Generating a Secure JWT Secret
 
@@ -550,7 +584,11 @@ Before going live:
 - [ ] Generate a secure JWT secret (256+ bits)
 - [ ] Use strong PostgreSQL password
 - [ ] Enable HTTPS/TLS with valid SSL certificates
-- [ ] Configure firewall rules (allow only port 443/8080)
+- [ ] Configure firewall rules (allow only 80/443 to Nginx). Keep 8080 unreachable from outside with
+      `APP_BIND_ADDRESS=127.0.0.1` (the default); ufw does not cover Docker-published ports, and the per-IP limits
+      trust Nginx's `X-Real-IP`
+- [ ] Add `https://<domain>` to the web OAuth client's authorized JavaScript origins (Google button on
+      `/eliminar-cuenta`)
 - [ ] Set `spring.jpa.hibernate.ddl-auto=validate` (not `update`)
 - [ ] Disable H2 console (`spring.h2.console.enabled=false`)
 - [ ] Configure CORS for allowed origins only
