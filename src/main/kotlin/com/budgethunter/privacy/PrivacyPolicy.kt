@@ -10,7 +10,7 @@ import java.time.temporal.ChronoUnit
  * disagree, so change both together whenever the policy changes. Every account is then asked to accept again: the
  * app compares this with the version the account accepted (`GET /api/users/me`, `privacyPolicy`).
  */
-const val PRIVACY_POLICY_VERSION = "2026-11-21"
+const val PRIVACY_POLICY_VERSION = "2026-11-23"
 
 /** [version] if it is the policy in force; an older or unknown one is ignored at sign-up and sign-in, not rejected. */
 fun currentPolicyVersionOrNull(version: String?): String? = version?.takeIf { it == PRIVACY_POLICY_VERSION }

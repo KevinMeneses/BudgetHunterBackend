@@ -236,7 +236,8 @@ account created before this). The date is always the server's.
 - **Nothing is blocked** server-side for accounts that have not accepted: that would cut off old app builds. The app
   asks; a server-side block is a later decision.
 - **Account deletion** removes both with the `users` row (`AccountDeletionService`, `database/delete_account.sql`);
-  nothing else points at them.
+  nothing else points at them. On purpose, and said so on both public pages (privacy policy section 6,
+  `/eliminar-cuenta`): keeping the proof would mean keeping the email of an account its owner asked to delete.
 
 ## Account deletion
 
