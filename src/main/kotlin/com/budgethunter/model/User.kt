@@ -77,6 +77,16 @@ data class User(
     @field:Column(name = "billing_id", nullable = false, unique = true, updatable = false, length = 36)
     val billingId: String = UUID.randomUUID().toString(),
 
+    // The privacy policy version the account accepted (com.budgethunter.privacy.PRIVACY_POLICY_VERSION at the time)
+    // and when the server recorded it; null = never accepted. Proof of the user's authorization (Ley 1581 de 2012).
+    // Written when the account is created, and afterwards only by PrivacyPolicyAcceptanceRepository.recordAcceptance:
+    // updatable = false keeps a save() of an entity read earlier (a sign-in, a preference) from writing back nulls.
+    @field:Column(name = "privacy_policy_version", length = 20, updatable = false)
+    val privacyPolicyVersion: String? = null,
+
+    @field:Column(name = "privacy_policy_accepted_at", updatable = false)
+    val privacyPolicyAcceptedAt: Instant? = null,
+
     @field:OneToMany(mappedBy = "user", cascade = [CascadeType.ALL], orphanRemoval = true)
     val userBudgets: MutableList<UserBudget> = mutableListOf()
 ) {

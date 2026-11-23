@@ -38,7 +38,7 @@ class UserControllerTest {
     fun setup() {
         userService = mockk()
         accountDeletionService = mockk()
-        userController = UserController(userService, accountDeletionService)
+        userController = UserController(userService, accountDeletionService, mockk(relaxed = true))
     }
 
     @AfterEach

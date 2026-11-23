@@ -78,7 +78,7 @@ The application uses a relational database with the following core entities:
 
 1. **User** - Primary entity for user authentication and identification
    - PK: `email` (String)
-   - Fields: `name`, `password`
+   - Fields: `name`, `password`, `privacyPolicyVersion` + `privacyPolicyAcceptedAt` (see "Privacy policy acceptance")
    - Relationships: One-to-many with `UserBudget`
 
 2. **Budget** - Represents a budget that can be shared among multiple users
@@ -150,6 +150,7 @@ src/main/kotlin/com/budgethunter/
 ├── categorization/                # automatic entry categorization (see below)
 ├── receipts/                      # AI receipt reading and the monthly scans per plan (see below)
 ├── sharing/                       # shared-budget limits per plan (see "Sharing limits")
+├── privacy/                       # the privacy policy version (see "Public pages", "Privacy policy acceptance")
 ├── billing/                       # store purchases through RevenueCat (see "Store purchases")
 └── deletion/                      # account deletion from the public page /eliminar-cuenta (see "Account deletion")
 ```
@@ -204,10 +205,39 @@ at `/privacidad` (`WebMvcConfig.addViewControllers`, public in `SecurityConfig`)
 link to it, so keep the URL. It describes what the app and this server really do with personal data: update it
 when that changes (a new provider, a new field sent to the AI, a longer log retention, ...).
 
+**Its version** is the date of its "Última actualización", `YYYY-MM-DD`, kept once in code:
+`privacy/PrivacyPolicy.kt` (`PRIVACY_POLICY_VERSION`). The page shows it too (`<span id="policy-version">`), and
+`PrivacyPolicyPageTest` fails unless the page's date, the version it shows and the constant agree. Changing the
+policy = change all three together; every account is then asked to accept again (see below).
+
 `static/eliminar-cuenta.html`, at `/eliminar-cuenta`, is where Google Play sends people to delete their account
 without the app (see "Account deletion"). It must say what deletion does exactly as `AccountDeletionService` does
 it, and that it does not cancel a store subscription: keep the page, the privacy policy and the service in step.
 Both pages are self-contained (inline CSS and JS) and use the contact address of the privacy policy.
+
+## Privacy policy acceptance
+
+Proof that each user authorized the processing of their data (Ley 1581 de 2012). `users.privacy_policy_version` and
+`users.privacy_policy_accepted_at` (`V8__add_privacy_policy_acceptance.sql`), both null = never accepted (every
+account created before this). The date is always the server's.
+
+- **Where it is recorded:** `POST /api/users/sign_up` and `POST /api/users/sign_in_with_google` take an optional
+  `acceptedPrivacyPolicyVersion` (optional so installed app builds keep working). Only the current version counts;
+  any other is ignored, not rejected. Google records it when it creates the account or when the account lacks the
+  current version. `POST /api/users/me/privacy-policy` `{"version"}` records it for the signed-in account: only the
+  current version, anything else is 400. That is how existing accounts, and all of them after a policy change, accept.
+- **First acceptance wins:** accepting a version already accepted keeps its first date
+  (`PrivacyPolicyAcceptanceRepository.recordAcceptance` updates only when the stored version differs; `PrivacyPolicyService` serves the endpoint).
+- **Only that query writes them** once the account exists: both columns are `updatable = false` in `User`, so the
+  `save()` of an entity read earlier (sign-in, preferences) cannot write back the nulls it read. At creation they
+  go in with the `INSERT`.
+- **`GET /api/users/me`** carries `privacyPolicy` (`PrivacyPolicyStatus`): `currentVersion`, `acceptedVersion`,
+  `acceptedAt`. The app asks for acceptance when the two versions differ. Optional for clients.
+- **Nothing is blocked** server-side for accounts that have not accepted: that would cut off old app builds. The app
+  asks; a server-side block is a later decision.
+- **Account deletion** removes both with the `users` row (`AccountDeletionService`, `database/delete_account.sql`);
+  nothing else points at them. On purpose, and said so on both public pages (privacy policy section 6,
+  `/eliminar-cuenta`): keeping the proof would mean keeping the email of an account its owner asked to delete.
 
 ## Account deletion
 

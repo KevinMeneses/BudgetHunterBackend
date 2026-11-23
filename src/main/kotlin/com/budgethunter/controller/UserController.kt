@@ -1,13 +1,16 @@
 package com.budgethunter.controller
 
+import com.budgethunter.dto.AcceptPrivacyPolicyRequest
 import com.budgethunter.dto.CurrentUserResponse
 import com.budgethunter.dto.GoogleSignInRequest
+import com.budgethunter.dto.PrivacyPolicyStatus
 import com.budgethunter.dto.RefreshTokenRequest
 import com.budgethunter.dto.SetPasswordRequest
 import com.budgethunter.dto.SignInRequest
 import com.budgethunter.dto.SignInResponse
 import com.budgethunter.dto.SignUpRequest
 import com.budgethunter.dto.UserResponse
+import com.budgethunter.privacy.PrivacyPolicyService
 import com.budgethunter.service.AccountDeletionService
 import com.budgethunter.service.UserService
 import io.swagger.v3.oas.annotations.Operation
@@ -33,13 +36,16 @@ import org.springframework.web.bind.annotation.RestController
 @Tag(name = "User Management", description = "Endpoints for user registration, authentication, and token management")
 class UserController(
     private val userService: UserService,
-    private val accountDeletionService: AccountDeletionService
+    private val accountDeletionService: AccountDeletionService,
+    private val privacyPolicyService: PrivacyPolicyService
 ) {
 
     @PostMapping("/sign_up")
     @Operation(
         summary = "Register a new user",
-        description = "Creates a new user account with email and password. Email must be unique and valid. Password must meet security requirements."
+        description = "Creates a new user account with email and password. Email must be unique and valid. " +
+            "Password must meet security requirements. `acceptedPrivacyPolicyVersion` (optional) records the user's " +
+            "acceptance of the privacy policy when it is the current version; any other value is ignored."
     )
     @ApiResponses(
         value = [
@@ -131,7 +137,9 @@ class UserController(
         summary = "Authenticate with a Google account",
         description = "Verifies a Google ID token and returns the same access/refresh token pair as a password sign in. " +
             "Creates the account on first use. If an account already exists with the same verified email it is linked " +
-            "to the Google identity rather than rejected, so the user keeps their budgets."
+            "to the Google identity rather than rejected, so the user keeps their budgets. " +
+            "`acceptedPrivacyPolicyVersion` (optional) records the acceptance of the privacy policy when it is the current " +
+            "version and the account has not accepted it yet; any other value is ignored."
     )
     @ApiResponses(
         value = [
@@ -182,6 +190,36 @@ class UserController(
     fun getCurrentUser(authentication: Authentication): ResponseEntity<CurrentUserResponse> {
         val userEmail = authentication.principal as String
         return ResponseEntity.ok(userService.getCurrentUser(userEmail))
+    }
+
+    @PostMapping("/me/privacy-policy")
+    @Operation(
+        summary = "Accept the privacy policy",
+        description = "Records that the authenticated user accepted the privacy policy, with the server's date. Only the " +
+            "current version (`privacyPolicy.currentVersion` of GET /api/users/me) is accepted. Accepting it again " +
+            "keeps the date of the first acceptance."
+    )
+    @ApiResponses(
+        value = [
+            ApiResponse(
+                responseCode = "200",
+                description = "Acceptance recorded; the account's privacy policy status",
+                content = [Content(schema = Schema(implementation = PrivacyPolicyStatus::class))]
+            ),
+            ApiResponse(
+                responseCode = "400",
+                description = "The version is missing or is not the current one",
+                content = [Content()]
+            ),
+            ApiResponse(responseCode = "401", description = "Missing or invalid access token", content = [Content()])
+        ]
+    )
+    fun acceptPrivacyPolicy(
+        @Valid @RequestBody request: AcceptPrivacyPolicyRequest,
+        authentication: Authentication
+    ): ResponseEntity<PrivacyPolicyStatus> {
+        val userEmail = authentication.principal as String
+        return ResponseEntity.ok(privacyPolicyService.accept(userEmail, request.version))
     }
 
     @PostMapping("/password")

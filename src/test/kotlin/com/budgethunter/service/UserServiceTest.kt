@@ -8,6 +8,8 @@ import com.budgethunter.dto.SignUpRequest
 import com.budgethunter.exception.DuplicateEmailException
 import com.budgethunter.model.AuthProvider
 import com.budgethunter.model.User
+import com.budgethunter.privacy.PRIVACY_POLICY_VERSION
+import com.budgethunter.repository.PrivacyPolicyAcceptanceRepository
 import com.budgethunter.repository.UserRepository
 import com.budgethunter.util.GoogleTokenVerifier
 import com.budgethunter.util.GoogleUserInfo
@@ -20,6 +22,7 @@ import io.mockk.verify
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
+import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -36,6 +39,7 @@ class UserServiceTest {
     private lateinit var passwordEncoder: PasswordEncoder
     private lateinit var jwtUtil: JwtUtil
     private lateinit var googleTokenVerifier: GoogleTokenVerifier
+    private lateinit var privacyPolicyAcceptanceRepository: PrivacyPolicyAcceptanceRepository
     private lateinit var userService: UserService
 
     @BeforeEach
@@ -44,7 +48,9 @@ class UserServiceTest {
         passwordEncoder = mockk()
         jwtUtil = mockk()
         googleTokenVerifier = mockk()
-        userService = UserService(userRepository, passwordEncoder, jwtUtil, googleTokenVerifier)
+        // Strict: any acceptance recorded that a test did not stub fails it.
+        privacyPolicyAcceptanceRepository = mockk()
+        userService = UserService(userRepository, passwordEncoder, jwtUtil, googleTokenVerifier, privacyPolicyAcceptanceRepository)
     }
 
     @AfterEach
@@ -361,6 +367,41 @@ class UserServiceTest {
         assertEquals(AuthProvider.GOOGLE, inserted.captured.authProvider)
         assertNull(inserted.captured.password)
         assertEquals("google-sub-123", inserted.captured.googleSubject)
+    }
+
+    @Test
+    fun `signInWithGoogle records the acceptance on an existing account only with the current version`() {
+        val existing = User(email = "test@example.com", name = "Test User", password = null, googleSubject = "google-sub-123")
+        every { userRepository.findByGoogleSubject("google-sub-123") } returns Optional.of(existing)
+        every { privacyPolicyAcceptanceRepository.recordAcceptance(any(), any(), any()) } returns 1
+        stubSessionIssuing()
+
+        listOf(null, "2025-01-01").forEach { version ->
+            every { googleTokenVerifier.verify("id-token") } returns googleInfo()
+            userService.signInWithGoogle(GoogleSignInRequest("id-token", version))
+        }
+        verify(exactly = 0) { privacyPolicyAcceptanceRepository.recordAcceptance(any(), any(), any()) }
+
+        userService.signInWithGoogle(GoogleSignInRequest("id-token", PRIVACY_POLICY_VERSION))
+        verify(exactly = 1) {
+            privacyPolicyAcceptanceRepository.recordAcceptance("test@example.com", PRIVACY_POLICY_VERSION, any())
+        }
+    }
+
+    @Test
+    fun `signUp stores the current version on the new account and ignores any other`() {
+        every { userRepository.existsByEmail(any()) } returns false
+        every { passwordEncoder.encode(any()) } returns "encoded"
+        val inserted = mutableListOf<User>()
+        every { userRepository.insert(capture(inserted)) } answers { firstArg() }
+
+        userService.signUp(SignUpRequest("a@example.com", "A", "password1", PRIVACY_POLICY_VERSION))
+        userService.signUp(SignUpRequest("b@example.com", "B", "password1", "2025-01-01"))
+
+        assertEquals(PRIVACY_POLICY_VERSION, inserted[0].privacyPolicyVersion)
+        assertNotNull(inserted[0].privacyPolicyAcceptedAt)
+        assertNull(inserted[1].privacyPolicyVersion)
+        assertNull(inserted[1].privacyPolicyAcceptedAt)
     }
 
     @Test
