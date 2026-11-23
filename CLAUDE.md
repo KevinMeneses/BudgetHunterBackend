@@ -151,7 +151,8 @@ src/main/kotlin/com/budgethunter/
 ├── receipts/                      # AI receipt reading and the monthly scans per plan (see below)
 ├── sharing/                       # shared-budget limits per plan (see "Sharing limits")
 ├── privacy/                       # the privacy policy version (see "Public pages", "Privacy policy acceptance")
-└── billing/                       # store purchases through RevenueCat (see "Store purchases")
+├── billing/                       # store purchases through RevenueCat (see "Store purchases")
+└── deletion/                      # account deletion from the public page /eliminar-cuenta (see "Account deletion")
 ```
 
 ## Budget ownership
@@ -209,6 +210,11 @@ when that changes (a new provider, a new field sent to the AI, a longer log rete
 `PrivacyPolicyPageTest` fails unless the page's date, the version it shows and the constant agree. Changing the
 policy = change all three together; every account is then asked to accept again (see below).
 
+`static/eliminar-cuenta.html`, at `/eliminar-cuenta`, is where Google Play sends people to delete their account
+without the app (see "Account deletion"). It must say what deletion does exactly as `AccountDeletionService` does
+it, and that it does not cancel a store subscription: keep the page, the privacy policy and the service in step.
+Both pages are self-contained (inline CSS and JS) and use the contact address of the privacy policy.
+
 ## Privacy policy acceptance
 
 Proof that each user authorized the processing of their data (Ley 1581 de 2012). `users.privacy_policy_version` and
@@ -241,6 +247,24 @@ delete its memberships and `ai_usage`, then the user. Each step is explicit rath
 accounts, so its sessions end at once. No re-authentication beyond the access token: the app confirms first.
 A store subscription is not cancelled (only the store can); the app must tell PREMIUM users to cancel it there.
 `database/delete_account.sql` does the same by hand; keep the two in step.
+
+**From the web** (package `deletion/`, `WebAccountDeletionController`, public in `SecurityConfig`): the page
+`/eliminar-cuenta` posts `delete_with_credentials` (email + password, checked like `sign_in`) or
+`delete_with_google` (ID token from Google Identity Services, checked like `sign_in_with_google`: the account linked
+to the subject, else the verified email). Both need `confirm: true` (400 otherwise), then call
+`AccountDeletionService.deleteAccount`, and answer `WebAccountDeletionResponse` with the plan it had and
+`cancelSubscriptionInStore` (PREMIUM), which the page turns into "cancel it in Google Play".
+- **No account enumeration:** unknown email, wrong password and an account without a password are all
+  `401 INVALID_CREDENTIALS`, after one bcrypt comparison each (a dummy hash when there is none). Google answers
+  `401 INVALID_GOOGLE_TOKEN` or `404 NO_ACCOUNT` (the caller already proved who they are).
+- **Attempts** (`DeletionAttemptLimiter`, Bucket4j via `PerAccountRateLimiter`, on in every profile): per hour, 20 per
+  IP (`X-Real-IP`, set by Nginx) and 5 per email for the password form, every attempt counted; then
+  `429 TOO_MANY_ATTEMPTS`. Config `ACCOUNT_DELETION_MAX_ATTEMPTS_PER_IP` / `_PER_EMAIL`, defaults in
+  `WebAccountDeletionConfig`.
+- **Google button:** `GET /api/users/delete_account/config` gives `GOOGLE_OAUTH_WEB_CLIENT_ID`, else the first of
+  `GOOGLE_OAUTH_CLIENT_IDS`; null hides it. Its origin must be authorized in Google Cloud (DEPLOYMENT.md).
+- **Logs:** nothing logs the bodies (`RequestLoggingInterceptor` logs method, path, status and principal); errors log
+  only their code. A test checks the password and the token never reach the output.
 
 ## Automatic categorization
 
