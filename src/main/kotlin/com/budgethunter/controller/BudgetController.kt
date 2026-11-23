@@ -11,8 +11,10 @@ import com.budgethunter.dto.CreateBudgetRequest
 import com.budgethunter.dto.SharingErrorResponse
 import com.budgethunter.dto.UpdateBudgetEntryRequest
 import com.budgethunter.dto.UpdateBudgetRequest
+import com.budgethunter.filter.sessionTokenVersion
 import com.budgethunter.service.BudgetService
 import com.budgethunter.service.ReactiveSseService
+import com.budgethunter.service.StreamAccessGuard
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.Parameter
 import io.swagger.v3.oas.annotations.media.Content
@@ -46,7 +48,8 @@ import java.time.Duration
 @SecurityRequirement(name = "bearerAuth")
 class BudgetController(
     private val budgetService: BudgetService,
-    private val reactiveSseService: ReactiveSseService
+    private val reactiveSseService: ReactiveSseService,
+    private val streamAccessGuard: StreamAccessGuard
 ) {
 
     companion object {
@@ -473,6 +476,7 @@ class BudgetController(
         response: HttpServletResponse
     ): Flux<ServerSentEvent<BudgetEntryEvent>> {
         val userEmail = authentication.principal as String
+        val tokenVersion = authentication.sessionTokenVersion()
 
         // Checked synchronously, in a completed transaction, and thrown rather than returned as
         // Flux.error: an error inside the Flux only surfaces on the async dispatch, where the JWT
@@ -522,10 +526,9 @@ class BudgetController(
                     .build()
             }
 
-        // Merge event stream with heartbeat stream; both end when the account's sessions are ended (a Google link
-        // that removed a password of unknown origin, see UserService.linkGoogle).
+        // Merge event stream with heartbeat stream; both end when the session or the membership is gone.
         return Flux.merge(eventStream, heartbeatStream)
-            .takeUntilOther(reactiveSseService.sessionsEnded(userEmail))
+            .takeUntilOther(streamAccessGuard.accessEnded(budgetId, userEmail, tokenVersion, HEARTBEAT_INTERVAL))
     }
 
     @DeleteMapping("/{budgetId}")

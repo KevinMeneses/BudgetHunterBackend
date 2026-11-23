@@ -45,6 +45,21 @@ interface UserBudgetRepository : JpaRepository<UserBudget, UserBudgetId> {
 
     fun deleteByBudgetId(budgetId: Long)
 
+    /**
+     * Cuts [email]'s account off from everyone else: removes the other members of the budgets it owns and its own
+     * membership in budgets someone else owns. Its own budgets, entries and its membership in them stay. Used when a
+     * Google link shows the account may have been set up by someone else (UserService.linkGoogle). Subqueries rather
+     * than PostgreSQL's DELETE ... USING, which H2 (tests) lacks.
+     */
+    @Modifying(flushAutomatically = true)
+    @Query(
+        value = "DELETE FROM user_budgets WHERE " +
+            "(user_email <> :email AND budget_id IN (SELECT id FROM budgets WHERE owner_email = :email)) OR " +
+            "(user_email = :email AND budget_id IN (SELECT id FROM budgets WHERE owner_email <> :email))",
+        nativeQuery = true
+    )
+    fun deleteMembershipsSharedWithOthers(@Param("email") email: String): Int
+
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query("DELETE FROM UserBudget ub WHERE ub.id.userEmail = :userEmail")
     fun deleteByUserEmail(@Param("userEmail") userEmail: String): Int

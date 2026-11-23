@@ -5,7 +5,9 @@ import com.budgethunter.util.JwtUtil
 import jakarta.servlet.FilterChain
 import jakarta.servlet.http.HttpServletRequest
 import jakarta.servlet.http.HttpServletResponse
+import org.springframework.security.authentication.BadCredentialsException
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken
+import org.springframework.security.core.Authentication
 import org.springframework.security.core.context.SecurityContextHolder
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource
 import org.springframework.stereotype.Component
@@ -44,7 +46,7 @@ class JwtAuthenticationFilter(
                     // lock (UserService.setPassword): a request can pass this filter just before the version rises.
                     val authToken = UsernamePasswordAuthenticationToken(
                         email,
-                        tokenVersion,
+                        SessionCredentials(tokenVersion),
                         emptyList()
                     )
                     authToken.details = WebAuthenticationDetailsSource().buildDetails(request)
@@ -58,3 +60,13 @@ class JwtAuthenticationFilter(
         filterChain.doFilter(request, response)
     }
 }
+
+/** What the JWT filter knows about the session besides the email (the principal): the token's `users.token_version`. */
+data class SessionCredentials(val tokenVersion: Int)
+
+/**
+ * The `users.token_version` of the access token that authenticated this request. Only [JwtAuthenticationFilter] builds
+ * authentications for the API, so anything else means there is no session to vouch for.
+ */
+fun Authentication.sessionTokenVersion(): Int =
+    (credentials as? SessionCredentials)?.tokenVersion ?: throw BadCredentialsException("Session has ended")

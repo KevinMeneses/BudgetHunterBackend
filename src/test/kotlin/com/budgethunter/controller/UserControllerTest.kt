@@ -9,6 +9,7 @@ import com.budgethunter.dto.SignInResponse
 import com.budgethunter.dto.SignUpRequest
 import com.budgethunter.dto.UserResponse
 import com.budgethunter.exception.DuplicateEmailException
+import com.budgethunter.filter.SessionCredentials
 import com.budgethunter.model.AuthProvider
 import com.budgethunter.service.AccountDeletionService
 import com.budgethunter.service.UserService
@@ -253,7 +254,7 @@ class UserControllerTest {
     private fun authenticationFor(email: String): Authentication =
         mockk<Authentication>().also {
             every { it.principal } returns email
-            every { it.credentials } returns 0
+            every { it.credentials } returns SessionCredentials(0)
         }
 
     @Test

@@ -84,11 +84,11 @@ class ReactiveSseService {
     private val endedSessions = Sinks.many().multicast().directBestEffort<String>()
 
     /**
-     * Completes when the sessions of [email] end, so a stream opened with one of its access tokens stops (the
+     * Emits [email] when its sessions end, so a stream opened with one of its access tokens stops (the
      * filter checks the token only when the stream opens). Streams opened after that are not affected.
      */
-    fun sessionsEnded(email: String): Mono<Void> =
-        endedSessions.asFlux().filter { it == email }.next().then()
+    fun sessionsEnded(email: String): Mono<String> =
+        endedSessions.asFlux().filter { it == email }.next()
 
     /**
      * After the commit, so a rollback leaves the streams alone, and before the new session reaches the client, so

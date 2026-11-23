@@ -8,8 +8,10 @@ import com.budgethunter.dto.SignUpRequest
 import com.budgethunter.exception.DuplicateEmailException
 import com.budgethunter.model.AuthProvider
 import com.budgethunter.model.User
+import com.budgethunter.model.UserBudgetId
 import com.budgethunter.privacy.PRIVACY_POLICY_VERSION
 import com.budgethunter.repository.PrivacyPolicyAcceptanceRepository
+import com.budgethunter.repository.UserBudgetRepository
 import com.budgethunter.repository.UserRepository
 import com.budgethunter.util.GoogleTokenVerifier
 import com.budgethunter.util.GoogleUserInfo
@@ -43,6 +45,7 @@ class UserServiceTest {
     private lateinit var googleTokenVerifier: GoogleTokenVerifier
     private lateinit var privacyPolicyAcceptanceRepository: PrivacyPolicyAcceptanceRepository
     private lateinit var eventPublisher: ApplicationEventPublisher
+    private lateinit var userBudgetRepository: UserBudgetRepository
     private lateinit var userService: UserService
 
     @BeforeEach
@@ -54,12 +57,14 @@ class UserServiceTest {
         // Strict: any acceptance recorded that a test did not stub fails it.
         privacyPolicyAcceptanceRepository = mockk()
         eventPublisher = mockk(relaxed = true)
+        userBudgetRepository = mockk()
         userService = UserService(
             userRepository,
             passwordEncoder,
             jwtUtil,
             googleTokenVerifier,
             privacyPolicyAcceptanceRepository,
+            userBudgetRepository,
             eventPublisher
         )
     }
@@ -443,12 +448,16 @@ class UserServiceTest {
         every { googleTokenVerifier.verify(request.idToken) } returns googleInfo()
         every { userRepository.findByGoogleSubject("google-sub-123") } returns Optional.empty()
         every { userRepository.lockForUpdate("test@example.com") } returns existing
+        every { userBudgetRepository.deleteMembershipsSharedWithOthers("test@example.com") } returns 2
         stubSessionIssuing()
 
         // When
         val result = userService.signInWithGoogle(request)
 
-        // Then - the account is reused, so the user keeps their budgets
+        // Then - nobody else stays in its budgets, nor it in anybody else's
+        verify(exactly = 1) { userBudgetRepository.deleteMembershipsSharedWithOthers("test@example.com") }
+
+        // and the account is reused, so the user keeps their budgets
         assertEquals("test@example.com", result.email)
         assertEquals("Existing User", result.name)
         // and the password nobody can vouch for is gone, with every session it had
@@ -459,6 +468,30 @@ class UserServiceTest {
         assertTrue(result.passwordRemoved)
         verify(exactly = 1) { jwtUtil.generateToken("test@example.com", 1) }
         verify(exactly = 1) { eventPublisher.publishEvent(SessionsEndedEvent("test@example.com")) }
+    }
+
+    @Test
+    fun `signInWithGoogle should clear a default budget the linked account no longer belongs to`() {
+        // Given - the default budget was someone else's, and the link has just removed the account from it
+        val request = GoogleSignInRequest("id-token")
+        val existing = User(
+            email = "test@example.com",
+            name = "Test User",
+            password = "encodedPassword",
+            defaultBudgetId = 7L
+        )
+        every { googleTokenVerifier.verify(request.idToken) } returns googleInfo()
+        every { userRepository.findByGoogleSubject("google-sub-123") } returns Optional.empty()
+        every { userRepository.lockForUpdate("test@example.com") } returns existing
+        every { userBudgetRepository.deleteMembershipsSharedWithOthers("test@example.com") } returns 1
+        every { userBudgetRepository.existsById(UserBudgetId(7L, "test@example.com")) } returns false
+        stubSessionIssuing()
+
+        // When
+        userService.signInWithGoogle(request)
+
+        // Then
+        assertNull(existing.defaultBudgetId)
     }
 
     @Test
@@ -485,6 +518,7 @@ class UserServiceTest {
         assertEquals(0, existing.tokenVersion)
         assertFalse(result.passwordRemoved)
         verify(exactly = 0) { eventPublisher.publishEvent(any<Any>()) }
+        verify(exactly = 0) { userBudgetRepository.deleteMembershipsSharedWithOthers(any()) }
     }
 
     @Test
@@ -506,6 +540,7 @@ class UserServiceTest {
         assertEquals(0, existing.tokenVersion)
         assertFalse(result.passwordRemoved)
         verify(exactly = 0) { eventPublisher.publishEvent(any<Any>()) }
+        verify(exactly = 0) { userBudgetRepository.deleteMembershipsSharedWithOthers(any()) }
     }
 
     @Test

@@ -12,9 +12,11 @@ import com.budgethunter.dto.UserResponse
 import com.budgethunter.exception.DuplicateEmailException
 import com.budgethunter.model.AuthProvider
 import com.budgethunter.model.User
+import com.budgethunter.model.UserBudgetId
 import com.budgethunter.privacy.currentPolicyVersionOrNull
 import com.budgethunter.privacy.privacyPolicyNow
 import com.budgethunter.repository.PrivacyPolicyAcceptanceRepository
+import com.budgethunter.repository.UserBudgetRepository
 import com.budgethunter.repository.UserRepository
 import com.budgethunter.util.GoogleTokenVerifier
 import com.budgethunter.util.JwtUtil
@@ -36,6 +38,7 @@ class UserService(
     private val jwtUtil: JwtUtil,
     private val googleTokenVerifier: GoogleTokenVerifier,
     private val privacyPolicyAcceptanceRepository: PrivacyPolicyAcceptanceRepository,
+    private val userBudgetRepository: UserBudgetRepository,
     private val eventPublisher: ApplicationEventPublisher,
     private val clock: Clock = Clock.systemUTC()
 ) {
@@ -104,8 +107,9 @@ class UserService(
      * has already proven the user controls that address, so sending them back to a password they
      * may not remember would only lock them out of their own budgets.
      *
-     * Linking an account that had a password but no Google subject yet also removes that password and ends every
-     * session it had (see [linkGoogle]); the response says so in `passwordRemoved`.
+     * Linking an account that had a password but no Google subject yet also removes that password, ends every
+     * session it had and unshares its budgets (see [linkGoogle]); the response says so in
+     * `passwordRemoved`.
      */
     @Transactional
     fun signInWithGoogle(request: GoogleSignInRequest): SignInResponse {
@@ -179,6 +183,12 @@ class UserService(
      * which ends every access token issued before (the refresh token is replaced by the new session anyway). The
      * owner can set a password again without the old one (setPassword, `POST /api/users/password`).
      *
+     * Whoever set the account up could also have shared its budgets with an account of their own, or have it join
+     * one of theirs, and keep reading what the owner records there (the app's default budget, entries read from
+     * SMS). So the account keeps its own budgets with nobody else in them, and a default budget it lost is cleared;
+     * a collaborator the owner really wanted has to be added again. Owned budgets are serialised by the row lock
+     * this runs under (additions of members lock the owner's row too, SharingLimitService).
+     *
      * An account that already had a Google subject only changes subject: its password, if any, was set while
      * signed in with Google (setPassword). An account without a password is linked as before.
      */
@@ -188,6 +198,11 @@ class UserService(
         if (passwordOfUnknownOrigin) {
             user.password = null
             user.tokenVersion += 1
+            val removed = userBudgetRepository.deleteMembershipsSharedWithOthers(user.email)
+            user.defaultBudgetId?.let { budgetId ->
+                if (!userBudgetRepository.existsById(UserBudgetId(budgetId, user.email))) user.defaultBudgetId = null
+            }
+            logger.info("Linked account cut off from {} shared memberships", removed)
         }
         user.authProvider = if (user.password != null) AuthProvider.PASSWORD_AND_GOOGLE else AuthProvider.GOOGLE
         return passwordOfUnknownOrigin

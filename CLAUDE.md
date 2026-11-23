@@ -160,20 +160,25 @@ src/main/kotlin/com/budgethunter/
 - **Access token:** JWT (`JwtUtil`), 24 h (`JWT_EXPIRATION`), with the claim `ver` = `users.token_version` when it was
   issued. `JwtAuthenticationFilter` reads the account's version on every request (the one query it already made) and
   rejects a token of a missing account or another version. Tokens without `ver` count as 0. Raising the version ends
-  every session; the filter puts the token's version in `Authentication.credentials`.
+  every session; the filter puts the token's version in `Authentication.credentials` (`SessionCredentials`, read with
+  `sessionTokenVersion()`).
 - **Refresh token:** one per account (`users.refresh_token`), replaced by every sign-in (`UserService.issueSession`).
 - **Google linking** (`sign_in_with_google`): matched by `google_subject`, else by the verified email. Linking by email
   an account that has a password and no subject yet **removes the password**, leaves it `GOOGLE`, raises
-  `token_version` and ends its open SSE streams (`SessionsEndedEvent` -> `ReactiveSseService`, after commit); the
-  response has `passwordRemoved: true`. Why: sign-up never verifies the email, so that password may belong to someone
+  `token_version`, ends its open SSE streams (`SessionsEndedEvent` -> `ReactiveSseService`, after commit) and
+  **unshares its budgets** (`deleteMembershipsSharedWithOthers`: nobody else stays in the budgets it owns, it leaves
+  the ones others own, a default budget it lost is cleared); the response has `passwordRemoved: true`. Why: sign-up never verifies the email, so that password may belong to someone
   who registered the victim's address first and waits for them to link it ("pre-account hijacking"); Google has just
-  proven who owns the email. The owner sets a new password without the old one (`POST /api/users/password`, allowed
+  proven who owns the email, and the squatter could have shared the account's budgets with an account of their own
+  to keep reading what the owner records there. A collaborator the owner really had must be added again. The owner sets a new password without the old one (`POST /api/users/password`, allowed
   while `password` is null). Accounts already found by subject, including ones that set a password after signing in
   with Google, and accounts without a password are linked as before. Accounts linked before this rule keep their
   password: `database/reports/password_and_google_accounts.sql` counts them.
 - **Races:** `User` is `@DynamicUpdate`, so a save writes only what it changed (a preference saved at the moment of
   the link cannot put the password back). The link and `setPassword` lock the row (`lockForUpdate`), and
   `setPassword` rechecks the token's version under the lock.
+- **SSE streams** are authenticated when they open only. `streamEntries` rechecks the token's version and the
+  membership at every heartbeat (`StreamAccessGuard`, 15 s) and ends the stream when either fails.
 
 ## Budget ownership
 

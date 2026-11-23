@@ -1,5 +1,8 @@
 package com.budgethunter.integration
 
+import com.budgethunter.dto.AddCollaboratorRequest
+import com.budgethunter.dto.BudgetResponse
+import com.budgethunter.dto.CreateBudgetRequest
 import com.budgethunter.dto.GoogleSignInRequest
 import com.budgethunter.dto.RefreshTokenRequest
 import com.budgethunter.dto.SetPasswordRequest
@@ -33,6 +36,7 @@ import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
 import org.springframework.transaction.annotation.Transactional
+import java.math.BigDecimal
 
 /**
  * Stands in for Google so the tests never leave the machine.
@@ -185,6 +189,62 @@ class GoogleAuthenticationIntegrationTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(RefreshTokenRequest(linked.refreshToken)))
         ).andExpect(status().isOk)
+    }
+
+    private fun createBudget(authToken: String, name: String): Long {
+        val result = mockMvc.perform(
+            post("/api/budgets")
+                .header("Authorization", "Bearer $authToken")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(CreateBudgetRequest(name = name, amount = BigDecimal("100"))))
+        ).andExpect(status().isCreated).andReturn()
+        return objectMapper.readValue(result.response.contentAsString, BudgetResponse::class.java).id
+    }
+
+    private fun addCollaborator(authToken: String, budgetId: Long, email: String) = mockMvc.perform(
+        post("/api/budgets/$budgetId/collaborators")
+            .header("Authorization", "Bearer $authToken")
+            .contentType(MediaType.APPLICATION_JSON)
+            .content(objectMapper.writeValueAsString(AddCollaboratorRequest(budgetId = budgetId, email = email)))
+    ).andExpect(status().isCreated)
+
+    private fun budgetIds(authToken: String): List<Long> =
+        objectMapper.readValue(
+            budgets(authToken).andExpect(status().isOk).andReturn().response.contentAsString,
+            Array<BudgetResponse>::class.java
+        ).map { it.id }
+
+    @Test
+    fun `should unshare the budgets of a password account linked by email`() {
+        // The squatter shares a budget of the account with an accomplice, and joins one of the accomplice's
+        signUp()
+        val squatter = session(signIn().andExpect(status().isOk).andReturn())
+        val accompliceEmail = "accomplice@example.com"
+        mockMvc.perform(
+            post("/api/users/sign_up")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(SignUpRequest(accompliceEmail, "Accomplice", testPassword)))
+        ).andExpect(status().isCreated)
+        val accomplice = session(
+            mockMvc.perform(
+                post("/api/users/sign_in")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(SignInRequest(accompliceEmail, testPassword)))
+            ).andExpect(status().isOk).andReturn()
+        )
+        val ownBudget = createBudget(squatter.authToken, "Gastos")
+        addCollaborator(squatter.authToken, ownBudget, accompliceEmail)
+        val accompliceBudget = createBudget(accomplice.authToken, "Casa")
+        addCollaborator(accomplice.authToken, accompliceBudget, testEmail)
+
+        val linked = session(signInWithGoogle().andExpect(status().isOk).andReturn())
+
+        // The owner keeps the account's own budget, alone; the accomplice keeps only theirs, alone
+        assertEquals(listOf(ownBudget), budgetIds(linked.authToken))
+        assertEquals(listOf(accompliceBudget), budgetIds(accomplice.authToken))
+        mockMvc.perform(
+            get("/api/budgets/$ownBudget/entries").header("Authorization", "Bearer ${accomplice.authToken}")
+        ).andExpect(status().isForbidden)
     }
 
     @Test
