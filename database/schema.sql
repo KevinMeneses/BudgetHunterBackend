@@ -41,7 +41,10 @@ CREATE TABLE IF NOT EXISTS users (
     plan VARCHAR(20) NOT NULL DEFAULT 'FREE' CONSTRAINT users_plan_check CHECK (plan IN ('FREE', 'PREMIUM')),
     -- Store purchases; see V5__add_billing.sql.
     plan_expires_at TIMESTAMP WITH TIME ZONE,
-    billing_id VARCHAR(36) NOT NULL UNIQUE DEFAULT gen_random_uuid()::text
+    billing_id VARCHAR(36) NOT NULL UNIQUE DEFAULT gen_random_uuid()::text,
+    -- Privacy policy version accepted and when (NULL = never); see V8__add_privacy_policy_acceptance.sql.
+    privacy_policy_version VARCHAR(20),
+    privacy_policy_accepted_at TIMESTAMP WITH TIME ZONE
 );
 
 -- Paid AI used per account and UTC calendar month ('YYYY-MM'); see V4__add_plan_and_ai_usage.sql

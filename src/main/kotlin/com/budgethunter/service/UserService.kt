@@ -2,6 +2,7 @@ package com.budgethunter.service
 
 import com.budgethunter.dto.CurrentUserResponse
 import com.budgethunter.dto.GoogleSignInRequest
+import com.budgethunter.dto.PrivacyPolicyStatus
 import com.budgethunter.dto.RefreshTokenRequest
 import com.budgethunter.dto.SetPasswordRequest
 import com.budgethunter.dto.SignInRequest
@@ -11,6 +12,9 @@ import com.budgethunter.dto.UserResponse
 import com.budgethunter.exception.DuplicateEmailException
 import com.budgethunter.model.AuthProvider
 import com.budgethunter.model.User
+import com.budgethunter.privacy.currentPolicyVersionOrNull
+import com.budgethunter.privacy.privacyPolicyNow
+import com.budgethunter.repository.PrivacyPolicyAcceptanceRepository
 import com.budgethunter.repository.UserRepository
 import com.budgethunter.util.GoogleTokenVerifier
 import com.budgethunter.util.JwtUtil
@@ -20,6 +24,7 @@ import org.springframework.security.authentication.BadCredentialsException
 import org.springframework.security.crypto.password.PasswordEncoder
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
+import java.time.Clock
 import java.time.Instant
 
 @Service
@@ -27,7 +32,9 @@ class UserService(
     private val userRepository: UserRepository,
     private val passwordEncoder: PasswordEncoder,
     private val jwtUtil: JwtUtil,
-    private val googleTokenVerifier: GoogleTokenVerifier
+    private val googleTokenVerifier: GoogleTokenVerifier,
+    private val privacyPolicyAcceptanceRepository: PrivacyPolicyAcceptanceRepository,
+    private val clock: Clock = Clock.systemUTC()
 ) {
 
     private val logger = LoggerFactory.getLogger(UserService::class.java)
@@ -38,11 +45,14 @@ class UserService(
         // guarantees a concurrent sign-up can't overwrite an account (see UserInsertRepository).
         if (userRepository.existsByEmail(request.email)) throw DuplicateEmailException()
 
+        val acceptedVersion = currentPolicyVersionOrNull(request.acceptedPrivacyPolicyVersion)
         val user = User(
             email = request.email,
             name = request.name,
             password = passwordEncoder.encode(request.password),
-            authProvider = AuthProvider.PASSWORD
+            authProvider = AuthProvider.PASSWORD,
+            privacyPolicyVersion = acceptedVersion,
+            privacyPolicyAcceptedAt = acceptedVersion?.let { privacyPolicyNow(clock) }
         )
 
         val savedUser = insertNewUser(user) { DuplicateEmailException() }
@@ -103,8 +113,9 @@ class UserService(
         }
 
         val email = info.email.lowercase()
+        val acceptedVersion = currentPolicyVersionOrNull(request.acceptedPrivacyPolicyVersion)
 
-        val user = userRepository.findByGoogleSubject(info.subject).orElse(null)
+        val existingUser = userRepository.findByGoogleSubject(info.subject).orElse(null)
             ?.also { existing ->
                 if (existing.email != email) {
                     // The email is the primary key and user_budgets / budget_entries point at it
@@ -121,6 +132,12 @@ class UserService(
                     AuthProvider.GOOGLE
                 }
             }
+        // An existing account records the acceptance only if it lacks this version (the update's own condition), so
+        // the date of its first acceptance stays. Done before issueSession's save, which flushes the link above too.
+        if (existingUser != null && acceptedVersion != null) {
+            privacyPolicyAcceptanceRepository.recordAcceptance(existingUser.email, acceptedVersion, privacyPolicyNow(clock))
+        }
+        val user = existingUser
             ?: insertNewUser(
                 User(
                     email = email,
@@ -128,7 +145,9 @@ class UserService(
                     name = info.name?.takeIf { it.isNotBlank() } ?: email.substringBefore('@'),
                     password = null,
                     googleSubject = info.subject,
-                    authProvider = AuthProvider.GOOGLE
+                    authProvider = AuthProvider.GOOGLE,
+                    privacyPolicyVersion = acceptedVersion,
+                    privacyPolicyAcceptedAt = acceptedVersion?.let { privacyPolicyNow(clock) }
                 )
             ) {
                 // Another request created this account between our lookup and the insert. A
@@ -147,7 +166,11 @@ class UserService(
                     email = it.email,
                     name = it.name,
                     hasPassword = it.password != null,
-                    authProvider = it.authProvider
+                    authProvider = it.authProvider,
+                    privacyPolicy = PrivacyPolicyStatus(
+                        acceptedVersion = it.privacyPolicyVersion,
+                        acceptedAt = it.privacyPolicyAcceptedAt
+                    )
                 )
             }
 

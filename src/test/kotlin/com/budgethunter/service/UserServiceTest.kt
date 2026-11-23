@@ -44,7 +44,7 @@ class UserServiceTest {
         passwordEncoder = mockk()
         jwtUtil = mockk()
         googleTokenVerifier = mockk()
-        userService = UserService(userRepository, passwordEncoder, jwtUtil, googleTokenVerifier)
+        userService = UserService(userRepository, passwordEncoder, jwtUtil, googleTokenVerifier, mockk(relaxed = true))
     }
 
     @AfterEach

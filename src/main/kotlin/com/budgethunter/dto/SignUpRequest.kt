@@ -14,5 +14,11 @@ data class SignUpRequest(
 
     @field:NotBlank(message = "Password is required")
     @field:Size(min = 6, message = "Password must be at least 6 characters")
-    val password: String
+    val password: String,
+
+    /**
+     * The privacy policy version the user accepted on the sign-up screen. Optional, so app builds that predate it
+     * keep working; recorded only when it is the current version, and ignored otherwise.
+     */
+    val acceptedPrivacyPolicyVersion: String? = null
 )
