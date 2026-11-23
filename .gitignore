@@ -39,8 +39,9 @@ bin/
 # Mac
 .DS_Store
 
-# Logs
+# Logs (the app writes and rotates them under logs/ when run from the checkout)
 *.log
+logs/
 
 # Application
 application-local.properties

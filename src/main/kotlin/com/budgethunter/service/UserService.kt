@@ -134,6 +134,8 @@ class UserService(
             }
         // An existing account records the acceptance only if it lacks this version (the update's own condition), so
         // the date of its first acceptance stays. Done before issueSession's save, which flushes the link above too.
+        // existingUser keeps the privacy fields it was read with (the update bypasses it); nothing here reads them,
+        // and the save cannot write them back (updatable = false).
         if (existingUser != null && acceptedVersion != null) {
             privacyPolicyAcceptanceRepository.recordAcceptance(existingUser.email, acceptedVersion, privacyPolicyNow(clock))
         }
