@@ -139,6 +139,9 @@ server {
         proxy_read_timeout 120s;
     }
 
+    # Also serves the public pages /privacidad and /eliminar-cuenta. No Content-Security-Policy is set here;
+    # if one is added, /eliminar-cuenta needs https://accounts.google.com/gsi/ for Google Identity Services
+    # (script-src .../gsi/client, frame-src, connect-src and style-src .../gsi/; see DEPLOYMENT.md).
     location / {
         proxy_pass http://localhost:8080;
         proxy_http_version 1.1;
