@@ -23,6 +23,7 @@ import io.swagger.v3.oas.annotations.tags.Tag
 import jakarta.validation.Valid
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
+import org.springframework.security.authentication.BadCredentialsException
 import org.springframework.security.core.Authentication
 import org.springframework.web.bind.annotation.DeleteMapping
 import org.springframework.web.bind.annotation.GetMapping
@@ -240,7 +241,10 @@ class UserController(
         authentication: Authentication
     ): ResponseEntity<Void> {
         val userEmail = authentication.principal as String
-        userService.setPassword(userEmail, request)
+        // The JWT filter puts the token's version in the credentials (JwtAuthenticationFilter).
+        val tokenVersion = authentication.credentials as? Int
+            ?: throw BadCredentialsException("Session has ended")
+        userService.setPassword(userEmail, request, tokenVersion)
         return ResponseEntity.noContent().build()
     }
 

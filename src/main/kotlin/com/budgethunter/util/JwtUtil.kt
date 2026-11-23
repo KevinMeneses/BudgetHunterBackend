@@ -26,12 +26,17 @@ class JwtUtil {
         return Keys.hmacShaKeyFor(secret.toByteArray())
     }
 
-    fun generateToken(email: String): String {
+    /**
+     * An access token for [email]. [tokenVersion] is the account's `users.token_version` when it is issued: raising
+     * that column ends every access token issued before (see JwtAuthenticationFilter).
+     */
+    fun generateToken(email: String, tokenVersion: Int): String {
         val now = Date()
         val expiryDate = Date(now.time + expiration)
 
         return Jwts.builder()
             .subject(email)
+            .claim(TOKEN_VERSION_CLAIM, tokenVersion)
             .issuedAt(now)
             .expiration(expiryDate)
             .signWith(getSigningKey())
@@ -50,6 +55,10 @@ class JwtUtil {
         return extractClaims(token).subject
     }
 
+    /** The `users.token_version` the token was issued with; tokens from before the claim existed count as 0. */
+    fun extractTokenVersion(token: String): Int =
+        (extractClaims(token)[TOKEN_VERSION_CLAIM] as? Number)?.toInt() ?: 0
+
     fun isTokenValid(token: String, email: String): Boolean {
         val extractedEmail = extractEmail(token)
         return extractedEmail == email && !isTokenExpired(token)
@@ -65,5 +74,9 @@ class JwtUtil {
 
     private fun isTokenExpired(token: String): Boolean {
         return extractClaims(token).expiration.before(Date())
+    }
+
+    private companion object {
+        const val TOKEN_VERSION_CLAIM = "ver"
     }
 }

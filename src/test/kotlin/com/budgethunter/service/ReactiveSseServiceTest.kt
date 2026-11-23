@@ -4,7 +4,10 @@ import com.budgethunter.dto.BudgetEntryAction
 import com.budgethunter.dto.BudgetEntryEvent
 import com.budgethunter.dto.UserEventInfo
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertFalse
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
+import java.util.concurrent.atomic.AtomicBoolean
 
 class ReactiveSseServiceTest {
 
@@ -22,6 +25,24 @@ class ReactiveSseServiceTest {
      * the budget's sink stayed in the map but shut down, so later subscribers kept the
      * connection (heartbeats) and never received another event until the server restarted.
      */
+    @Test
+    fun `ending the sessions of an account ends only its open streams`() {
+        val victimEnded = AtomicBoolean(false)
+        val otherEnded = AtomicBoolean(false)
+        service.sessionsEnded("victim@test.com").subscribe(null, null) { victimEnded.set(true) }
+        service.sessionsEnded("other@test.com").subscribe(null, null) { otherEnded.set(true) }
+
+        service.endStreamsOf(SessionsEndedEvent("victim@test.com"))
+
+        assertTrue(victimEnded.get())
+        assertFalse(otherEnded.get())
+
+        // A stream opened afterwards (the new session) is not ended by the past event
+        val laterEnded = AtomicBoolean(false)
+        service.sessionsEnded("victim@test.com").subscribe(null, null) { laterEnded.set(true) }
+        assertFalse(laterEnded.get())
+    }
+
     @Test
     fun `a subscriber that joins after everyone left still receives events`() {
         val first = service.subscribeToEvents(BUDGET_ID).subscribe()

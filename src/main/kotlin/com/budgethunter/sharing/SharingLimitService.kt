@@ -96,10 +96,10 @@ class SharingLimitService(
      */
     fun lockForAddition(budgetId: Long): LockedOwner {
         val firstOwner = ownerOf(budgetId)
-        userRepository.lockForSharingChange(firstOwner)
+        userRepository.lockForUpdate(firstOwner)
         budgetRepository.findByIdForMembershipChange(budgetId) ?: throw budgetNotFound(budgetId)
         val owner = ownerOf(budgetId)
-        if (owner != firstOwner) userRepository.lockForSharingChange(owner)
+        if (owner != firstOwner) userRepository.lockForUpdate(owner)
         return LockedOwner(budgetId, owner)
     }
 

@@ -19,6 +19,7 @@ import com.budgethunter.repository.UserRepository
 import com.budgethunter.util.GoogleTokenVerifier
 import com.budgethunter.util.JwtUtil
 import org.slf4j.LoggerFactory
+import org.springframework.context.ApplicationEventPublisher
 import org.springframework.dao.DataIntegrityViolationException
 import org.springframework.security.authentication.BadCredentialsException
 import org.springframework.security.crypto.password.PasswordEncoder
@@ -28,12 +29,14 @@ import java.time.Clock
 import java.time.Instant
 
 @Service
+@Suppress("LongParameterList") // Spring constructor injection; the clock is only overridden by tests.
 class UserService(
     private val userRepository: UserRepository,
     private val passwordEncoder: PasswordEncoder,
     private val jwtUtil: JwtUtil,
     private val googleTokenVerifier: GoogleTokenVerifier,
     private val privacyPolicyAcceptanceRepository: PrivacyPolicyAcceptanceRepository,
+    private val eventPublisher: ApplicationEventPublisher,
     private val clock: Clock = Clock.systemUTC()
 ) {
 
@@ -100,6 +103,9 @@ class UserService(
      * An existing password account whose email matches is *linked* rather than rejected: Google
      * has already proven the user controls that address, so sending them back to a password they
      * may not remember would only lock them out of their own budgets.
+     *
+     * Linking an account that had a password but no Google subject yet also removes that password and ends every
+     * session it had (see [linkGoogle]); the response says so in `passwordRemoved`.
      */
     @Transactional
     fun signInWithGoogle(request: GoogleSignInRequest): SignInResponse {
@@ -113,6 +119,7 @@ class UserService(
         }
 
         val email = info.email.lowercase()
+        var passwordRemoved = false
         val acceptedVersion = currentPolicyVersionOrNull(request.acceptedPrivacyPolicyVersion)
 
         val existingUser = userRepository.findByGoogleSubject(info.subject).orElse(null)
@@ -124,13 +131,9 @@ class UserService(
                     logger.info("Google account changed its email; keeping the stored address")
                 }
             }
-            ?: userRepository.findById(email).orElse(null)?.also { existing ->
-                existing.googleSubject = info.subject
-                existing.authProvider = if (existing.password != null) {
-                    AuthProvider.PASSWORD_AND_GOOGLE
-                } else {
-                    AuthProvider.GOOGLE
-                }
+            // Locked, so a password being set on the account at this moment waits for the link (see setPassword).
+            ?: userRepository.lockForUpdate(email)?.also { existing ->
+                passwordRemoved = linkGoogle(existing, info.subject)
             }
         // An existing account records the acceptance only if it lacks this version (the update's own condition), so
         // the date of its first acceptance stays. Done before issueSession's save, which flushes the link above too.
@@ -157,7 +160,37 @@ class UserService(
                 DuplicateEmailException("Account was created by another request, please try again")
             }
 
-        return issueSession(user)
+        if (passwordRemoved) {
+            // Closes the account's open event streams once the link is committed (ReactiveSseService); its access
+            // and refresh tokens already stopped working with the version raised above.
+            eventPublisher.publishEvent(SessionsEndedEvent(user.email))
+            logger.info("Linked Google to an account with a password of unknown origin: password removed, sessions ended")
+        }
+        return issueSession(user, passwordRemoved)
+    }
+
+    /**
+     * Links the Google account [subject] to [user], found by its email. Returns whether its password was removed.
+     *
+     * Sign-up with a password never proves who owns the email, so an account that had a password and no Google
+     * subject may have been opened by someone else with the victim's address, waiting for the victim to sign in
+     * with Google and fill it ("pre-account hijacking"). Google has just proven who controls the email; the
+     * password may be anybody's. So it is removed, the account becomes GOOGLE, and [User.tokenVersion] is raised,
+     * which ends every access token issued before (the refresh token is replaced by the new session anyway). The
+     * owner can set a password again without the old one (setPassword, `POST /api/users/password`).
+     *
+     * An account that already had a Google subject only changes subject: its password, if any, was set while
+     * signed in with Google (setPassword). An account without a password is linked as before.
+     */
+    private fun linkGoogle(user: User, subject: String): Boolean {
+        val passwordOfUnknownOrigin = user.googleSubject == null && user.password != null
+        user.googleSubject = subject
+        if (passwordOfUnknownOrigin) {
+            user.password = null
+            user.tokenVersion += 1
+        }
+        user.authProvider = if (user.password != null) AuthProvider.PASSWORD_AND_GOOGLE else AuthProvider.GOOGLE
+        return passwordOfUnknownOrigin
     }
 
     fun getCurrentUser(email: String): CurrentUserResponse =
@@ -182,19 +215,18 @@ class UserService(
      * When the account has no password yet no current one is required — the caller is already
      * authenticated by their bearer token, and this is how a user who signed up through Google
      * gains the ability to sign in with a password too.
+     *
+     * [tokenVersion] is the version of the caller's access token. It is checked again under the row lock: a request
+     * that passed the JWT filter just before a Google link ended its sessions would otherwise find the password
+     * gone and set one of its own without knowing any.
      */
     @Transactional
-    fun setPassword(email: String, request: SetPasswordRequest) {
-        val user = userRepository.findById(email)
-            .orElseThrow { BadCredentialsException("User not found") }
+    fun setPassword(email: String, request: SetPasswordRequest, tokenVersion: Int) {
+        val user = userRepository.lockForUpdate(email)
+            ?: throw BadCredentialsException("User not found")
+        if (user.tokenVersion != tokenVersion) throw BadCredentialsException("Session has ended")
 
-        user.password?.let { storedPassword ->
-            val currentPassword = request.currentPassword
-                ?: throw BadCredentialsException("Current password is required")
-            if (!passwordEncoder.matches(currentPassword, storedPassword)) {
-                throw BadCredentialsException("Current password is incorrect")
-            }
-        }
+        user.password?.let { requireCurrentPassword(request.currentPassword, it) }
 
         user.password = passwordEncoder.encode(request.newPassword)
         user.authProvider = if (user.googleSubject != null) {
@@ -203,6 +235,13 @@ class UserService(
             AuthProvider.PASSWORD
         }
         userRepository.save(user)
+    }
+
+    private fun requireCurrentPassword(currentPassword: String?, storedPassword: String) {
+        if (currentPassword == null) throw BadCredentialsException("Current password is required")
+        if (!passwordEncoder.matches(currentPassword, storedPassword)) {
+            throw BadCredentialsException("Current password is incorrect")
+        }
     }
 
     /**
@@ -227,8 +266,8 @@ class UserService(
      *
      * Shared by every sign-in path so they cannot drift apart in what a session looks like.
      */
-    private fun issueSession(user: User): SignInResponse {
-        val authToken = jwtUtil.generateToken(user.email)
+    private fun issueSession(user: User, passwordRemoved: Boolean = false): SignInResponse {
+        val authToken = jwtUtil.generateToken(user.email, user.tokenVersion)
         val refreshToken = jwtUtil.generateRefreshToken()
 
         user.refreshToken = refreshToken
@@ -239,7 +278,11 @@ class UserService(
             authToken = authToken,
             refreshToken = refreshToken,
             email = savedUser.email,
-            name = savedUser.name
+            name = savedUser.name,
+            passwordRemoved = passwordRemoved
         )
     }
 }
+
+/** Every session of the account [email] has been ended; published inside the transaction that ended them. */
+data class SessionsEndedEvent(val email: String)

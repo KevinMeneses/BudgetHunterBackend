@@ -1,6 +1,7 @@
 package com.budgethunter.integration
 
 import com.budgethunter.dto.GoogleSignInRequest
+import com.budgethunter.dto.RefreshTokenRequest
 import com.budgethunter.dto.SetPasswordRequest
 import com.budgethunter.dto.SignInRequest
 import com.budgethunter.dto.SignInResponse
@@ -12,7 +13,6 @@ import com.budgethunter.util.GoogleUserInfo
 import com.fasterxml.jackson.databind.ObjectMapper
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
-import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
@@ -27,6 +27,7 @@ import org.springframework.context.annotation.Primary
 import org.springframework.http.MediaType
 import org.springframework.security.authentication.BadCredentialsException
 import org.springframework.test.web.servlet.MockMvc
+import org.springframework.test.web.servlet.MvcResult
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath
@@ -121,26 +122,95 @@ class GoogleAuthenticationIntegrationTest {
         ).andExpect(status().isOk)
     }
 
-    @Test
-    fun `should link a Google sign in to an existing password account with the same email`() {
-        mockMvc.perform(
-            post("/api/users/sign_up")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(SignUpRequest(testEmail, testName, testPassword)))
-        ).andExpect(status().isCreated)
+    private fun signUp() = mockMvc.perform(
+        post("/api/users/sign_up")
+            .contentType(MediaType.APPLICATION_JSON)
+            .content(objectMapper.writeValueAsString(SignUpRequest(testEmail, testName, testPassword)))
+    ).andExpect(status().isCreated)
 
-        signInWithGoogle().andExpect(status().isOk).andExpect(jsonPath("$.email").value(testEmail))
+    private fun signIn(password: String = testPassword) = mockMvc.perform(
+        post("/api/users/sign_in")
+            .contentType(MediaType.APPLICATION_JSON)
+            .content(objectMapper.writeValueAsString(SignInRequest(testEmail, password)))
+    )
+
+    private fun session(result: MvcResult): SignInResponse =
+        objectMapper.readValue(result.response.contentAsString, SignInResponse::class.java)
+
+    private fun budgets(authToken: String) =
+        mockMvc.perform(get("/api/budgets").header("Authorization", "Bearer $authToken"))
+
+    private fun setPassword(authToken: String, newPassword: String) = mockMvc.perform(
+        post("/api/users/password")
+            .header("Authorization", "Bearer $authToken")
+            .contentType(MediaType.APPLICATION_JSON)
+            .content(objectMapper.writeValueAsString(SetPasswordRequest(newPassword = newPassword)))
+    )
+
+    @Test
+    fun `should link a password account by email, removing its password and ending its sessions`() {
+        // Someone registered the address with a password and is signed in with it ("pre-account hijacking")
+        signUp()
+        val before = session(signIn().andExpect(status().isOk).andReturn())
+        budgets(before.authToken).andExpect(status().isOk)
+
+        // The owner of the address signs in with Google
+        val linked = session(
+            signInWithGoogle()
+                .andExpect(status().isOk)
+                .andExpect(jsonPath("$.email").value(testEmail))
+                .andExpect(jsonPath("$.passwordRemoved").value(true))
+                .andReturn()
+        )
 
         val user = userRepository.findById(testEmail).orElseThrow()
-        assertEquals(AuthProvider.PASSWORD_AND_GOOGLE, user.authProvider)
-        assertNotNull(user.password, "linking must not wipe the existing password")
+        assertNull(user.password)
+        assertEquals(AuthProvider.GOOGLE, user.authProvider)
+        assertEquals("google-subject-integration", user.googleSubject)
 
-        // The password still works, so the user has not been locked out of either route.
+        // Everything from before the link is dead: the password, the refresh token and the access token
+        signIn().andExpect(status().isUnauthorized)
         mockMvc.perform(
-            post("/api/users/sign_in")
+            post("/api/users/refresh_token")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(SignInRequest(testEmail, testPassword)))
+                .content(objectMapper.writeValueAsString(RefreshTokenRequest(before.refreshToken)))
+        ).andExpect(status().isUnauthorized)
+        budgets(before.authToken).andExpect(status().isUnauthorized)
+        setPassword(before.authToken, "AttackerPassword1!").andExpect(status().isUnauthorized)
+
+        // The new session works, including its refresh token
+        budgets(linked.authToken).andExpect(status().isOk)
+        mockMvc.perform(
+            post("/api/users/refresh_token")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(RefreshTokenRequest(linked.refreshToken)))
         ).andExpect(status().isOk)
+    }
+
+    @Test
+    fun `should let the owner set a password without the old one after the link`() {
+        signUp()
+        val linked = session(signInWithGoogle().andExpect(status().isOk).andReturn())
+
+        setPassword(linked.authToken, "OwnersNewPassword1!").andExpect(status().isNoContent)
+
+        signIn("OwnersNewPassword1!").andExpect(status().isOk)
+        signIn().andExpect(status().isUnauthorized)
+        assertEquals(AuthProvider.PASSWORD_AND_GOOGLE, userRepository.findById(testEmail).orElseThrow().authProvider)
+    }
+
+    @Test
+    fun `should keep the password of a Google account that set one, on its next Google sign in`() {
+        val first = session(signInWithGoogle().andExpect(status().isOk).andReturn())
+        setPassword(first.authToken, testPassword).andExpect(status().isNoContent)
+
+        signInWithGoogle()
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.passwordRemoved").value(false))
+
+        signIn().andExpect(status().isOk)
+        budgets(first.authToken).andExpect(status().isOk)
+        assertEquals(AuthProvider.PASSWORD_AND_GOOGLE, userRepository.findById(testEmail).orElseThrow().authProvider)
     }
 
     @Test

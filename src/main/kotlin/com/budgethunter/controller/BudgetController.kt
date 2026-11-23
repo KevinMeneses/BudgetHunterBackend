@@ -522,8 +522,10 @@ class BudgetController(
                     .build()
             }
 
-        // Merge event stream with heartbeat stream
+        // Merge event stream with heartbeat stream; both end when the account's sessions are ended (a Google link
+        // that removed a password of unknown origin, see UserService.linkGoogle).
         return Flux.merge(eventStream, heartbeatStream)
+            .takeUntilOther(reactiveSseService.sessionsEnded(userEmail))
     }
 
     @DeleteMapping("/{budgetId}")

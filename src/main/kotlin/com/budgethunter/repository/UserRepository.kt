@@ -18,6 +18,11 @@ interface UserRepository : JpaRepository<User, String>, UserInsertRepository {
     fun existsByEmail(email: String): Boolean
     fun findByRefreshToken(refreshToken: String): Optional<User>
     fun findByGoogleSubject(googleSubject: String): Optional<User>
+
+    /** The account's current `token_version`, or null when there is no such account (see JwtAuthenticationFilter). */
+    @Query("SELECT u.tokenVersion FROM User u WHERE u.email = :email")
+    fun findTokenVersion(@Param("email") email: String): Int?
+
     fun findByBillingIdIn(billingIds: Collection<String>): List<User>
 
     /**
@@ -44,13 +49,15 @@ interface UserRepository : JpaRepository<User, String>, UserInsertRepository {
     fun lockForDeletion(@Param("email") email: String): String?
 
     /**
-     * The account, with its row locked until the transaction ends, so that additions of members counted against
-     * it as a budget owner run one at a time (see [com.budgethunter.sharing.SharingLimitService]). On PostgreSQL
-     * this is `FOR NO KEY UPDATE`, which still lets foreign key checks of new entries and memberships through.
+     * The account, with its row locked until the transaction ends, so that changes that must not interleave run one
+     * at a time: additions of members counted against it as a budget owner
+     * ([com.budgethunter.sharing.SharingLimitService]), and changes to how it authenticates (linking Google, setting
+     * a password; see [com.budgethunter.service.UserService]). On PostgreSQL this is `FOR NO KEY UPDATE`, which still
+     * lets foreign key checks of new entries and memberships through.
      */
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT u FROM User u WHERE u.email = :email")
-    fun lockForSharingChange(@Param("email") email: String): User?
+    fun lockForUpdate(@Param("email") email: String): User?
 
     /**
      * The plan columns as they are in the database now. A query for the entity would hand back the instance

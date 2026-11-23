@@ -3,7 +3,9 @@ package com.budgethunter.service
 import com.budgethunter.dto.BudgetEntryEvent
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
+import org.springframework.transaction.event.TransactionalEventListener
 import reactor.core.publisher.Flux
+import reactor.core.publisher.Mono
 import reactor.core.publisher.Sinks
 import java.util.concurrent.ConcurrentHashMap
 
@@ -72,6 +74,31 @@ class ReactiveSseService {
             result.isFailure -> {
                 logger.warn("Failed to broadcast event to budget: {}. Result: {}", budgetId, result)
             }
+        }
+    }
+
+    /**
+     * Emits the email of each account whose sessions have ended ([SessionsEndedEvent]), to every open stream.
+     * Never shut down; nobody listening is fine. Emission is serialised in [endStreamsOf].
+     */
+    private val endedSessions = Sinks.many().multicast().directBestEffort<String>()
+
+    /**
+     * Completes when the sessions of [email] end, so a stream opened with one of its access tokens stops (the
+     * filter checks the token only when the stream opens). Streams opened after that are not affected.
+     */
+    fun sessionsEnded(email: String): Mono<Void> =
+        endedSessions.asFlux().filter { it == email }.next().then()
+
+    /**
+     * After the commit, so a rollback leaves the streams alone, and before the new session reaches the client, so
+     * none of its streams can be open yet.
+     */
+    @TransactionalEventListener
+    fun endStreamsOf(event: SessionsEndedEvent) {
+        val result = synchronized(endedSessions) { endedSessions.tryEmitNext(event.email) }
+        if (result.isFailure && result != Sinks.EmitResult.FAIL_ZERO_SUBSCRIBER) {
+            logger.warn("Failed to end the event streams of an account: {}", result)
         }
     }
 

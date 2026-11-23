@@ -10,9 +10,15 @@ import jakarta.persistence.OneToMany
 import jakarta.persistence.Table
 import jakarta.validation.constraints.Email
 import jakarta.validation.constraints.NotBlank
+import org.hibernate.annotations.DynamicUpdate
 import java.time.Instant
 import java.util.UUID
 
+// Each save() writes only the columns it changed. Without this Hibernate writes every column as it was read, so a
+// request that read the account before Google was linked (a preference saved at that moment) would put back the
+// password and the provider the link had just removed. Columns two requests both change still need the row lock
+// (UserRepository.lockForUpdate).
+@DynamicUpdate
 @Entity
 @Table(name = "users")
 data class User(
@@ -45,6 +51,11 @@ data class User(
 
     @field:Column
     var refreshTokenExpiry: Instant? = null,
+
+    // Raised to end every session issued before: access tokens carry the version they were issued with (claim
+    // "ver") and the JWT filter rejects any other. See V9__add_token_version.sql and UserService.signInWithGoogle.
+    @field:Column(name = "token_version", nullable = false)
+    var tokenVersion: Int = 0,
 
     // App preferences. Null means the account never saved one, which is how a client tells a
     // fresh account (upload the device's values) from a chosen setting (adopt it).

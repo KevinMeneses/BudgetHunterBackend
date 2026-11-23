@@ -34,12 +34,17 @@ class JwtAuthenticationFilter(
             val email = jwtUtil.extractEmail(token)
 
             if (SecurityContextHolder.getContext().authentication == null) {
-                val userExists = userRepository.existsByEmail(email)
+                // Null when the account no longer exists, which ends its sessions at once (account deletion).
+                // A token issued before the account's sessions were ended carries a lower version.
+                val currentVersion = userRepository.findTokenVersion(email)
+                val tokenVersion = jwtUtil.extractTokenVersion(token)
 
-                if (userExists && jwtUtil.isTokenValid(token, email)) {
+                if (currentVersion != null && tokenVersion == currentVersion && jwtUtil.isTokenValid(token, email)) {
+                    // The version travels as the credentials, for the operations that must recheck it under a
+                    // lock (UserService.setPassword): a request can pass this filter just before the version rises.
                     val authToken = UsernamePasswordAuthenticationToken(
                         email,
-                        null,
+                        tokenVersion,
                         emptyList()
                     )
                     authToken.details = WebAuthenticationDetailsSource().buildDetails(request)
