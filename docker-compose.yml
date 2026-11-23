@@ -59,7 +59,10 @@ services:
       REVENUECAT_ENTITLEMENT_ID: ${REVENUECAT_ENTITLEMENT_ID:-premium}
       MANAGEMENT_ENDPOINTS_EXPOSED: ${MANAGEMENT_ENDPOINTS_EXPOSED:-health}
     ports:
-      - "8080:8080"
+      # Loopback only: Nginx on the host is the way in. A published port bypasses ufw (Docker writes its own
+      # iptables rules), and the per-IP limits trust Nginx's X-Real-IP. Before SSL is set up
+      # (DIGITALOCEAN_SETUP.md), set APP_BIND_ADDRESS=0.0.0.0 to reach it directly.
+      - "${APP_BIND_ADDRESS:-127.0.0.1}:8080:8080"
     volumes:
       - ./app.jar:/app/app.jar:ro
       - ./logs:/app/logs

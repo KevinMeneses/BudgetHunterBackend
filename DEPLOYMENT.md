@@ -301,6 +301,7 @@ docker-compose up -d
 | `RECEIPTS_MAX_CONCURRENT_SCANS` | Scans in flight at once on the server; above it `503 AI_BUSY` (bounds memory and threads) | `8` |
 | `GOOGLE_OAUTH_WEB_CLIENT_ID` | Client id of the "Sign in with Google" button on `/eliminar-cuenta`. Empty = the first id of `GOOGLE_OAUTH_CLIENT_IDS` (keep the web one first); no id at all hides the button | empty |
 | `ACCOUNT_DELETION_MAX_ATTEMPTS_PER_IP` | Deletion attempts per hour from one IP at `/eliminar-cuenta` (both forms); above it `429 TOO_MANY_ATTEMPTS` | `20` |
+| `APP_BIND_ADDRESS` | Host address docker-compose publishes port 8080 on. `127.0.0.1` keeps it behind Nginx (a published port bypasses ufw); `0.0.0.0` only before Nginx is set up | `127.0.0.1` |
 | `ACCOUNT_DELETION_MAX_ATTEMPTS_PER_EMAIL` | Deletion attempts per hour against one email with the password form, from any IP (the brute-force limit) | `5` |
 | `RECEIPTS_ENABLED` | `false` removes the receipt endpoints altogether | `true` |
 | `SHARING_FREE_SHARED_BUDGETS` | Budgets a `FREE` account may share as their owner (budgets it is invited to do not count). Past it, adding a collaborator answers `402 SHARING_LIMIT_REACHED`; nothing already shared is removed. `PREMIUM` has no limit | `1` |
@@ -389,7 +390,9 @@ The deletion page deletes with the email and password (`POST /api/users/delete_w
    `https://<domain>` (e.g. `https://budgethunter.duckdns.org`). Without it Google refuses to show the button. No
    redirect URI is needed: the page uses the popup flow of Google Identity Services.
 2. **Which id:** the page gets it from `GET /api/users/delete_account/config`: `GOOGLE_OAUTH_WEB_CLIENT_ID`, or else
-   the first id of `GOOGLE_OAUTH_CLIENT_IDS`. With no id the page simply hides the Google button.
+   the first id of `GOOGLE_OAUTH_CLIENT_IDS`. With no id the page simply hides the Google button. An explicit
+   `GOOGLE_OAUTH_WEB_CLIENT_ID` must also be listed in `GOOGLE_OAUTH_CLIENT_IDS`: that list is what tokens are
+   verified against.
 3. **Content-Security-Policy:** `setup-ssl.sh` sets no CSP today (and Spring sets none), so nothing has to change.
    If one is ever added, the page needs, besides `'self'` and its own inline `<style>` and `<script>`:
    `script-src https://accounts.google.com/gsi/client`, `frame-src https://accounts.google.com/gsi/`,
@@ -398,8 +401,9 @@ The deletion page deletes with the email and password (`POST /api/users/delete_w
 **Attempt limits** (on in every profile, unlike the general limiter, which only covers `/api/**` in production at
 100 requests a minute): see the `ACCOUNT_DELETION_*` variables above. The per-email limit is the brute-force
 defence and does not depend on the client's IP. The per-IP one reads `X-Real-IP`, which Nginx overwrites with the
-connecting address; a client that reaches port 8080 directly (docker-compose publishes it on every interface) can set
-it freely, so keep 8080 closed in the firewall (see the checklist below).
+connecting address; a client that reaches port 8080 directly could set it freely. docker-compose therefore publishes
+8080 on 127.0.0.1 only (`APP_BIND_ADDRESS`): ufw alone does not protect a Docker-published port, since Docker writes
+its own iptables rules. Set `APP_BIND_ADDRESS=0.0.0.0` only before Nginx is in place (DIGITALOCEAN_SETUP.md).
 
 ### Generating a Secure JWT Secret
 
@@ -580,8 +584,9 @@ Before going live:
 - [ ] Generate a secure JWT secret (256+ bits)
 - [ ] Use strong PostgreSQL password
 - [ ] Enable HTTPS/TLS with valid SSL certificates
-- [ ] Configure firewall rules (allow only 80/443 to Nginx; keep 8080 closed from outside, the per-IP limits trust
-      Nginx's `X-Real-IP`)
+- [ ] Configure firewall rules (allow only 80/443 to Nginx). Keep 8080 unreachable from outside with
+      `APP_BIND_ADDRESS=127.0.0.1` (the default); ufw does not cover Docker-published ports, and the per-IP limits
+      trust Nginx's `X-Real-IP`
 - [ ] Add `https://<domain>` to the web OAuth client's authorized JavaScript origins (Google button on
       `/eliminar-cuenta`)
 - [ ] Set `spring.jpa.hibernate.ddl-auto=validate` (not `update`)
