@@ -6,6 +6,7 @@ import com.budgethunter.dto.CreateBudgetRequest
 import com.budgethunter.dto.GoogleSignInRequest
 import com.budgethunter.dto.RefreshTokenRequest
 import com.budgethunter.dto.SetPasswordRequest
+import com.budgethunter.dto.SharedBudgetNotice
 import com.budgethunter.dto.SignInRequest
 import com.budgethunter.dto.SignInResponse
 import com.budgethunter.dto.SignUpRequest
@@ -215,7 +216,7 @@ class GoogleAuthenticationIntegrationTest {
         ).map { it.id }
 
     @Test
-    fun `should unshare the budgets of a password account linked by email`() {
+    fun `should list the shared budgets of a password account linked by email`() {
         // The squatter shares a budget of the account with an accomplice, and joins one of the accomplice's
         signUp()
         val squatter = session(signIn().andExpect(status().isOk).andReturn())
@@ -239,12 +240,16 @@ class GoogleAuthenticationIntegrationTest {
 
         val linked = session(signInWithGoogle().andExpect(status().isOk).andReturn())
 
-        // The owner keeps the account's own budget, alone; the accomplice keeps only theirs, alone
-        assertEquals(listOf(ownBudget), budgetIds(linked.authToken))
-        assertEquals(listOf(accompliceBudget), budgetIds(accomplice.authToken))
-        mockMvc.perform(
-            get("/api/budgets/$ownBudget/entries").header("Authorization", "Bearer ${accomplice.authToken}")
-        ).andExpect(status().isForbidden)
+        // Nothing is removed: both budgets are listed for the owner to review, with who else is in them
+        assertEquals(
+            listOf(
+                SharedBudgetNotice(ownBudget, "Gastos", testEmail, listOf(accompliceEmail)),
+                SharedBudgetNotice(accompliceBudget, "Casa", accompliceEmail, listOf(accompliceEmail))
+            ),
+            linked.sharedBudgets
+        )
+        assertEquals(setOf(ownBudget, accompliceBudget), budgetIds(linked.authToken).toSet())
+        assertEquals(setOf(ownBudget, accompliceBudget), budgetIds(accomplice.authToken).toSet())
     }
 
     @Test

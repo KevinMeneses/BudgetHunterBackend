@@ -3,13 +3,14 @@ package com.budgethunter.service
 import com.budgethunter.dto.GoogleSignInRequest
 import com.budgethunter.dto.RefreshTokenRequest
 import com.budgethunter.dto.SetPasswordRequest
+import com.budgethunter.dto.SharedBudgetNotice
 import com.budgethunter.dto.SignInRequest
 import com.budgethunter.dto.SignUpRequest
 import com.budgethunter.exception.DuplicateEmailException
 import com.budgethunter.model.AuthProvider
 import com.budgethunter.model.User
-import com.budgethunter.model.UserBudgetId
 import com.budgethunter.privacy.PRIVACY_POLICY_VERSION
+import com.budgethunter.repository.BudgetMemberRow
 import com.budgethunter.repository.PrivacyPolicyAcceptanceRepository
 import com.budgethunter.repository.UserBudgetRepository
 import com.budgethunter.repository.UserRepository
@@ -448,14 +449,24 @@ class UserServiceTest {
         every { googleTokenVerifier.verify(request.idToken) } returns googleInfo()
         every { userRepository.findByGoogleSubject("google-sub-123") } returns Optional.empty()
         every { userRepository.lockForUpdate("test@example.com") } returns existing
-        every { userBudgetRepository.deleteMembershipsSharedWithOthers("test@example.com") } returns 2
+        every { userBudgetRepository.findOtherMembersOfBudgetsOf("test@example.com") } returns listOf(
+            memberRow(3L, "Gastos", "test@example.com", "accomplice@example.com"),
+            memberRow(5L, "Casa", "owner@example.com", "owner@example.com"),
+            memberRow(5L, "Casa", "owner@example.com", "third@example.com")
+        )
         stubSessionIssuing()
 
         // When
         val result = userService.signInWithGoogle(request)
 
-        // Then - nobody else stays in its budgets, nor it in anybody else's
-        verify(exactly = 1) { userBudgetRepository.deleteMembershipsSharedWithOthers("test@example.com") }
+        // Then - the budgets it shares are listed for the user to review, and none is removed
+        assertEquals(
+            listOf(
+                SharedBudgetNotice(3L, "Gastos", "test@example.com", listOf("accomplice@example.com")),
+                SharedBudgetNotice(5L, "Casa", "owner@example.com", listOf("owner@example.com", "third@example.com"))
+            ),
+            result.sharedBudgets
+        )
 
         // and the account is reused, so the user keeps their budgets
         assertEquals("test@example.com", result.email)
@@ -471,8 +482,8 @@ class UserServiceTest {
     }
 
     @Test
-    fun `signInWithGoogle should clear a default budget the linked account no longer belongs to`() {
-        // Given - the default budget was someone else's, and the link has just removed the account from it
+    fun `signInWithGoogle should clear a shared default budget of the linked account`() {
+        // Given - the default budget, where the app records SMS entries on its own, is shared with someone
         val request = GoogleSignInRequest("id-token")
         val existing = User(
             email = "test@example.com",
@@ -483,8 +494,8 @@ class UserServiceTest {
         every { googleTokenVerifier.verify(request.idToken) } returns googleInfo()
         every { userRepository.findByGoogleSubject("google-sub-123") } returns Optional.empty()
         every { userRepository.lockForUpdate("test@example.com") } returns existing
-        every { userBudgetRepository.deleteMembershipsSharedWithOthers("test@example.com") } returns 1
-        every { userBudgetRepository.existsById(UserBudgetId(7L, "test@example.com")) } returns false
+        every { userBudgetRepository.findOtherMembersOfBudgetsOf("test@example.com") } returns
+            listOf(memberRow(7L, "Gastos", "test@example.com", "accomplice@example.com"))
         stubSessionIssuing()
 
         // When
@@ -492,6 +503,30 @@ class UserServiceTest {
 
         // Then
         assertNull(existing.defaultBudgetId)
+    }
+
+    @Test
+    fun `signInWithGoogle should keep a default budget the linked account has to itself`() {
+        val request = GoogleSignInRequest("id-token")
+        val existing = User(email = "test@example.com", name = "Test User", password = "encodedPassword", defaultBudgetId = 7L)
+        every { googleTokenVerifier.verify(request.idToken) } returns googleInfo()
+        every { userRepository.findByGoogleSubject("google-sub-123") } returns Optional.empty()
+        every { userRepository.lockForUpdate("test@example.com") } returns existing
+        every { userBudgetRepository.findOtherMembersOfBudgetsOf("test@example.com") } returns emptyList()
+        stubSessionIssuing()
+
+        val result = userService.signInWithGoogle(request)
+
+        assertEquals(7L, existing.defaultBudgetId)
+        assertTrue(result.passwordRemoved)
+        assertTrue(result.sharedBudgets.isEmpty())
+    }
+
+    private fun memberRow(id: Long, name: String, owner: String, member: String) = object : BudgetMemberRow {
+        override val budgetId = id
+        override val budgetName = name
+        override val ownerEmail = owner
+        override val memberEmail = member
     }
 
     @Test
@@ -518,7 +553,7 @@ class UserServiceTest {
         assertEquals(0, existing.tokenVersion)
         assertFalse(result.passwordRemoved)
         verify(exactly = 0) { eventPublisher.publishEvent(any<Any>()) }
-        verify(exactly = 0) { userBudgetRepository.deleteMembershipsSharedWithOthers(any()) }
+        verify(exactly = 0) { userBudgetRepository.findOtherMembersOfBudgetsOf(any()) }
     }
 
     @Test
@@ -540,7 +575,7 @@ class UserServiceTest {
         assertEquals(0, existing.tokenVersion)
         assertFalse(result.passwordRemoved)
         verify(exactly = 0) { eventPublisher.publishEvent(any<Any>()) }
-        verify(exactly = 0) { userBudgetRepository.deleteMembershipsSharedWithOthers(any()) }
+        verify(exactly = 0) { userBudgetRepository.findOtherMembersOfBudgetsOf(any()) }
     }
 
     @Test

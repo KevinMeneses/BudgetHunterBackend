@@ -5,6 +5,7 @@ import com.budgethunter.dto.GoogleSignInRequest
 import com.budgethunter.dto.PrivacyPolicyStatus
 import com.budgethunter.dto.RefreshTokenRequest
 import com.budgethunter.dto.SetPasswordRequest
+import com.budgethunter.dto.SharedBudgetNotice
 import com.budgethunter.dto.SignInRequest
 import com.budgethunter.dto.SignInResponse
 import com.budgethunter.dto.SignUpRequest
@@ -12,7 +13,6 @@ import com.budgethunter.dto.UserResponse
 import com.budgethunter.exception.DuplicateEmailException
 import com.budgethunter.model.AuthProvider
 import com.budgethunter.model.User
-import com.budgethunter.model.UserBudgetId
 import com.budgethunter.privacy.currentPolicyVersionOrNull
 import com.budgethunter.privacy.privacyPolicyNow
 import com.budgethunter.repository.PrivacyPolicyAcceptanceRepository
@@ -108,8 +108,8 @@ class UserService(
      * may not remember would only lock them out of their own budgets.
      *
      * Linking an account that had a password but no Google subject yet also removes that password, ends every
-     * session it had and unshares its budgets (see [linkGoogle]); the response says so in
-     * `passwordRemoved`.
+     * session it had (see [linkGoogle]); the response says so in `passwordRemoved` and lists the budgets the account
+     * shares with someone in `sharedBudgets`.
      */
     @Transactional
     fun signInWithGoogle(request: GoogleSignInRequest): SignInResponse {
@@ -123,7 +123,7 @@ class UserService(
         }
 
         val email = info.email.lowercase()
-        var passwordRemoved = false
+        var sharedBudgets: List<SharedBudgetNotice>? = null
         val acceptedVersion = currentPolicyVersionOrNull(request.acceptedPrivacyPolicyVersion)
 
         val existingUser = userRepository.findByGoogleSubject(info.subject).orElse(null)
@@ -137,7 +137,7 @@ class UserService(
             }
             // Locked, so a password being set on the account at this moment waits for the link (see setPassword).
             ?: userRepository.lockForUpdate(email)?.also { existing ->
-                passwordRemoved = linkGoogle(existing, info.subject)
+                sharedBudgets = linkGoogle(existing, info.subject)
             }
         // An existing account records the acceptance only if it lacks this version (the update's own condition), so
         // the date of its first acceptance stays. Done before issueSession's save, which flushes the link above too.
@@ -164,17 +164,19 @@ class UserService(
                 DuplicateEmailException("Account was created by another request, please try again")
             }
 
+        val passwordRemoved = sharedBudgets != null
         if (passwordRemoved) {
             // Closes the account's open event streams once the link is committed (ReactiveSseService); its access
             // and refresh tokens already stopped working with the version raised above.
             eventPublisher.publishEvent(SessionsEndedEvent(user.email))
             logger.info("Linked Google to an account with a password of unknown origin: password removed, sessions ended")
         }
-        return issueSession(user, passwordRemoved)
+        return issueSession(user, passwordRemoved, sharedBudgets.orEmpty())
     }
 
     /**
-     * Links the Google account [subject] to [user], found by its email. Returns whether its password was removed.
+     * Links the Google account [subject] to [user], found by its email. Returns null when the password stays, else
+     * the budgets the account shares with someone (empty when none).
      *
      * Sign-up with a password never proves who owns the email, so an account that had a password and no Google
      * subject may have been opened by someone else with the victim's address, waiting for the victim to sign in
@@ -184,28 +186,32 @@ class UserService(
      * owner can set a password again without the old one (setPassword, `POST /api/users/password`).
      *
      * Whoever set the account up could also have shared its budgets with an account of their own, or have it join
-     * one of theirs, and keep reading what the owner records there (the app's default budget, entries read from
-     * SMS). So the account keeps its own budgets with nobody else in them, and a default budget it lost is cleared;
-     * a collaborator the owner really wanted has to be added again. Owned budgets are serialised by the row lock
-     * this runs under (additions of members lock the owner's row too, SharingLimitService).
+     * one of theirs, to read what the owner records there. Removing those memberships would look like a bug to a
+     * real user who shares budgets, so they stay: the response lists them and the app asks the user to remove the
+     * ones they do not recognise. Only a shared default budget is cleared, so entries the app records on its own
+     * (read from SMS) do not land in a budget the user never chose.
      *
      * An account that already had a Google subject only changes subject: its password, if any, was set while
      * signed in with Google (setPassword). An account without a password is linked as before.
      */
-    private fun linkGoogle(user: User, subject: String): Boolean {
+    private fun linkGoogle(user: User, subject: String): List<SharedBudgetNotice>? {
         val passwordOfUnknownOrigin = user.googleSubject == null && user.password != null
         user.googleSubject = subject
         if (passwordOfUnknownOrigin) {
             user.password = null
             user.tokenVersion += 1
-            val removed = userBudgetRepository.deleteMembershipsSharedWithOthers(user.email)
-            user.defaultBudgetId?.let { budgetId ->
-                if (!userBudgetRepository.existsById(UserBudgetId(budgetId, user.email))) user.defaultBudgetId = null
-            }
-            logger.info("Linked account cut off from {} shared memberships", removed)
         }
         user.authProvider = if (user.password != null) AuthProvider.PASSWORD_AND_GOOGLE else AuthProvider.GOOGLE
-        return passwordOfUnknownOrigin
+        if (!passwordOfUnknownOrigin) return null
+
+        val shared = userBudgetRepository.findOtherMembersOfBudgetsOf(user.email)
+            .groupBy { it.budgetId }
+            .map { (budgetId, rows) ->
+                SharedBudgetNotice(budgetId, rows.first().budgetName, rows.first().ownerEmail, rows.map { it.memberEmail })
+            }
+        if (shared.any { it.budgetId == user.defaultBudgetId }) user.defaultBudgetId = null
+        logger.info("Linked account shares {} budgets with others", shared.size)
+        return shared
     }
 
     fun getCurrentUser(email: String): CurrentUserResponse =
@@ -281,7 +287,11 @@ class UserService(
      *
      * Shared by every sign-in path so they cannot drift apart in what a session looks like.
      */
-    private fun issueSession(user: User, passwordRemoved: Boolean = false): SignInResponse {
+    private fun issueSession(
+        user: User,
+        passwordRemoved: Boolean = false,
+        sharedBudgets: List<SharedBudgetNotice> = emptyList()
+    ): SignInResponse {
         val authToken = jwtUtil.generateToken(user.email, user.tokenVersion)
         val refreshToken = jwtUtil.generateRefreshToken()
 
@@ -294,7 +304,8 @@ class UserService(
             refreshToken = refreshToken,
             email = savedUser.email,
             name = savedUser.name,
-            passwordRemoved = passwordRemoved
+            passwordRemoved = passwordRemoved,
+            sharedBudgets = sharedBudgets
         )
     }
 }

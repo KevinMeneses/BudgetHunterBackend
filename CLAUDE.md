@@ -165,12 +165,14 @@ src/main/kotlin/com/budgethunter/
 - **Refresh token:** one per account (`users.refresh_token`), replaced by every sign-in (`UserService.issueSession`).
 - **Google linking** (`sign_in_with_google`): matched by `google_subject`, else by the verified email. Linking by email
   an account that has a password and no subject yet **removes the password**, leaves it `GOOGLE`, raises
-  `token_version`, ends its open SSE streams (`SessionsEndedEvent` -> `ReactiveSseService`, after commit) and
-  **unshares its budgets** (`deleteMembershipsSharedWithOthers`: nobody else stays in the budgets it owns, it leaves
-  the ones others own, a default budget it lost is cleared); the response has `passwordRemoved: true`. Why: sign-up never verifies the email, so that password may belong to someone
+  `token_version` and ends its open SSE streams (`SessionsEndedEvent` -> `ReactiveSseService`, after commit); the
+  response has `passwordRemoved: true` and `sharedBudgets` (each budget the account shares with someone, its owner and
+  other members). Memberships are **not** removed (to a real user who shares budgets that would look like a bug): the
+  app lists them and asks the user to remove the ones they do not recognise. Only a shared default budget is cleared,
+  so SMS entries the app records on its own do not land where the user never chose. Why: sign-up never verifies the email, so that password may belong to someone
   who registered the victim's address first and waits for them to link it ("pre-account hijacking"); Google has just
   proven who owns the email, and the squatter could have shared the account's budgets with an account of their own
-  to keep reading what the owner records there. A collaborator the owner really had must be added again. The owner sets a new password without the old one (`POST /api/users/password`, allowed
+  to keep reading what the owner records there. The owner sets a new password without the old one (`POST /api/users/password`, allowed
   while `password` is null). Accounts already found by subject, including ones that set a password after signing in
   with Google, and accounts without a password are linked as before. Accounts linked before this rule keep their
   password: `database/reports/password_and_google_accounts.sql` counts them.

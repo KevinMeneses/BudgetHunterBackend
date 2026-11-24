@@ -46,19 +46,17 @@ interface UserBudgetRepository : JpaRepository<UserBudget, UserBudgetId> {
     fun deleteByBudgetId(budgetId: Long)
 
     /**
-     * Cuts [email]'s account off from everyone else: removes the other members of the budgets it owns and its own
-     * membership in budgets someone else owns. Its own budgets, entries and its membership in them stay. Used when a
-     * Google link shows the account may have been set up by someone else (UserService.linkGoogle). Subqueries rather
-     * than PostgreSQL's DELETE ... USING, which H2 (tests) lacks.
+     * One row per other member of each budget [email] belongs to: the budgets it shares with someone, and with whom.
+     * Budgets it has to itself give no row.
      */
-    @Modifying(flushAutomatically = true)
     @Query(
-        value = "DELETE FROM user_budgets WHERE " +
-            "(user_email <> :email AND budget_id IN (SELECT id FROM budgets WHERE owner_email = :email)) OR " +
-            "(user_email = :email AND budget_id IN (SELECT id FROM budgets WHERE owner_email <> :email))",
-        nativeQuery = true
+        "SELECT ub.id.budgetId AS budgetId, ub.budget.name AS budgetName, ub.budget.ownerEmail AS ownerEmail, " +
+            "ub.id.userEmail AS memberEmail FROM UserBudget ub " +
+            "WHERE ub.id.userEmail <> :email AND ub.id.budgetId IN " +
+            "(SELECT m.id.budgetId FROM UserBudget m WHERE m.id.userEmail = :email) " +
+            "ORDER BY ub.id.budgetId, ub.id.userEmail"
     )
-    fun deleteMembershipsSharedWithOthers(@Param("email") email: String): Int
+    fun findOtherMembersOfBudgetsOf(@Param("email") email: String): List<BudgetMemberRow>
 
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query("DELETE FROM UserBudget ub WHERE ub.id.userEmail = :userEmail")
@@ -69,4 +67,12 @@ interface UserBudgetRepository : JpaRepository<UserBudget, UserBudgetId> {
 interface BudgetCollaboratorCount {
     val budgetId: Long
     val total: Long
+}
+
+/** Projection of [UserBudgetRepository.findOtherMembersOfBudgetsOf]. */
+interface BudgetMemberRow {
+    val budgetId: Long
+    val budgetName: String
+    val ownerEmail: String
+    val memberEmail: String
 }
