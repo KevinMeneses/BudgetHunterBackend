@@ -14,9 +14,11 @@ import com.budgethunter.dto.UpdateBudgetRequest
 import com.budgethunter.dto.UserEventInfo
 import com.budgethunter.exception.ForbiddenAccessException
 import com.budgethunter.exception.ResourceNotFoundException
+import com.budgethunter.filter.SessionCredentials
 import com.budgethunter.model.EntryType
 import com.budgethunter.service.BudgetService
 import com.budgethunter.service.ReactiveSseService
+import com.budgethunter.service.StreamAccessGuard
 import io.mockk.Runs
 import io.mockk.clearAllMocks
 import io.mockk.every
@@ -47,6 +49,7 @@ class BudgetControllerTest {
     private lateinit var reactiveSseService: ReactiveSseService
     private lateinit var budgetController: BudgetController
     private lateinit var authentication: Authentication
+    private lateinit var streamAccessGuard: StreamAccessGuard
 
     private val testUserEmail = "test@example.com"
 
@@ -57,11 +60,14 @@ class BudgetControllerTest {
     fun setup() {
         budgetService = mockk()
         reactiveSseService = mockk(relaxed = true)
-        budgetController = BudgetController(budgetService, reactiveSseService)
+        streamAccessGuard = mockk()
+        every { streamAccessGuard.accessEnded(any(), any(), any(), any()) } returns Flux.never()
+        budgetController = BudgetController(budgetService, reactiveSseService, streamAccessGuard)
         authentication = mockk()
 
         // Mock authentication to return test user email
         every { authentication.principal } returns testUserEmail
+        every { authentication.credentials } returns SessionCredentials(0)
     }
 
     @AfterEach
@@ -649,6 +655,21 @@ class BudgetControllerTest {
         StepVerifier.create(flux)
             .assertNext { event -> assertEquals("keep-alive", event.comment()) }
             .thenCancel()
+            .verify(Duration.ofSeconds(2))
+    }
+
+    @Test
+    fun `streamEntries should end once its access is gone`() {
+        val budgetId = 1L
+        every { budgetService.verifyBudgetAccess(budgetId, testUserEmail) } just Runs
+        every { reactiveSseService.subscribeToEvents(budgetId) } returns Flux.never()
+        every {
+            streamAccessGuard.accessEnded(budgetId, testUserEmail, 0, BudgetController.HEARTBEAT_INTERVAL)
+        } returns Flux.just(testUserEmail)
+
+        StepVerifier.create(budgetController.streamEntries(budgetId, authentication, MockHttpServletResponse()))
+            .thenConsumeWhile { it.comment() == "keep-alive" }
+            .expectComplete()
             .verify(Duration.ofSeconds(2))
     }
 

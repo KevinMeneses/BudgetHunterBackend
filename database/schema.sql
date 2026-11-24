@@ -32,6 +32,8 @@ CREATE TABLE IF NOT EXISTS users (
     auth_provider VARCHAR(32) NOT NULL DEFAULT 'PASSWORD',
     refresh_token VARCHAR(500) UNIQUE,
     refresh_token_expiry TIMESTAMP,
+    -- Raised to end every session of the account; see V9__add_token_version.sql.
+    token_version INTEGER NOT NULL DEFAULT 0,
     -- App preferences. NULL = never saved, so a client can tell a fresh account from a chosen value.
     sms_reading_enabled BOOLEAN,
     ai_processing_enabled BOOLEAN,
@@ -140,6 +142,7 @@ COMMENT ON COLUMN users.google_subject IS 'Google "sub" claim - immutable accoun
 COMMENT ON COLUMN users.auth_provider IS 'How the account can authenticate: PASSWORD, GOOGLE or PASSWORD_AND_GOOGLE';
 COMMENT ON COLUMN users.refresh_token IS 'JWT refresh token for authentication renewal';
 COMMENT ON COLUMN users.refresh_token_expiry IS 'Expiration timestamp for the refresh token';
+COMMENT ON COLUMN users.token_version IS 'Access tokens carry it (claim ver); raising it ends every session issued before';
 COMMENT ON COLUMN budget_entries.type IS 'Entry type: INCOME or OUTCOME';
 COMMENT ON COLUMN budget_entries.created_by IS 'User email who created this entry (nullable for audit trail)';
 COMMENT ON COLUMN budget_entries.updated_by IS 'User email who last updated this entry (nullable for audit trail)';

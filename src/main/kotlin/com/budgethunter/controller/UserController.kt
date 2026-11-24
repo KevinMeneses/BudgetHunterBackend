@@ -10,6 +10,7 @@ import com.budgethunter.dto.SignInRequest
 import com.budgethunter.dto.SignInResponse
 import com.budgethunter.dto.SignUpRequest
 import com.budgethunter.dto.UserResponse
+import com.budgethunter.filter.sessionTokenVersion
 import com.budgethunter.privacy.PrivacyPolicyService
 import com.budgethunter.service.AccountDeletionService
 import com.budgethunter.service.UserService
@@ -240,7 +241,7 @@ class UserController(
         authentication: Authentication
     ): ResponseEntity<Void> {
         val userEmail = authentication.principal as String
-        userService.setPassword(userEmail, request)
+        userService.setPassword(userEmail, request, authentication.sessionTokenVersion())
         return ResponseEntity.noContent().build()
     }
 

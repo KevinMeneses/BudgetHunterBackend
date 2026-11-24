@@ -9,6 +9,7 @@ import com.budgethunter.dto.SignInResponse
 import com.budgethunter.dto.SignUpRequest
 import com.budgethunter.dto.UserResponse
 import com.budgethunter.exception.DuplicateEmailException
+import com.budgethunter.filter.SessionCredentials
 import com.budgethunter.model.AuthProvider
 import com.budgethunter.service.AccountDeletionService
 import com.budgethunter.service.UserService
@@ -251,7 +252,10 @@ class UserControllerTest {
     // Google Sign-In Tests
 
     private fun authenticationFor(email: String): Authentication =
-        mockk<Authentication>().also { every { it.principal } returns email }
+        mockk<Authentication>().also {
+            every { it.principal } returns email
+            every { it.credentials } returns SessionCredentials(0)
+        }
 
     @Test
     fun `signInWithGoogle should return ok with the session`() {
@@ -316,14 +320,14 @@ class UserControllerTest {
         // Given
         val request = SetPasswordRequest(newPassword = "newPassword")
 
-        every { userService.setPassword("test@example.com", request) } just Runs
+        every { userService.setPassword("test@example.com", request, 0) } just Runs
 
         // When
         val response = userController.setPassword(request, authenticationFor("test@example.com"))
 
         // Then
         assertEquals(HttpStatus.NO_CONTENT, response.statusCode)
-        verify(exactly = 1) { userService.setPassword("test@example.com", request) }
+        verify(exactly = 1) { userService.setPassword("test@example.com", request, 0) }
     }
 
     @Test
@@ -332,7 +336,7 @@ class UserControllerTest {
         val request = SetPasswordRequest(currentPassword = "wrong", newPassword = "newPassword")
 
         every {
-            userService.setPassword("test@example.com", request)
+            userService.setPassword("test@example.com", request, 0)
         } throws BadCredentialsException("Current password is incorrect")
 
         // When & Then

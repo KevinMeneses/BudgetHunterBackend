@@ -155,6 +155,33 @@ src/main/kotlin/com/budgethunter/
 └── deletion/                      # account deletion from the public page /eliminar-cuenta (see "Account deletion")
 ```
 
+## Authentication and sessions
+
+- **Access token:** JWT (`JwtUtil`), 24 h (`JWT_EXPIRATION`), with the claim `ver` = `users.token_version` when it was
+  issued. `JwtAuthenticationFilter` reads the account's version on every request (the one query it already made) and
+  rejects a token of a missing account or another version. Tokens without `ver` count as 0. Raising the version ends
+  every session; the filter puts the token's version in `Authentication.credentials` (`SessionCredentials`, read with
+  `sessionTokenVersion()`).
+- **Refresh token:** one per account (`users.refresh_token`), replaced by every sign-in (`UserService.issueSession`).
+- **Google linking** (`sign_in_with_google`): matched by `google_subject`, else by the verified email. Linking by email
+  an account that has a password and no subject yet **removes the password**, leaves it `GOOGLE`, raises
+  `token_version` and ends its open SSE streams (`SessionsEndedEvent` -> `ReactiveSseService`, after commit); the
+  response has `passwordRemoved: true` and `sharedBudgets` (each budget the account shares with someone, its owner and
+  other members). Memberships are **not** removed (to a real user who shares budgets that would look like a bug): the
+  app lists them and asks the user to remove the ones they do not recognise. Only a shared default budget is cleared,
+  so SMS entries the app records on its own do not land where the user never chose. Why: sign-up never verifies the email, so that password may belong to someone
+  who registered the victim's address first and waits for them to link it ("pre-account hijacking"); Google has just
+  proven who owns the email, and the squatter could have shared the account's budgets with an account of their own
+  to keep reading what the owner records there. The owner sets a new password without the old one (`POST /api/users/password`, allowed
+  while `password` is null). Accounts already found by subject, including ones that set a password after signing in
+  with Google, and accounts without a password are linked as before. Accounts linked before this rule keep their
+  password: `database/reports/password_and_google_accounts.sql` counts them.
+- **Races:** `User` is `@DynamicUpdate`, so a save writes only what it changed (a preference saved at the moment of
+  the link cannot put the password back). The link and `setPassword` lock the row (`lockForUpdate`), and
+  `setPassword` rechecks the token's version under the lock.
+- **SSE streams** are authenticated when they open only. `streamEntries` rechecks the token's version and the
+  membership at every heartbeat (`StreamAccessGuard`, 15 s) and ends the stream when either fails.
+
 ## Budget ownership
 
 `budgets.owner_email` (`V6__add_budget_owner.sql`) is the budget's creator and is always a member too.

@@ -45,6 +45,19 @@ interface UserBudgetRepository : JpaRepository<UserBudget, UserBudgetId> {
 
     fun deleteByBudgetId(budgetId: Long)
 
+    /**
+     * One row per other member of each budget [email] belongs to: the budgets it shares with someone, and with whom.
+     * Budgets it has to itself give no row.
+     */
+    @Query(
+        "SELECT ub.id.budgetId AS budgetId, ub.budget.name AS budgetName, ub.budget.ownerEmail AS ownerEmail, " +
+            "ub.id.userEmail AS memberEmail FROM UserBudget ub " +
+            "WHERE ub.id.userEmail <> :email AND ub.id.budgetId IN " +
+            "(SELECT m.id.budgetId FROM UserBudget m WHERE m.id.userEmail = :email) " +
+            "ORDER BY ub.id.budgetId, ub.id.userEmail"
+    )
+    fun findOtherMembersOfBudgetsOf(@Param("email") email: String): List<BudgetMemberRow>
+
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query("DELETE FROM UserBudget ub WHERE ub.id.userEmail = :userEmail")
     fun deleteByUserEmail(@Param("userEmail") userEmail: String): Int
@@ -54,4 +67,12 @@ interface UserBudgetRepository : JpaRepository<UserBudget, UserBudgetId> {
 interface BudgetCollaboratorCount {
     val budgetId: Long
     val total: Long
+}
+
+/** Projection of [UserBudgetRepository.findOtherMembersOfBudgetsOf]. */
+interface BudgetMemberRow {
+    val budgetId: Long
+    val budgetName: String
+    val ownerEmail: String
+    val memberEmail: String
 }
