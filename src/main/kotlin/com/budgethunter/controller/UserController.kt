@@ -13,6 +13,7 @@ import com.budgethunter.dto.UserResponse
 import com.budgethunter.filter.sessionTokenVersion
 import com.budgethunter.privacy.PrivacyPolicyService
 import com.budgethunter.service.AccountDeletionService
+import com.budgethunter.service.GoogleLinkNoticeService
 import com.budgethunter.service.UserService
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.media.Content
@@ -38,7 +39,8 @@ import org.springframework.web.bind.annotation.RestController
 class UserController(
     private val userService: UserService,
     private val accountDeletionService: AccountDeletionService,
-    private val privacyPolicyService: PrivacyPolicyService
+    private val privacyPolicyService: PrivacyPolicyService,
+    private val linkNoticeService: GoogleLinkNoticeService
 ) {
 
     @PostMapping("/sign_up")
@@ -265,6 +267,24 @@ class UserController(
     )
     fun deleteAccount(authentication: Authentication): ResponseEntity<Void> {
         accountDeletionService.deleteAccount(authentication.principal as String)
+        return ResponseEntity.noContent().build()
+    }
+
+    @DeleteMapping("/me/link-notice")
+    @Operation(
+        summary = "Acknowledge the Google link notice",
+        description = "The app told the user that a Google sign-in removed their password (`passwordRemoved` in " +
+            "POST /api/users/sign_in_with_google). Until this is called every Google sign-in answers it again, so a " +
+            "lost answer is not lost for good. Calling it with nothing pending does nothing."
+    )
+    @ApiResponses(
+        value = [
+            ApiResponse(responseCode = "204", description = "Acknowledged"),
+            ApiResponse(responseCode = "401", description = "Missing or invalid access token", content = [Content()])
+        ]
+    )
+    fun acknowledgeLinkNotice(authentication: Authentication): ResponseEntity<Void> {
+        linkNoticeService.acknowledge(authentication.principal as String)
         return ResponseEntity.noContent().build()
     }
 }

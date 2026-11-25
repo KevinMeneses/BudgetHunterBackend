@@ -32,6 +32,7 @@ import org.springframework.http.MediaType
 import org.springframework.security.authentication.BadCredentialsException
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.MvcResult
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath
@@ -347,5 +348,28 @@ class GoogleAuthenticationIntegrationTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(SetPasswordRequest(newPassword = testPassword)))
         ).andExpect(status().isUnauthorized)
+    }
+
+    private fun acknowledgeLinkNotice(authToken: String) = mockMvc.perform(
+        delete("/api/users/me/link-notice").header("Authorization", "Bearer $authToken")
+    )
+
+    @Test
+    fun `should tell the removed password on every Google sign in until the app acknowledges it`() {
+        signUp()
+        signInWithGoogle().andExpect(jsonPath("$.passwordRemoved").value(true))
+
+        // That answer was lost: the next Google sign in tells it again
+        val again = session(signInWithGoogle().andExpect(jsonPath("$.passwordRemoved").value(true)).andReturn())
+
+        acknowledgeLinkNotice(again.authToken).andExpect(status().isNoContent)
+
+        signInWithGoogle().andExpect(jsonPath("$.passwordRemoved").value(false))
+        assertEquals(false, userRepository.findById(testEmail).orElseThrow().linkNoticePending)
+    }
+
+    @Test
+    fun `should require authentication to acknowledge the link notice`() {
+        mockMvc.perform(delete("/api/users/me/link-notice")).andExpect(status().isUnauthorized)
     }
 }

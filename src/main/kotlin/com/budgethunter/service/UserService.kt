@@ -16,7 +16,6 @@ import com.budgethunter.model.User
 import com.budgethunter.privacy.currentPolicyVersionOrNull
 import com.budgethunter.privacy.privacyPolicyNow
 import com.budgethunter.repository.PrivacyPolicyAcceptanceRepository
-import com.budgethunter.repository.UserBudgetRepository
 import com.budgethunter.repository.UserRepository
 import com.budgethunter.util.GoogleTokenVerifier
 import com.budgethunter.util.JwtUtil
@@ -38,7 +37,7 @@ class UserService(
     private val jwtUtil: JwtUtil,
     private val googleTokenVerifier: GoogleTokenVerifier,
     private val privacyPolicyAcceptanceRepository: PrivacyPolicyAcceptanceRepository,
-    private val userBudgetRepository: UserBudgetRepository,
+    private val linkNoticeService: GoogleLinkNoticeService,
     private val eventPublisher: ApplicationEventPublisher,
     private val clock: Clock = Clock.systemUTC()
 ) {
@@ -109,7 +108,8 @@ class UserService(
      *
      * Linking an account that had a password but no Google subject yet also removes that password, ends every
      * session it had (see [linkGoogle]); the response says so in `passwordRemoved` and lists the budgets the account
-     * shares with someone in `sharedBudgets`.
+     * shares with someone in `sharedBudgets`. Every Google sign-in answers that again until the app acknowledges it
+     * ([GoogleLinkNoticeService]), so a lost answer is told by the next one.
      */
     @Transactional
     fun signInWithGoogle(request: GoogleSignInRequest): SignInResponse {
@@ -123,7 +123,7 @@ class UserService(
         }
 
         val email = info.email.lowercase()
-        var sharedBudgets: List<SharedBudgetNotice>? = null
+        var linkedNow = false
         val acceptedVersion = currentPolicyVersionOrNull(request.acceptedPrivacyPolicyVersion)
 
         val existingUser = userRepository.findByGoogleSubject(info.subject).orElse(null)
@@ -137,7 +137,7 @@ class UserService(
             }
             // Locked, so a password being set on the account at this moment waits for the link (see setPassword).
             ?: userRepository.lockForUpdate(email)?.also { existing ->
-                sharedBudgets = linkGoogle(existing, info.subject)
+                linkedNow = linkGoogle(existing, info.subject)
             }
         // An existing account records the acceptance only if it lacks this version (the update's own condition), so
         // the date of its first acceptance stays. Done before issueSession's save, which flushes the link above too.
@@ -164,24 +164,25 @@ class UserService(
                 DuplicateEmailException("Account was created by another request, please try again")
             }
 
-        val passwordRemoved = sharedBudgets != null
-        if (passwordRemoved) {
+        if (linkedNow) {
             // Closes the account's open event streams once the link is committed (ReactiveSseService); its access
             // and refresh tokens already stopped working with the version raised above.
             eventPublisher.publishEvent(SessionsEndedEvent(user.email))
             logger.info("Linked Google to an account with a password of unknown origin: password removed, sessions ended")
         }
-        return issueSession(user, passwordRemoved, sharedBudgets.orEmpty())
+        // Read again on every Google sign-in while pending, so the list is what is shared now
+        val sharedBudgets = if (user.linkNoticePending) linkNoticeService.sharedBudgetsOf(user.email) else emptyList()
+        return issueSession(user, user.linkNoticePending, sharedBudgets)
     }
 
     /**
-     * Links the Google account [subject] to [user], found by its email. Returns null when the password stays, else
-     * the budgets the account shares with someone (empty when none).
+     * Links the Google account [subject] to [user], found by its email. Returns true when it removed the password.
      *
      * Sign-up with a password never proves who owns the email, so an account that had a password and no Google
      * subject may have been opened by someone else with the victim's address, waiting for the victim to sign in
      * with Google and fill it ("pre-account hijacking"). Google has just proven who controls the email; the
-     * password may be anybody's. So it is removed, the account becomes GOOGLE, and [User.tokenVersion] is raised,
+     * password may be anybody's. So it is removed, the account becomes GOOGLE, [User.tokenVersion] is raised and
+     * [User.linkNoticePending] set,
      * which ends every access token issued before (the refresh token is replaced by the new session anyway). The
      * owner can set a password again without the old one (setPassword, `POST /api/users/password`).
      *
@@ -194,24 +195,21 @@ class UserService(
      * An account that already had a Google subject only changes subject: its password, if any, was set while
      * signed in with Google (setPassword). An account without a password is linked as before.
      */
-    private fun linkGoogle(user: User, subject: String): List<SharedBudgetNotice>? {
+    private fun linkGoogle(user: User, subject: String): Boolean {
         val passwordOfUnknownOrigin = user.googleSubject == null && user.password != null
         user.googleSubject = subject
         if (passwordOfUnknownOrigin) {
             user.password = null
             user.tokenVersion += 1
+            user.linkNoticePending = true
         }
         user.authProvider = if (user.password != null) AuthProvider.PASSWORD_AND_GOOGLE else AuthProvider.GOOGLE
-        if (!passwordOfUnknownOrigin) return null
+        if (!passwordOfUnknownOrigin) return false
 
-        val shared = userBudgetRepository.findOtherMembersOfBudgetsOf(user.email)
-            .groupBy { it.budgetId }
-            .map { (budgetId, rows) ->
-                SharedBudgetNotice(budgetId, rows.first().budgetName, rows.first().ownerEmail, rows.map { it.memberEmail })
-            }
+        val shared = linkNoticeService.sharedBudgetsOf(user.email)
         if (shared.any { it.budgetId == user.defaultBudgetId }) user.defaultBudgetId = null
         logger.info("Linked account shares {} budgets with others", shared.size)
-        return shared
+        return true
     }
 
     fun getCurrentUser(email: String): CurrentUserResponse =
@@ -250,6 +248,8 @@ class UserService(
         user.password?.let { requireCurrentPassword(request.currentPassword, it) }
 
         user.password = passwordEncoder.encode(request.newPassword)
+        // "Your password was turned off" would be wrong from now on
+        user.linkNoticePending = false
         user.authProvider = if (user.googleSubject != null) {
             AuthProvider.PASSWORD_AND_GOOGLE
         } else {

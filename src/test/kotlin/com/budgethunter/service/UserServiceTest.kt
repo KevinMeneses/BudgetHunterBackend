@@ -65,7 +65,7 @@ class UserServiceTest {
             jwtUtil,
             googleTokenVerifier,
             privacyPolicyAcceptanceRepository,
-            userBudgetRepository,
+            GoogleLinkNoticeService(userRepository, userBudgetRepository),
             eventPublisher
         )
     }
@@ -476,6 +476,7 @@ class UserServiceTest {
         assertEquals("google-sub-123", existing.googleSubject)
         assertNull(existing.password)
         assertEquals(1, existing.tokenVersion)
+        assertTrue(existing.linkNoticePending)
         assertTrue(result.passwordRemoved)
         verify(exactly = 1) { jwtUtil.generateToken("test@example.com", 1) }
         verify(exactly = 1) { eventPublisher.publishEvent(SessionsEndedEvent("test@example.com")) }
