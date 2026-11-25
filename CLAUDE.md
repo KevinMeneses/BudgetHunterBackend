@@ -181,7 +181,8 @@ src/main/kotlin/com/budgethunter/
   the first answer can be lost (no connection, app killed mid-request) and the user would never learn the password is
   gone. The app clears it with `DELETE /api/users/me/link-notice` once it has stored the notice
   (`GoogleLinkNoticeService`); setting a password clears it too. Older apps never acknowledge, so for them it stays
-  set, which only repeats a field they ignore.
+  set, which only repeats a field they ignore. A repeat does not clear the default budget again: that happens only at
+  the link, and the user may have chosen a shared one since.
 - **Races:** `User` is `@DynamicUpdate`, so a save writes only what it changed (a preference saved at the moment of
   the link cannot put the password back). The link and `setPassword` lock the row (`lockForUpdate`), and
   `setPassword` rechecks the token's version under the lock.

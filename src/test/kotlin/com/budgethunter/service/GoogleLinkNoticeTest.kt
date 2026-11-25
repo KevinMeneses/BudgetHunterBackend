@@ -107,6 +107,13 @@ class GoogleLinkNoticeTest {
     }
 
     @Test
+    fun `acknowledging for an unknown account does nothing`() {
+        every { userRepository.findById("gone@example.com") } returns Optional.empty()
+
+        linkNoticeService.acknowledge("gone@example.com")
+    }
+
+    @Test
     fun `setting a password ends a pending notice`() {
         val user = linkedUser()
         every { userRepository.lockForUpdate("test@example.com") } returns user

@@ -106,6 +106,7 @@ class GoogleAuthenticationIntegrationTest {
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.email").value(testEmail))
             .andExpect(jsonPath("$.name").value(testName))
+            .andExpect(jsonPath("$.passwordRemoved").value(false))
             .andReturn()
 
         val response = objectMapper.readValue(result.response.contentAsString, SignInResponse::class.java)
