@@ -12,6 +12,7 @@ import com.budgethunter.exception.DuplicateEmailException
 import com.budgethunter.filter.SessionCredentials
 import com.budgethunter.model.AuthProvider
 import com.budgethunter.service.AccountDeletionService
+import com.budgethunter.service.GoogleLinkNoticeService
 import com.budgethunter.service.UserService
 import io.mockk.Runs
 import io.mockk.clearAllMocks
@@ -34,12 +35,14 @@ class UserControllerTest {
     private lateinit var userService: UserService
     private lateinit var accountDeletionService: AccountDeletionService
     private lateinit var userController: UserController
+    private lateinit var linkNoticeService: GoogleLinkNoticeService
 
     @BeforeEach
     fun setup() {
         userService = mockk()
         accountDeletionService = mockk()
-        userController = UserController(userService, accountDeletionService, mockk(relaxed = true))
+        linkNoticeService = mockk()
+        userController = UserController(userService, accountDeletionService, mockk(relaxed = true), linkNoticeService)
     }
 
     @AfterEach
@@ -353,5 +356,15 @@ class UserControllerTest {
 
         assertEquals(HttpStatus.NO_CONTENT, response.statusCode)
         verify(exactly = 1) { accountDeletionService.deleteAccount("test@example.com") }
+    }
+
+    @Test
+    fun `acknowledgeLinkNotice clears the caller's notice and answers 204`() {
+        every { linkNoticeService.acknowledge("test@example.com") } just Runs
+
+        val response = userController.acknowledgeLinkNotice(authenticationFor("test@example.com"))
+
+        assertEquals(HttpStatus.NO_CONTENT, response.statusCode)
+        verify(exactly = 1) { linkNoticeService.acknowledge("test@example.com") }
     }
 }

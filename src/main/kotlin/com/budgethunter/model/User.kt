@@ -57,6 +57,11 @@ data class User(
     @field:Column(name = "token_version", nullable = false)
     var tokenVersion: Int = 0,
 
+    // A Google sign-in removed the password and the app has not yet confirmed telling the user: every Google sign-in
+    // answers passwordRemoved until then. See V10__add_link_notice_pending.sql and GoogleLinkNoticeService.
+    @field:Column(name = "link_notice_pending", nullable = false)
+    var linkNoticePending: Boolean = false,
+
     // App preferences. Null means the account never saved one, which is how a client tells a
     // fresh account (upload the device's values) from a chosen setting (adopt it).
     @field:Column(name = "sms_reading_enabled")
